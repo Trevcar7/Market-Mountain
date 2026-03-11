@@ -1,5 +1,5 @@
 {
-  "name": "market-mountain-tmp",
+  "name": "market-mountain",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,9 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
+    "date-fns": "^4.1.0",
+    "gray-matter": "^4.0.3",
     "next": "16.1.6",
+    "next-mdx-remote": "^6.0.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "reading-time": "^1.5.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
