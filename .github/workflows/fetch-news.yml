@@ -29,7 +29,7 @@ jobs:
           response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets.FETCH_NEWS_SECRET }}" \
             -H "Content-Type: application/json" \
-            https://market-mountain.com/api/fetch-news)
+            https://marketmountainfinance.com/api/fetch-news)
           echo "Response status: $response"
           if [ "$response" != "200" ]; then
             echo "Error: API returned status $response"
