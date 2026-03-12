@@ -1,5 +1,4 @@
 import { NewsItem } from "@/lib/news-types";
-import Link from "next/link";
 
 interface NewsCardProps {
   news: NewsItem;
@@ -7,12 +6,10 @@ interface NewsCardProps {
 }
 
 export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
-  const isExternal = true; // News items link to external sources
-
   const sentimentColor = {
-    positive: "bg-emerald-50 border-emerald-200",
-    negative: "bg-red-50 border-red-200",
-    neutral: "bg-slate-50 border-slate-200",
+    positive: "border-emerald-200 bg-emerald-50/50",
+    negative: "border-red-200 bg-red-50/50",
+    neutral: "border-slate-200 bg-slate-50/50",
   }[news.sentiment || "neutral"];
 
   const sentimentBadgeColor = {
@@ -21,138 +18,91 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
     neutral: "bg-slate-100 text-slate-700",
   }[news.sentiment || "neutral"];
 
-  const importanceBadgeColor = {
-    high: news.importance >= 8 ? "bg-accent-100 text-accent-700" : "",
-    medium:
-      news.importance >= 5 && news.importance < 8
-        ? "bg-blue-100 text-blue-700"
-        : "",
-    low: news.importance < 5 ? "bg-slate-100 text-slate-700" : "",
-  };
+  const categoryColor = {
+    macro: "bg-blue-100 text-blue-700",
+    earnings: "bg-purple-100 text-purple-700",
+    markets: "bg-amber-100 text-amber-700",
+    policy: "bg-teal-100 text-teal-700",
+    crypto: "bg-orange-100 text-orange-700",
+    other: "bg-slate-100 text-slate-700",
+  }[news.category] || "bg-slate-100 text-slate-700";
 
-  const badges = [];
-  if (news.importance >= 8) {
-    badges.push({
-      text: `Importance: ${news.importance}/10`,
-      color: "bg-accent-100 text-accent-700",
-    });
-  }
-  if (news.sentiment) {
-    badges.push({
-      text: news.sentiment.charAt(0).toUpperCase() + news.sentiment.slice(1),
-      color: sentimentBadgeColor,
-    });
-  }
-  if (news.factCheckScore >= 85) {
-    badges.push({
-      text: `Verified: ${news.factCheckScore}%`,
-      color: "bg-green-100 text-green-700",
-    });
-  }
+  const sourceNames = news.sourcesUsed
+    .map((src) => src.source)
+    .filter((src, i, arr) => arr.indexOf(src) === i) // Remove duplicates
+    .join(", ");
 
   return (
     <article
-      className={`flex flex-col gap-3 rounded-lg border p-4 transition-shadow hover:shadow-md ${sentimentColor}`}
+      className={`flex flex-col gap-4 rounded-lg border p-6 transition-shadow hover:shadow-lg ${sentimentColor}`}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <h3 className="font-playfair text-lg font-semibold text-navy-900 line-clamp-2">
-            {news.title}
-          </h3>
-          <p className="text-sm text-slate-600 mt-1">
-            {news.sourcesUsed[0]?.source || "Financial News"}
-          </p>
-        </div>
+      {/* Headline */}
+      <div>
+        <h3 className="font-playfair text-xl sm:text-2xl font-bold text-navy-900 mb-3 leading-snug">
+          {news.title}
+        </h3>
+      </div>
 
-        {/* External link icon */}
-        <a
-          href={news.sourcesUsed[0]?.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-shrink-0 text-slate-400 hover:text-accent-500 transition-colors"
-          aria-label="Read original story"
+      {/* Story body - full text */}
+      <div className="prose prose-sm max-w-none">
+        <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+          {news.story}
+        </p>
+      </div>
+
+      {/* Badges row */}
+      <div className="flex flex-wrap gap-2">
+        <span
+          className={`inline-block px-3 py-1 text-xs font-semibold rounded-full capitalize ${categoryColor}`}
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-            />
-          </svg>
-        </a>
-      </div>
-
-      {/* Story excerpt */}
-      <p className="text-sm text-slate-700 line-clamp-3">{news.story}</p>
-
-      {/* Badges */}
-      <div className="flex flex-wrap gap-2 mt-1">
-        {badges.map((badge, i) => (
+          {news.category}
+        </span>
+        {news.sentiment && (
           <span
-            key={i}
-            className={`inline-block px-2.5 py-1 text-xs font-medium rounded ${badge.color}`}
+            className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${sentimentBadgeColor}`}
           >
-            {badge.text}
+            {news.sentiment.charAt(0).toUpperCase() + news.sentiment.slice(1)}
           </span>
-        ))}
-      </div>
-
-      {/* Footer: metadata */}
-      <div className="flex items-center justify-between text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200/50">
-        <div className="flex gap-2">
-          <span className="capitalize">{news.category}</span>
-          <span>•</span>
-          <time dateTime={news.publishedAt}>
-            {new Date(news.publishedAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-            })}
-          </time>
-        </div>
-
-        {/* Related tickers */}
-        {news.relatedTickers && news.relatedTickers.length > 0 && (
-          <div className="flex gap-1">
-            {news.relatedTickers.slice(0, 3).map((ticker) => (
-              <span
-                key={ticker}
-                className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-xs font-mono"
-              >
-                {ticker}
-              </span>
-            ))}
-          </div>
         )}
       </div>
 
-      {/* Sources used */}
-      {news.sourcesUsed.length > 1 && (
-        <div className="text-xs text-slate-500 mt-1 pt-1 border-t border-slate-200/50">
-          <span className="text-slate-400">Sources: </span>
-          {news.sourcesUsed.map((src, i) => (
-            <span key={i}>
-              <a
-                href={src.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-600 hover:text-accent-500 underline"
-              >
-                {src.source}
-              </a>
-              {i < news.sourcesUsed.length - 1 && ", "}
+      {/* Tickers row */}
+      {news.relatedTickers && news.relatedTickers.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {news.relatedTickers.map((ticker) => (
+            <span
+              key={ticker}
+              className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded text-xs font-mono font-semibold"
+            >
+              {ticker}
             </span>
           ))}
         </div>
       )}
+
+      {/* Divider */}
+      <div className="border-t border-slate-200/50" />
+
+      {/* Metadata footer */}
+      <div className="flex items-center justify-between text-xs text-slate-600">
+        <time dateTime={news.publishedAt}>
+          {new Date(news.publishedAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}
+        </time>
+      </div>
+
+      {/* Source attribution */}
+      <div className="text-xs text-slate-600 pt-2 border-t border-slate-200/50">
+        <p>
+          <span className="text-slate-500">Based on analysis of </span>
+          <span className="font-medium text-slate-700">{sourceNames}</span>
+        </p>
+      </div>
     </article>
   );
 }

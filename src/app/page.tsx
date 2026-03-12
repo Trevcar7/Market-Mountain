@@ -41,6 +41,46 @@ export default function HomePage() {
       {/* Divider strip */}
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
+      {/* Market News */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+        <div className="flex items-baseline justify-between mb-8 sm:mb-10">
+          <h2
+            className="text-2xl sm:text-3xl font-bold text-navy-900"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          >
+            Market News
+          </h2>
+          <Link
+            href="/news"
+            className="text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors hidden sm:inline-flex items-center gap-1"
+          >
+            View all
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </Link>
+        </div>
+
+        <NewsSection
+          limit={6}
+          showCategories={false}
+          showSort={false}
+        />
+
+        {/* Mobile "view all" link */}
+        <div className="mt-8 text-center sm:hidden">
+          <Link
+            href="/news"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
+          >
+            View all news
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </Link>
+        </div>
+      </section>
+
       {/* Latest Posts */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
         <div className="flex items-baseline justify-between mb-8 sm:mb-10">
@@ -90,46 +130,6 @@ export default function HomePage() {
             className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
           >
             View all articles
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </Link>
-        </div>
-      </section>
-
-      {/* Market News */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
-        <div className="flex items-baseline justify-between mb-8 sm:mb-10">
-          <h2
-            className="text-2xl sm:text-3xl font-bold text-navy-900"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-          >
-            Market News
-          </h2>
-          <Link
-            href="/news"
-            className="text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors hidden sm:inline-flex items-center gap-1"
-          >
-            View all
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </Link>
-        </div>
-
-        <NewsSection
-          limit={6}
-          showCategories={false}
-          showSort={false}
-        />
-
-        {/* Mobile "view all" link */}
-        <div className="mt-8 text-center sm:hidden">
-          <Link
-            href="/news"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
-          >
-            View all news
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>

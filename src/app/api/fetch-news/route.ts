@@ -262,6 +262,20 @@ async function loadNewsWithArchival(
 }
 
 /**
+ * Simple hash function for deduplication
+ */
+function hashContent(text: string): string {
+  let hash = 0;
+  const str = text.substring(0, 200); // Use first 200 chars
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString();
+}
+
+/**
  * Merge new stories with existing, avoiding duplicates
  */
 function mergeNewsWithDedup(stories: NewsItem[]): NewsItem[] {
@@ -269,9 +283,13 @@ function mergeNewsWithDedup(stories: NewsItem[]): NewsItem[] {
   const merged: NewsItem[] = [];
 
   for (const story of stories) {
-    // Use title as dedup key
-    if (!seen.has(story.title.toLowerCase())) {
-      seen.add(story.title.toLowerCase());
+    // Deduplicate by both title and story content hash
+    const titleKey = story.title.toLowerCase();
+    const contentHash = hashContent(story.story);
+    const uniqueKey = `${titleKey}|${contentHash}`;
+
+    if (!seen.has(uniqueKey)) {
+      seen.add(uniqueKey);
       merged.push(story);
     }
   }

@@ -48,18 +48,6 @@ export default function NewsPage() {
         />
       </section>
 
-      {/* Footer note */}
-      <section className="bg-slate-50 py-8 border-t border-slate-200">
-        <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-          <p className="text-sm text-slate-600">
-            <strong>Disclaimer:</strong> News articles are synthesized from
-            reputable financial sources (Finnhub, NewsAPI) using AI analysis.
-            All claims are fact-checked against source materials. This is not
-            financial advice. Always conduct your own research and consult with
-            a financial advisor before making investment decisions.
-          </p>
-        </div>
-      </section>
     </main>
   );
 }
