@@ -88,16 +88,23 @@ async function handleNewsFetch() {
     stats.fetchedFinnhub = finnhubArticles.length;
     stats.fetchedNewsAPI = newsapiArticles.length;
 
+    console.log(`[fetch-news] Fetched: Finnhub=${finnhubArticles.length}, NewsAPI=${newsapiArticles.length}`);
+
     // 2. Combine and filter
     const allArticles = [...finnhubArticles, ...newsapiArticles];
     const relevant = filterByRelevance(allArticles);
     stats.filtered = relevant.length;
 
+    console.log(`[fetch-news] After filterByRelevance: ${relevant.length} articles passed filter`);
+
     // 3. Deduplicate
     const unique = deduplicateNews(relevant);
     stats.deduplicated = unique.length;
 
+    console.log(`[fetch-news] After deduplication: ${unique.length} unique articles`);
+
     if (unique.length === 0) {
+      console.warn("[fetch-news] No relevant news found after filtering & dedup");
       return NextResponse.json({
         message: "No relevant news found",
         stats,
@@ -106,12 +113,16 @@ async function handleNewsFetch() {
 
     // 4. Group related articles
     const grouped = groupRelatedArticles(unique);
+    console.log(`[fetch-news] Grouped into ${grouped.length} topic groups`);
 
-    // 5. Synthesize with Gemini
+    // 5. Synthesize with Claude
+    console.log(`[fetch-news] Starting synthesis on ${grouped.length} groups (max 5 will be processed)`);
     const { stories, stats: synthStats } = await synthesizeGroupedArticles(grouped);
     stats.posted = synthStats.posted;
     stats.rejected = synthStats.rejected;
     stats.errors = synthStats.errors;
+
+    console.log(`[fetch-news] Synthesis complete: posted=${synthStats.posted}, rejected=${synthStats.rejected}, errors=${synthStats.errors}`);
 
     // 6. Load existing news and archive old stories
     const { active, archived } = await loadNewsWithArchival(kv);
@@ -161,6 +172,9 @@ async function handleNewsFetch() {
 
     if (kv) {
       await kv.set("news", newsCollection);
+      console.log(`[fetch-news] Saved ${sortedStories.length} active stories to Redis KV`);
+    } else {
+      console.warn("[fetch-news] KV client not initialized - news not saved to Redis");
     }
 
     // 11. Save archive to KV
@@ -186,10 +200,13 @@ async function handleNewsFetch() {
 
       if (kv) {
         await kv.set("news-archive", archiveCollection);
+        console.log(`[fetch-news] Saved ${archiveStories.length} archived stories to Redis KV`);
       }
     }
 
     stats.executionMs = Date.now() - startTime;
+
+    console.log(`[fetch-news] FINAL STATS: ${JSON.stringify(stats)}`);
 
     return NextResponse.json({
       success: true,
@@ -198,7 +215,7 @@ async function handleNewsFetch() {
       nextUpdate: newsCollection.meta.nextUpdate,
     });
   } catch (error) {
-    console.error("News fetch error:", error);
+    console.error("[fetch-news] Fatal error:", error);
     stats.executionMs = Date.now() - startTime;
 
     return NextResponse.json(

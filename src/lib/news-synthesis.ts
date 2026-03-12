@@ -117,6 +117,8 @@ export async function synthesizeGroupedArticles(
     try {
       const formattedArticles = formatNewsForStorage(group.articles);
 
+      console.log(`[synthesis] Processing group: "${group.topic}" (${group.articles.length} articles, importance=${group.importance})`);
+
       const systemPrompt = createSystemPrompt(toneProfile);
       const userPrompt = createUserPrompt(group, formattedArticles);
 
@@ -128,9 +130,11 @@ export async function synthesizeGroupedArticles(
 
       if (!synthesizedText || synthesizedText.length < 50) {
         stats.errors++;
-        console.error(`Synthesis failed for "${group.topic}"`);
+        console.error(`[synthesis] Synthesis failed for "${group.topic}" - text length: ${synthesizedText?.length || 0}`);
         continue;
       }
+
+      console.log(`[synthesis] Generated ${synthesizedText.length} chars for "${group.topic}"`);
 
       const claims = extractClaimsFromStory(synthesizedText);
 
@@ -138,8 +142,12 @@ export async function synthesizeGroupedArticles(
 
       scoreFactCheckResult([]);
 
+      console.log(`[synthesis] Fact-check score for "${group.topic}": ${overallScore}`);
+
       if (shouldRejectStory(overallScore, 75)) {
         stats.rejected++;
+
+        console.warn(`[synthesis] Story rejected: "${group.topic}" - fact-check score ${overallScore} < 75 threshold`);
 
         logRejection(
           group.topic,
@@ -179,13 +187,17 @@ export async function synthesizeGroupedArticles(
 
       stats.posted++;
 
+      console.log(`[synthesis] ✓ Story posted for "${group.topic}" (${newsItem.relatedTickers?.join(", ") || "no tickers"})`);
+
       await sleep(2000);
     } catch (error) {
       stats.errors++;
 
-      console.error(`Error synthesizing "${group.topic}":`, error);
+      console.error(`[synthesis] Exception synthesizing "${group.topic}":`, error instanceof Error ? error.message : String(error));
     }
   }
+
+  console.log(`[synthesis] Summary: processed=${groupsToProcess.length}, posted=${stats.posted}, rejected=${stats.rejected}, errors=${stats.errors}`);
 
   return { stories, stats };
 }
