@@ -49,7 +49,7 @@ export async function synthesizeGroupedArticles(
 
   const toneProfile = await getToneProfile();
   const client = initGeminiClient();
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   for (const group of groupedNews) {
     try {
