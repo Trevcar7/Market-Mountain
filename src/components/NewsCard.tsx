@@ -1,108 +1,136 @@
 import { NewsItem } from "@/lib/news-types";
+import Link from "next/link";
 
 interface NewsCardProps {
   news: NewsItem;
   variant?: "default" | "featured";
 }
 
+const categoryGradients: Record<string, string> = {
+  macro: "from-blue-900 via-blue-950 to-navy-900",
+  earnings: "from-purple-900 via-purple-950 to-navy-900",
+  markets: "from-amber-900 via-amber-950 to-navy-900",
+  policy: "from-teal-900 via-teal-950 to-navy-900",
+  crypto: "from-orange-900 via-orange-950 to-navy-900",
+  other: "from-slate-800 via-slate-900 to-navy-900",
+};
+
+const categoryLabels: Record<string, string> = {
+  macro: "Macro Economics",
+  earnings: "Earnings",
+  markets: "Markets",
+  policy: "Policy & Economics",
+  crypto: "Crypto",
+  other: "Market News",
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
-  const sentimentColor = {
-    positive: "border-emerald-200 bg-emerald-50/50",
-    negative: "border-red-200 bg-red-50/50",
-    neutral: "border-slate-200 bg-slate-50/50",
-  }[news.sentiment || "neutral"];
+  const href = `/news/${news.id}`;
+  const gradient = categoryGradients[news.category] ?? categoryGradients.other;
+  const categoryLabel = categoryLabels[news.category] ?? "Market News";
 
-  const sentimentBadgeColor = {
-    positive: "bg-emerald-100 text-emerald-700",
-    negative: "bg-red-100 text-red-700",
-    neutral: "bg-slate-100 text-slate-700",
-  }[news.sentiment || "neutral"];
-
-  const categoryColor = {
-    macro: "bg-blue-100 text-blue-700",
-    earnings: "bg-purple-100 text-purple-700",
-    markets: "bg-amber-100 text-amber-700",
-    policy: "bg-teal-100 text-teal-700",
-    crypto: "bg-orange-100 text-orange-700",
-    other: "bg-slate-100 text-slate-700",
-  }[news.category] || "bg-slate-100 text-slate-700";
+  // Excerpt: first sentence of the story
+  const excerpt = news.story.split(/(?<=[.!?])\s/)[0] || news.story.substring(0, 180);
 
   const sourceNames = news.sourcesUsed
-    .map((src) => src.source)
-    .filter((src, i, arr) => arr.indexOf(src) === i) // Remove duplicates
+    .map((s) => s.source)
+    .filter((s, i, arr) => arr.indexOf(s) === i)
     .join(", ");
 
+  if (variant === "featured") {
+    return (
+      <Link
+        href={href}
+        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300"
+        style={{ minHeight: 360 }}
+      >
+        {/* Gradient background */}
+        <div
+          className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-60 group-hover:opacity-70 transition-opacity duration-500`}
+        />
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
+
+        {/* Content at bottom */}
+        <div className="absolute inset-0 flex flex-col justify-end p-7 sm:p-10">
+          <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-300 bg-white/10 px-2 py-0.5 rounded mb-4 w-fit">
+            {categoryLabel}
+          </span>
+
+          <h2
+            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-3 group-hover:text-accent-300 transition-colors duration-200"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          >
+            {news.title}
+          </h2>
+
+          <p className="text-white/55 text-sm leading-relaxed mb-5 line-clamp-2 hidden sm:block">
+            {excerpt}
+          </p>
+
+          <div className="flex items-center gap-3 text-white/40 text-[11px] tracking-wide">
+            <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
+            <span className="w-3 h-px bg-white/20" aria-hidden="true" />
+            <span>{sourceNames}</span>
+            <span className="ml-auto flex items-center gap-1.5 text-accent-400 text-xs font-semibold group-hover:gap-2.5 transition-all duration-200">
+              Read story
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   return (
-    <article
-      className={`flex flex-col gap-4 rounded-lg border p-6 transition-shadow hover:shadow-lg ${sentimentColor}`}
+    <Link
+      href={href}
+      className="group flex flex-col rounded-lg bg-card border border-border hover:border-navy-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
     >
-      {/* Headline */}
-      <div>
-        <h3 className="font-playfair text-xl sm:text-2xl font-bold text-navy-900 mb-3 leading-snug">
+      {/* Gradient "cover image" — 16:9 */}
+      <div className={`relative w-full aspect-video overflow-hidden bg-gradient-to-br ${gradient}`}>
+        <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-500 bg-gradient-to-br opacity-100" />
+        {/* Category label in bottom-left */}
+        <div className="absolute inset-0 flex items-end p-3">
+          <span className="text-[10px] font-semibold tracking-widest uppercase text-white/50">
+            {categoryLabel}
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-col flex-1 p-4 sm:p-5">
+        <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-700 bg-accent-100 px-2 py-0.5 rounded mb-2.5 w-fit">
+          {categoryLabel}
+        </span>
+
+        <h3
+          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-2 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+        >
           {news.title}
         </h3>
-      </div>
 
-      {/* Story body - full text */}
-      <div className="prose prose-sm max-w-none">
-        <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-          {news.story}
+        <p className="text-text-muted text-sm leading-relaxed line-clamp-2 flex-1 hidden sm:block">
+          {excerpt}
         </p>
-      </div>
 
-      {/* Badges row */}
-      <div className="flex flex-wrap gap-2">
-        <span
-          className={`inline-block px-3 py-1 text-xs font-semibold rounded-full capitalize ${categoryColor}`}
-        >
-          {news.category}
-        </span>
-        {news.sentiment && (
-          <span
-            className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${sentimentBadgeColor}`}
-          >
-            {news.sentiment.charAt(0).toUpperCase() + news.sentiment.slice(1)}
-          </span>
-        )}
-      </div>
-
-      {/* Tickers row */}
-      {news.relatedTickers && news.relatedTickers.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {news.relatedTickers.map((ticker) => (
-            <span
-              key={ticker}
-              className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded text-xs font-mono font-semibold"
-            >
-              {ticker}
-            </span>
-          ))}
+        <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 pt-3 border-t border-border/60">
+          <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
+          <span className="w-3 h-px bg-border-2" aria-hidden="true" />
+          <span className="truncate">{sourceNames}</span>
         </div>
-      )}
-
-      {/* Divider */}
-      <div className="border-t border-slate-200/50" />
-
-      {/* Metadata footer */}
-      <div className="flex items-center justify-between text-xs text-slate-600">
-        <time dateTime={news.publishedAt}>
-          {new Date(news.publishedAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          })}
-        </time>
       </div>
-
-      {/* Source attribution */}
-      <div className="text-xs text-slate-600 pt-2 border-t border-slate-200/50">
-        <p>
-          <span className="text-slate-500">Based on analysis of </span>
-          <span className="font-medium text-slate-700">{sourceNames}</span>
-        </p>
-      </div>
-    </article>
+    </Link>
   );
 }
