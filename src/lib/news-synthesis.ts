@@ -1,24 +1,34 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { GroupedNews, NewsItem, NewsSource } from "./news-types";
+import Anthropic from "@anthropic-ai/sdk";
+import { GroupedNews, NewsItem } from "./news-types";
 import { analyzeTone, formatToneForPrompt, ToneProfile } from "./tone-analyzer";
-import { extractClaimsFromStory, verifyClaims, scoreFactCheckResult, shouldRejectStory, logRejection } from "./fact-checker";
+import {
+  extractClaimsFromStory,
+  verifyClaims,
+  scoreFactCheckResult,
+  shouldRejectStory,
+  logRejection,
+} from "./fact-checker";
 import { formatNewsForStorage } from "./news";
 
-let genAI: GoogleGenerativeAI | null = null;
+let anthropic: Anthropic | null = null;
 let cachedToneProfile: ToneProfile | null = null;
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Initialize Gemini client
+ * Initialize Anthropic client
  */
-export function initGeminiClient(): GoogleGenerativeAI {
-  if (!genAI) {
-    const apiKey = process.env.GEMINI_API_KEY;
+export function initAnthropicClient(): Anthropic {
+  if (!anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is required");
+      throw new Error("ANTHROPIC_API_KEY environment variable is required");
     }
-    genAI = new GoogleGenerativeAI(apiKey);
+    anthropic = new Anthropic({ apiKey });
   }
-  return genAI;
+  return anthropic;
 }
 
 /**
@@ -32,6 +42,80 @@ async function getToneProfile(): Promise<ToneProfile> {
 }
 
 /**
+ * Basic quality filter so we do not waste model calls on junk topics
+ */
+function isWeakTopic(topic: string): boolean {
+  const t = topic.trim().toLowerCase();
+  if (t.length < 12) return true;
+
+  const weak = new Set([
+    "fed",
+    "rate",
+    "rates",
+    "earnings",
+    "inflation",
+    "markets",
+    "stocks",
+    "crypto",
+  ]);
+
+  return weak.has(t);
+}
+
+/**
+ * Call Claude with one retry for transient failures
+ */
+async function synthesizeWithClaude(
+  client: Anthropic,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const maxAttempts = 2;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 500,
+        temperature: 0.7,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: userPrompt,
+          },
+        ],
+      });
+
+      const text = response.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("\n")
+        .trim();
+
+      if (!text) {
+        throw new Error("empty response");
+      }
+
+      return text;
+    } catch (error: any) {
+      const isLastAttempt = attempt === maxAttempts;
+      const status = error?.status;
+
+      if (isLastAttempt || (status !== 429 && status !== 500 && status !== 502 && status !== 503 && status !== 504)) {
+        throw error;
+      }
+
+      const retryDelayMs = 8000 * attempt;
+      console.warn(`Claude call failed (attempt ${attempt}). Retrying in ${retryDelayMs}ms...`);
+      await sleep(retryDelayMs);
+    }
+  }
+
+  throw new Error("Failed to synthesize after retries");
+}
+
+/**
  * Main synthesis function: group articles and synthesize into original stories
  */
 export async function synthesizeGroupedArticles(
@@ -42,52 +126,45 @@ export async function synthesizeGroupedArticles(
     posted: number;
     rejected: number;
     errors: number;
+    skipped: number;
+    retried: number;
   };
 }> {
   const stories: NewsItem[] = [];
-  const stats = { posted: 0, rejected: 0, errors: 0 };
+  const stats = {
+    posted: 0,
+    rejected: 0,
+    errors: 0,
+    skipped: 0,
+    retried: 0,
+  };
 
   const toneProfile = await getToneProfile();
-  const client = initGeminiClient();
- const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const client = initAnthropicClient();
 
-  for (const group of groupedNews) {
+  const rankedGroups = [...groupedNews]
+    .filter((group) => !isWeakTopic(group.topic))
+    .sort((a, b) => {
+      const importanceDiff = (b.importance ?? 0) - (a.importance ?? 0);
+      if (importanceDiff !== 0) return importanceDiff;
+      return (b.articles?.length ?? 0) - (a.articles?.length ?? 0);
+    })
+    .slice(0, 5);
+
+  stats.skipped = Math.max(0, groupedNews.length - rankedGroups.length);
+
+  for (const [index, group] of rankedGroups.entries()) {
     try {
-      // Convert articles to formatted structure
       const formattedArticles = formatNewsForStorage(group.articles);
 
-      // Create synthesis prompt
       const systemPrompt = createSystemPrompt(toneProfile);
       const userPrompt = createUserPrompt(group, formattedArticles);
 
-      // Call Gemini
-      const response = await model.generateContent({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: systemPrompt + "\n\n" + userPrompt,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          maxOutputTokens: 500,
-          temperature: 0.7,
-        },
-      });
-
-      let synthesizedText = "";
-      try {
-        const responseData = response as any;
-        synthesizedText =
-          responseData?.candidates?.[0]?.content?.parts?.[0]?.text ||
-          responseData?.text ||
-          "";
-      } catch {
-        // Ignore type errors
-      }
+      const synthesizedText = await synthesizeWithClaude(
+        client,
+        systemPrompt,
+        userPrompt
+      );
 
       if (!synthesizedText || synthesizedText.length < 50) {
         stats.errors++;
@@ -95,12 +172,10 @@ export async function synthesizeGroupedArticles(
         continue;
       }
 
-      // Extract and verify claims
       const claims = extractClaimsFromStory(synthesizedText);
       const { overallScore } = await verifyClaims(claims);
-      const factCheckScore = scoreFactCheckResult([]);
+      scoreFactCheckResult([]);
 
-      // Reject if fact-check fails
       if (shouldRejectStory(overallScore, 75)) {
         stats.rejected++;
         logRejection(
@@ -111,7 +186,6 @@ export async function synthesizeGroupedArticles(
         continue;
       }
 
-      // Create NewsItem
       const newsItem: NewsItem = {
         id: generateId(group.topic),
         title: extractTitle(synthesizedText, group.topic),
@@ -129,7 +203,7 @@ export async function synthesizeGroupedArticles(
             source: formatted.source,
           };
         }),
-        synthesizedBy: "Gemini",
+        synthesizedBy: "Claude Haiku 4.5",
         factCheckScore: overallScore,
         verifiedClaims: claims.slice(0, 3),
         toneMatch: "Trevor's voice - analytical, data-driven, measured skepticism",
@@ -137,7 +211,14 @@ export async function synthesizeGroupedArticles(
 
       stories.push(newsItem);
       stats.posted++;
-    } catch (error) {
+
+      if (index < rankedGroups.length - 1) {
+        await sleep(2500);
+      }
+    } catch (error: any) {
+      if (error?.status === 429) {
+        stats.retried++;
+      }
       stats.errors++;
       console.error(`Error synthesizing "${group.topic}":`, error);
     }
@@ -156,14 +237,14 @@ ${formatToneForPrompt(toneProfile)}
 
 CRITICAL REQUIREMENTS:
 1. Write in 2-4 paragraphs (200-400 words)
-2. Base EVERY claim on the source articles provided - do not infer, extrapolate, or add information
-3. Be specific: reference numbers, names, companies, dates from sources
+2. Base EVERY claim on the source articles provided. Do not infer, extrapolate, or add unsupported information
+3. Be specific. Reference numbers, names, companies, and dates from sources
 4. Use the voice of a disciplined value investor who analyzes fundamentals
 5. Acknowledge complexity and risk where appropriate
-6. Do NOT copy headlines or sentences verbatim - synthesize original narrative
+6. Do NOT copy headlines or sentences verbatim. Synthesize an original narrative
 7. If you cannot verify a claim from the sources, do not include it
 
-Start your response directly with the synthesized story. Do not add disclaimers or warnings.`;
+Start directly with the synthesized story. Do not add disclaimers or warnings.`;
 }
 
 /**
@@ -171,14 +252,22 @@ Start your response directly with the synthesized story. Do not add disclaimers 
  */
 function createUserPrompt(
   group: GroupedNews,
-  formattedArticles: Array<{ title: string; summary: string; url: string; source: string; publishedAt: string }>
+  formattedArticles: Array<{
+    title: string;
+    summary: string;
+    url: string;
+    source: string;
+    publishedAt: string;
+  }>
 ): string {
   const articleTexts = formattedArticles
     .map(
       (article, i) =>
-        `SOURCE ${i + 1} (${article.source}):
+        `SOURCE ${i + 1} (${article.source})
 Title: ${article.title}
-Summary: ${article.summary}`
+Summary: ${article.summary}
+Published: ${article.publishedAt}
+URL: ${article.url}`
     )
     .join("\n\n");
 
@@ -186,19 +275,17 @@ Summary: ${article.summary}`
 
 ${articleTexts}
 
-Write the synthesized story now:`;
+Write the synthesized story now.`;
 }
 
 /**
- * Extract title from synthesized story (first sentence or generated)
+ * Extract title from synthesized story
  */
 function extractTitle(story: string, fallback: string): string {
   const firstSentence = story.split(/[.!?]/)[0];
   if (firstSentence && firstSentence.length > 10 && firstSentence.length < 150) {
     return firstSentence.trim();
   }
-
-  // Generate title from topic
   return fallback.charAt(0).toUpperCase() + fallback.slice(1);
 }
 
@@ -229,10 +316,8 @@ function inferSentiment(
     "crash",
   ];
 
-  const positiveCount = positiveWords.filter((w) => lowerText.includes(w))
-    .length;
-  const negativeCount = negativeWords.filter((w) => lowerText.includes(w))
-    .length;
+  const positiveCount = positiveWords.filter((w) => lowerText.includes(w)).length;
+  const negativeCount = negativeWords.filter((w) => lowerText.includes(w)).length;
 
   if (positiveCount > negativeCount) return "positive";
   if (negativeCount > positiveCount) return "negative";
@@ -244,21 +329,17 @@ function inferSentiment(
  */
 function extractTickers(text: string): string[] {
   const tickers = new Set<string>();
-
-  // Look for ticker patterns: $AAPL, SPY, ^GSPC, etc.
   const tickerPattern = /\$?([A-Z]{1,5})(?:\s|$|[,.\-])/g;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = tickerPattern.exec(text)) !== null) {
     const ticker = match[1];
-    // Filter out common words that aren't tickers
     const excluded = ["THE", "AND", "FOR", "WITH", "FROM", "THAT", "THIS"];
     if (!excluded.includes(ticker) && ticker.length >= 1 && ticker.length <= 5) {
       tickers.add(ticker);
     }
   }
 
-  // Add known index tickers mentioned
   if (text.toLowerCase().includes("s&p 500")) tickers.add("^GSPC");
   if (text.toLowerCase().includes("nasdaq")) tickers.add("^IXIC");
   if (text.toLowerCase().includes("dow")) tickers.add("^DJI");
