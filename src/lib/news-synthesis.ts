@@ -13,110 +13,81 @@ import { formatNewsForStorage } from "./news";
 let anthropic: Anthropic | null = null;
 let cachedToneProfile: ToneProfile | null = null;
 
-function sleep(ms: number): Promise<void> {
+function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Initialize Anthropic client
+ * Initialize Claude client
  */
 export function initAnthropicClient(): Anthropic {
   if (!anthropic) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
+
     if (!apiKey) {
       throw new Error("ANTHROPIC_API_KEY environment variable is required");
     }
+
     anthropic = new Anthropic({ apiKey });
   }
+
   return anthropic;
 }
 
 /**
- * Get cached tone profile or analyze articles
+ * Get cached tone profile
  */
 async function getToneProfile(): Promise<ToneProfile> {
   if (!cachedToneProfile) {
     cachedToneProfile = await analyzeTone();
   }
+
   return cachedToneProfile;
 }
 
 /**
- * Basic quality filter so we do not waste model calls on junk topics
+ * Extract text from Claude response safely
  */
-function isWeakTopic(topic: string): boolean {
-  const t = topic.trim().toLowerCase();
-  if (t.length < 12) return true;
+function extractClaudeText(response: any): string {
+  let text = "";
 
-  const weak = new Set([
-    "fed",
-    "rate",
-    "rates",
-    "earnings",
-    "inflation",
-    "markets",
-    "stocks",
-    "crypto",
-  ]);
+  if (!response?.content) return text;
 
-  return weak.has(t);
+  for (const block of response.content) {
+    if (block?.type === "text" && typeof block.text === "string") {
+      text += block.text + "\n";
+    }
+  }
+
+  return text.trim();
 }
 
 /**
- * Call Claude with one retry for transient failures
+ * Call Claude
  */
 async function synthesizeWithClaude(
   client: Anthropic,
   systemPrompt: string,
   userPrompt: string
 ): Promise<string> {
-  const maxAttempts = 2;
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 500,
+    temperature: 0.7,
+    system: systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: userPrompt,
+      },
+    ],
+  });
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 500,
-        temperature: 0.7,
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: userPrompt,
-          },
-        ],
-      });
-
-      const text = response.content
-        .filter((block) => block.type === "text")
-        .map((block) => block.text)
-        .join("\n")
-        .trim();
-
-      if (!text) {
-        throw new Error("empty response");
-      }
-
-      return text;
-    } catch (error: any) {
-      const isLastAttempt = attempt === maxAttempts;
-      const status = error?.status;
-
-      if (isLastAttempt || (status !== 429 && status !== 500 && status !== 502 && status !== 503 && status !== 504)) {
-        throw error;
-      }
-
-      const retryDelayMs = 8000 * attempt;
-      console.warn(`Claude call failed (attempt ${attempt}). Retrying in ${retryDelayMs}ms...`);
-      await sleep(retryDelayMs);
-    }
-  }
-
-  throw new Error("Failed to synthesize after retries");
+  return extractClaudeText(response);
 }
 
 /**
- * Main synthesis function: group articles and synthesize into original stories
+ * MAIN SYNTHESIS FUNCTION
  */
 export async function synthesizeGroupedArticles(
   groupedNews: GroupedNews[]
@@ -126,34 +97,23 @@ export async function synthesizeGroupedArticles(
     posted: number;
     rejected: number;
     errors: number;
-    skipped: number;
-    retried: number;
   };
 }> {
   const stories: NewsItem[] = [];
+
   const stats = {
     posted: 0,
     rejected: 0,
     errors: 0,
-    skipped: 0,
-    retried: 0,
   };
 
   const toneProfile = await getToneProfile();
   const client = initAnthropicClient();
 
-  const rankedGroups = [...groupedNews]
-    .filter((group) => !isWeakTopic(group.topic))
-    .sort((a, b) => {
-      const importanceDiff = (b.importance ?? 0) - (a.importance ?? 0);
-      if (importanceDiff !== 0) return importanceDiff;
-      return (b.articles?.length ?? 0) - (a.articles?.length ?? 0);
-    })
-    .slice(0, 5);
+  // Only synthesize top 5 stories to control cost
+  const groupsToProcess = groupedNews.slice(0, 5);
 
-  stats.skipped = Math.max(0, groupedNews.length - rankedGroups.length);
-
-  for (const [index, group] of rankedGroups.entries()) {
+  for (const group of groupsToProcess) {
     try {
       const formattedArticles = formatNewsForStorage(group.articles);
 
@@ -168,21 +128,25 @@ export async function synthesizeGroupedArticles(
 
       if (!synthesizedText || synthesizedText.length < 50) {
         stats.errors++;
-        console.error(`Synthesis failed for "${group.topic}": empty response`);
+        console.error(`Synthesis failed for "${group.topic}"`);
         continue;
       }
 
       const claims = extractClaimsFromStory(synthesizedText);
+
       const { overallScore } = await verifyClaims(claims);
+
       scoreFactCheckResult([]);
 
       if (shouldRejectStory(overallScore, 75)) {
         stats.rejected++;
+
         logRejection(
           group.topic,
-          `Fact-check score too low: ${overallScore}`,
+          `Fact check score too low: ${overallScore}`,
           overallScore
         );
+
         continue;
       }
 
@@ -197,29 +161,28 @@ export async function synthesizeGroupedArticles(
         relatedTickers: extractTickers(synthesizedText),
         sourcesUsed: group.articles.map((article) => {
           const formatted = formatNewsForStorage([article])[0];
+
           return {
             title: formatted.title,
             url: formatted.url,
             source: formatted.source,
           };
         }),
-        synthesizedBy: "Claude Haiku 4.5",
+        synthesizedBy: "Claude Haiku",
         factCheckScore: overallScore,
         verifiedClaims: claims.slice(0, 3),
-        toneMatch: "Trevor's voice - analytical, data-driven, measured skepticism",
+        toneMatch:
+          "Trevor's voice - analytical, data-driven, measured skepticism",
       };
 
       stories.push(newsItem);
+
       stats.posted++;
 
-      if (index < rankedGroups.length - 1) {
-        await sleep(2500);
-      }
-    } catch (error: any) {
-      if (error?.status === 429) {
-        stats.retried++;
-      }
+      await sleep(2000);
+    } catch (error) {
       stats.errors++;
+
       console.error(`Error synthesizing "${group.topic}":`, error);
     }
   }
@@ -228,131 +191,102 @@ export async function synthesizeGroupedArticles(
 }
 
 /**
- * Create system prompt with tone guidance
+ * System Prompt
  */
 function createSystemPrompt(toneProfile: ToneProfile): string {
-  return `You are a financial analyst and news synthesizer. Your job is to read multiple news articles about a market event and write an original, cohesive story that synthesizes the information.
+  return `You are a financial analyst and news synthesizer.
 
 ${formatToneForPrompt(toneProfile)}
 
-CRITICAL REQUIREMENTS:
-1. Write in 2-4 paragraphs (200-400 words)
-2. Base EVERY claim on the source articles provided. Do not infer, extrapolate, or add unsupported information
-3. Be specific. Reference numbers, names, companies, and dates from sources
-4. Use the voice of a disciplined value investor who analyzes fundamentals
-5. Acknowledge complexity and risk where appropriate
-6. Do NOT copy headlines or sentences verbatim. Synthesize an original narrative
-7. If you cannot verify a claim from the sources, do not include it
+CRITICAL RULES
 
-Start directly with the synthesized story. Do not add disclaimers or warnings.`;
+1 Write 2-4 paragraphs
+2 Base all claims only on provided sources
+3 Use numbers, names, and companies from sources
+4 Write like a disciplined value investor
+5 Do not copy headlines
+6 Do not invent facts
+
+Start directly with the story.`;
 }
 
 /**
- * Create user prompt with article content
+ * User Prompt
  */
 function createUserPrompt(
   group: GroupedNews,
-  formattedArticles: Array<{
-    title: string;
-    summary: string;
-    url: string;
-    source: string;
-    publishedAt: string;
-  }>
+  formattedArticles: any[]
 ): string {
   const articleTexts = formattedArticles
     .map(
-      (article, i) =>
-        `SOURCE ${i + 1} (${article.source})
+      (article: any, i: number) =>
+        `SOURCE ${i + 1}
 Title: ${article.title}
-Summary: ${article.summary}
-Published: ${article.publishedAt}
-URL: ${article.url}`
+Summary: ${article.summary}`
     )
     .join("\n\n");
 
-  return `Synthesize the following news articles about "${group.topic}" (Category: ${group.category}) into one original, cohesive story. The story should read naturally and analytically, backed only by facts from these sources.
+  return `Write one cohesive story about "${group.topic}"
 
 ${articleTexts}
 
-Write the synthesized story now.`;
+Write the story now.`;
 }
 
 /**
- * Extract title from synthesized story
+ * Extract title
  */
 function extractTitle(story: string, fallback: string): string {
   const firstSentence = story.split(/[.!?]/)[0];
-  if (firstSentence && firstSentence.length > 10 && firstSentence.length < 150) {
+
+  if (firstSentence && firstSentence.length > 10 && firstSentence.length < 150)
     return firstSentence.trim();
-  }
-  return fallback.charAt(0).toUpperCase() + fallback.slice(1);
+
+  return fallback;
 }
 
 /**
- * Infer sentiment from story text
+ * Sentiment
  */
-function inferSentiment(
-  text: string
-): "positive" | "negative" | "neutral" {
-  const lowerText = text.toLowerCase();
+function inferSentiment(text: string): "positive" | "negative" | "neutral" {
+  const lower = text.toLowerCase();
 
-  const positiveWords = [
-    "growth",
-    "rise",
-    "gain",
-    "opportunity",
-    "strength",
-    "bull",
-    "rally",
-  ];
-  const negativeWords = [
-    "decline",
-    "fall",
-    "loss",
-    "risk",
-    "weakness",
-    "bear",
-    "crash",
-  ];
+  const positive = ["growth", "gain", "rise", "strength", "rally"];
+  const negative = ["fall", "decline", "loss", "risk", "weakness"];
 
-  const positiveCount = positiveWords.filter((w) => lowerText.includes(w)).length;
-  const negativeCount = negativeWords.filter((w) => lowerText.includes(w)).length;
+  const pos = positive.filter((w) => lower.includes(w)).length;
+  const neg = negative.filter((w) => lower.includes(w)).length;
 
-  if (positiveCount > negativeCount) return "positive";
-  if (negativeCount > positiveCount) return "negative";
+  if (pos > neg) return "positive";
+  if (neg > pos) return "negative";
+
   return "neutral";
 }
 
 /**
- * Extract stock tickers from story text
+ * Extract tickers
  */
 function extractTickers(text: string): string[] {
   const tickers = new Set<string>();
-  const tickerPattern = /\$?([A-Z]{1,5})(?:\s|$|[,.\-])/g;
-  let match: RegExpExecArray | null;
 
-  while ((match = tickerPattern.exec(text)) !== null) {
-    const ticker = match[1];
-    const excluded = ["THE", "AND", "FOR", "WITH", "FROM", "THAT", "THIS"];
-    if (!excluded.includes(ticker) && ticker.length >= 1 && ticker.length <= 5) {
-      tickers.add(ticker);
-    }
+  const regex = /\$?([A-Z]{1,5})(?:\s|$|[,.\-])/g;
+
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    tickers.add(match[1]);
   }
-
-  if (text.toLowerCase().includes("s&p 500")) tickers.add("^GSPC");
-  if (text.toLowerCase().includes("nasdaq")) tickers.add("^IXIC");
-  if (text.toLowerCase().includes("dow")) tickers.add("^DJI");
 
   return Array.from(tickers).slice(0, 5);
 }
 
 /**
- * Generate unique ID for story
+ * Generate ID
  */
 function generateId(topic: string): string {
   const hash = topic
     .split("")
     .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
   return `news-${Date.now()}-${hash}`;
 }
