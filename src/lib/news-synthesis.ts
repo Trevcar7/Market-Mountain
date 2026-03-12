@@ -110,8 +110,15 @@ export async function synthesizeGroupedArticles(
   const toneProfile = await getToneProfile();
   const client = initAnthropicClient();
 
-  // Only synthesize top 5 stories to control cost
-  const groupsToProcess = groupedNews.slice(0, 5);
+  // Deduplicate by category — at most 1 story per category to avoid covering the same topic repeatedly
+  const seenCategories = new Set<string>();
+  const groupsToProcess = groupedNews
+    .filter((group) => {
+      if (seenCategories.has(group.category)) return false;
+      seenCategories.add(group.category);
+      return true;
+    })
+    .slice(0, 5);
 
   for (const group of groupsToProcess) {
     try {
@@ -165,14 +172,24 @@ export async function synthesizeGroupedArticles(
         group.topic
       );
 
-      const imageUrl = await fetchUnsplashImage(parsedTitle);
+      const categoryFallbackQueries: Record<string, string> = {
+        macro: "federal reserve economy",
+        earnings: "stock market earnings",
+        markets: "financial markets trading",
+        policy: "government policy regulation",
+        crypto: "cryptocurrency bitcoin",
+        other: "financial markets",
+      };
+      const imageUrl =
+        (await fetchUnsplashImage(parsedTitle)) ??
+        (await fetchUnsplashImage(categoryFallbackQueries[group.category] ?? "financial markets"));
 
       const newsItem: NewsItem = {
         id: generateId(group.topic),
         title: parsedTitle,
         story: parsedStory,
         category: group.category,
-        imageUrl: imageUrl ?? undefined,
+        imageUrl: imageUrl || undefined,
         publishedAt: new Date().toISOString(),
         importance: group.importance,
         sentiment: inferSentiment(synthesizedText),

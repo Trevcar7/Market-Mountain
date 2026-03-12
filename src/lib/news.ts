@@ -290,30 +290,36 @@ export function groupRelatedArticles(articles: (FinnhubArticle | NewsAPIArticle)
 }
 
 /**
- * Extract topic key from headline for grouping
+ * Extract topic key from headline for grouping.
+ * Consolidates semantically related terms so articles about the same
+ * broad subject land in the same group rather than spawning near-duplicate stories.
  */
 function extractTopicKey(headline: string): string {
-  const keywords = [
-    "federal reserve",
-    "fed",
-    "rate",
-    "inflation",
-    "gdp",
-    "earnings",
-    "bankruptcy",
-    "merger",
-    "acquisition",
+  const lower = headline.toLowerCase();
+
+  const topicMappings: [string[], string][] = [
+    [["federal reserve", "fed ", "fomc", "powell", "rate hike", "rate cut", "rate pause", "interest rate"], "federal_reserve"],
+    [["inflation", "cpi", "ppi", "consumer price index", "producer price"], "inflation"],
+    [["gdp", "gross domestic product", "economic growth", "economic output"], "gdp"],
+    [["jobs report", "nonfarm payroll", "unemployment rate", "employment report"], "employment"],
+    [["tariff", "trade war", "trade policy", "import duty", "trade deal"], "trade_policy"],
+    [["s&p 500", "nasdaq", "dow jones", "stock market", "market rally", "market selloff", "market decline", "market gains"], "broad_market"],
+    [["bitcoin", "crypto", "ethereum", "digital asset", "blockchain"], "crypto"],
+    [["bankruptcy", "chapter 11", "debt restructuring", "default"], "bankruptcy"],
+    [["merger", "acquisition", "takeover", "buyout", "deal worth"], "merger_acquisition"],
+    [["treasury yield", "bond yield", "yield curve", "10-year", "2-year"], "bond_market"],
+    [["oil price", "crude oil", "brent", "wti", "opec"], "energy"],
+    [["earnings", "quarterly results", "revenue beat", "revenue miss", "eps beat", "eps miss"], "earnings"],
   ];
 
-  for (const keyword of keywords) {
-    if (headline.toLowerCase().includes(keyword)) {
-      return keyword;
+  for (const [keywords, topicKey] of topicMappings) {
+    if (keywords.some((kw) => lower.includes(kw))) {
+      return topicKey;
     }
   }
 
-  // Default: use first 3-5 words as topic
-  const words = headline.split(" ").slice(0, 4).join(" ").toLowerCase();
-  return words;
+  // Default: use first 4 words as a specific topic key
+  return headline.split(" ").slice(0, 4).join(" ").toLowerCase();
 }
 
 /**

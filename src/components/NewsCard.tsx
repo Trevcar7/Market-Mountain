@@ -1,6 +1,5 @@
 import { NewsItem } from "@/lib/news-types";
 import Link from "next/link";
-import Image from "next/image";
 
 interface NewsCardProps {
   news: NewsItem;
@@ -48,20 +47,10 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
         className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300"
         style={{ minHeight: 360 }}
       >
-        {/* Cover: photo or gradient */}
-        {news.imageUrl ? (
-          <Image
-            src={news.imageUrl}
-            alt={news.title}
-            fill
-            className="object-cover opacity-50 group-hover:opacity-60 transition-opacity duration-500"
-            sizes="(max-width: 768px) 100vw, 80vw"
-          />
-        ) : (
-          <div
-            className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-60 group-hover:opacity-70 transition-opacity duration-500`}
-          />
-        )}
+        {/* Gradient background */}
+        <div
+          className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-60 group-hover:opacity-70 transition-opacity duration-500`}
+        />
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
 
@@ -101,19 +90,9 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
       href={href}
       className="group flex flex-col rounded-lg bg-card border border-border hover:border-navy-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
     >
-      {/* Cover: photo or gradient — 16:9 */}
+      {/* Gradient cover — 16:9 */}
       <div className={`relative w-full aspect-video overflow-hidden bg-gradient-to-br ${gradient}`}>
-        {news.imageUrl ? (
-          <Image
-            src={news.imageUrl}
-            alt={news.title}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
-        ) : (
-          <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-500 bg-gradient-to-br opacity-100" />
-        )}
+        <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-500" />
         {/* Category label in bottom-left */}
         <div className="absolute inset-0 flex items-end p-3">
           <span className="text-[10px] font-semibold tracking-widest uppercase text-white/50">
