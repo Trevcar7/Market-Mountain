@@ -144,10 +144,10 @@ export async function synthesizeGroupedArticles(
 
       console.log(`[synthesis] Fact-check score for "${group.topic}": ${overallScore}`);
 
-      if (shouldRejectStory(overallScore, 75)) {
+      if (shouldRejectStory(overallScore, 40)) {
         stats.rejected++;
 
-        console.warn(`[synthesis] Story rejected: "${group.topic}" - fact-check score ${overallScore} < 75 threshold`);
+        console.warn(`[synthesis] Story rejected: "${group.topic}" - fact-check score ${overallScore} < 40 threshold`);
 
         logRejection(
           group.topic,
