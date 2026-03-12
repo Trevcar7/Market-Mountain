@@ -1,0 +1,38 @@
+name: Fetch News (10x Daily)
+
+on:
+  schedule:
+    # 10x daily during market hours (UTC times = EST + 5)
+    # 12,14,15,17,18,19,20,21,23,1 UTC = 7am,9am,10am,12pm,1pm,2pm,3pm,4pm,6pm,8pm EST
+    - cron: '0 12 * * *'
+    - cron: '0 14 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 17 * * *'
+    - cron: '0 18 * * *'
+    - cron: '0 19 * * *'
+    - cron: '0 20 * * *'
+    - cron: '0 21 * * *'
+    - cron: '0 23 * * *'
+    - cron: '0 1 * * *'
+
+  # Manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  fetch-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Fetch news from Market Mountain API
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ secrets.FETCH_NEWS_SECRET }}" \
+            -H "Content-Type: application/json" \
+            https://market-mountain.com/api/fetch-news)
+          echo "Response status: $response"
+          if [ "$response" != "200" ]; then
+            echo "Error: API returned status $response"
+            exit 1
+          fi
+          echo "News fetch completed successfully"

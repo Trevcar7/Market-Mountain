@@ -42,12 +42,13 @@ export async function GET(request: NextRequest) {
  * Vercel Cron trigger (authenticates via secret)
  */
 export async function POST(request: NextRequest) {
-  // Verify Vercel Cron signature
+  // Verify GitHub Actions Bearer token
   const authHeader = request.headers.get("authorization");
   const expectedSecret = process.env.NEXT_PUBLIC_FETCH_NEWS_SECRET;
 
   if (process.env.NODE_ENV === "production") {
-    if (!authHeader || !authHeader.includes(expectedSecret || "")) {
+    const token = authHeader?.replace("Bearer ", "") || "";
+    if (token !== expectedSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
