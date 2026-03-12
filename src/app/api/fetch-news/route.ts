@@ -130,16 +130,25 @@ async function handleNewsFetch() {
 
     stats.archived = archiveStories.length;
 
-    // 9. Save active news
+    // 9. Hard cap at 5 articles per day (keep only top 5 by importance + recency)
+    const sortedStories = activeStories
+      .sort((a, b) => {
+        // Primary: importance score (descending)
+        if (b.importance !== a.importance) {
+          return b.importance - a.importance;
+        }
+        // Secondary: recency (descending)
+        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+      })
+      .slice(0, 5); // Hard cap at 5
+
+    // 10. Save active news
     const newsCollection: NewsCollection = {
       lastUpdated: new Date().toISOString(),
       source: "Finnhub + NewsAPI (synthesized via Gemini, fact-checked)",
-      news: activeStories.sort(
-        (a, b) =>
-          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-      ),
+      news: sortedStories,
       meta: {
-        totalCount: activeStories.length,
+        totalCount: sortedStories.length,
         nextUpdate: getNextUpdateTime(),
         archiveUrl: "/api/news-archive",
       },
@@ -147,7 +156,7 @@ async function handleNewsFetch() {
 
     fs.writeFileSync(ACTIVE_NEWS_FILE, JSON.stringify(newsCollection, null, 2));
 
-    // 10. Save archive
+    // 11. Save archive
     if (archiveStories.length > 0) {
       const archiveCollection: ArchivedNewsCollection = {
         lastUpdated: new Date().toISOString(),
@@ -248,7 +257,7 @@ function mergeNewsWithDedup(stories: NewsItem[]): NewsItem[] {
 }
 
 /**
- * Calculate next update time (for 3x daily: 7am, 12pm, 6pm EST)
+ * Calculate next update time (for 10x daily: 7am, 9am, 10am, 12pm, 1pm, 2pm, 3pm, 4pm, 6pm, 8pm EST)
  */
 function getNextUpdateTime(): string {
   const now = new Date();
@@ -257,23 +266,20 @@ function getNextUpdateTime(): string {
   );
 
   const hour = estTime.getHours();
-  let nextHour = 7; // 7 AM
+  const updateHours = [7, 9, 10, 12, 13, 14, 15, 16, 18, 20]; // EST times
 
-  if (hour < 7) {
-    nextHour = 7;
-  } else if (hour < 12) {
-    nextHour = 12;
-  } else if (hour < 18) {
-    nextHour = 18;
-  } else {
-    // Next day 7 AM
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(7, 0, 0, 0);
-    return tomorrow.toISOString();
+  // Find next update time today
+  for (const updateHour of updateHours) {
+    if (hour < updateHour) {
+      const nextUpdate = new Date(estTime);
+      nextUpdate.setHours(updateHour, 0, 0, 0);
+      return nextUpdate.toISOString();
+    }
   }
 
-  const nextUpdate = new Date(estTime);
-  nextUpdate.setHours(nextHour, 0, 0, 0);
-  return nextUpdate.toISOString();
+  // If past all times today, next update is 7 AM tomorrow
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(7, 0, 0, 0);
+  return tomorrow.toISOString();
 }

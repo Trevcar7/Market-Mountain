@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/fetch-news",
-      "schedule": "0 7,12,18 * * *"
+      "schedule": "0 12,14,15,17,18,19,20,21,23,1 * * *"
     }
   ]
 }

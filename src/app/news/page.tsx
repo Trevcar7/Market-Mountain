@@ -39,9 +39,6 @@ export default function NewsPage() {
           <h2 className="font-playfair text-2xl font-bold text-navy-900 mb-2">
             Latest News
           </h2>
-          <p className="text-slate-600">
-            Updated 3x daily during market hours (7 AM, 12 PM, 6 PM EST)
-          </p>
         </div>
 
         <NewsSection

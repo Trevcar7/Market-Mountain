@@ -178,44 +178,77 @@ export function deduplicateNews(articles: (FinnhubArticle | NewsAPIArticle)[]): 
 }
 
 /**
- * Score articles by importance based on recency and source credibility
+ * Score articles by importance: recency, source credibility, multi-source mentions, keyword relevance
  */
 export function scoreByImportance(articles: (FinnhubArticle | NewsAPIArticle)[], now = Date.now()): number {
-  const article = articles[0]; // Score first article
-  if (!article) return 0;
+  if (!articles || articles.length === 0) return 0;
 
-  const timeMs = isFinnhub(article)
-    ? ((article as FinnhubArticle).datetime || 0) * 1000
-    : new Date((article as NewsAPIArticle).publishedAt).getTime();
+  // Recency score using first article
+  const firstArticle = articles[0];
+  const timeMs = isFinnhub(firstArticle)
+    ? ((firstArticle as FinnhubArticle).datetime || 0) * 1000
+    : new Date((firstArticle as NewsAPIArticle).publishedAt).getTime();
 
   const hoursSincePublish = (now - timeMs) / (1000 * 60 * 60);
-
-  // Recency score: 10 if <1 hour old, 8 if <6 hours, 6 if <24 hours
   let recencyScore = 6;
   if (hoursSincePublish < 1) recencyScore = 10;
+  else if (hoursSincePublish < 3) recencyScore = 9;
   else if (hoursSincePublish < 6) recencyScore = 8;
 
-  // Source credibility (rough estimate)
-  const source = isFinnhub(article)
-    ? (article as FinnhubArticle).source
-    : (article as NewsAPIArticle).source?.name;
+  // Source credibility (tier-based)
+  const source = isFinnhub(firstArticle)
+    ? (firstArticle as FinnhubArticle).source
+    : (firstArticle as NewsAPIArticle).source?.name;
 
-  const credibleSources = [
-    "Reuters",
-    "Bloomberg",
-    "AP",
-    "CNBC",
-    "Wall Street Journal",
-    "Financial Times",
-    "MarketWatch",
+  const tier1 = ["Reuters", "Bloomberg", "Wall Street Journal", "Financial Times", "AP"];
+  const tier2 = ["CNBC", "MarketWatch", "Seeking Alpha", "Barron's"];
+
+  let credibilityScore = 0;
+  if (tier1.some((s) => source?.toLowerCase().includes(s.toLowerCase()))) credibilityScore = 3;
+  else if (tier2.some((s) => source?.toLowerCase().includes(s.toLowerCase()))) credibilityScore = 2;
+
+  // Multi-source mentions (more sources = more important)
+  const uniqueSources = new Set(
+    articles.map((a) =>
+      isFinnhub(a) ? (a as FinnhubArticle).source : (a as NewsAPIArticle).source?.name
+    )
+  ).size;
+
+  let multiSourceScore = 0;
+  if (uniqueSources >= 3) multiSourceScore = 3;
+  else if (uniqueSources === 2) multiSourceScore = 2;
+
+  // Keyword importance
+  const combinedText = articles
+    .map((a) =>
+      isFinnhub(a)
+        ? `${(a as FinnhubArticle).headline} ${(a as FinnhubArticle).summary}`
+        : `${(a as NewsAPIArticle).title} ${(a as NewsAPIArticle).description}`
+    )
+    .join(" ")
+    .toLowerCase();
+
+  const highImpactKeywords = [
+    "federal reserve", "rate hike", "rate cut", "rate pause", "fed decision",
+    "earnings beat", "earnings miss", "market crash", "circuit breaker",
+    "s&p 500", "nasdaq", "dow jones", "recession", "gdp", "inflation",
+    "jobs report", "unemployment", "treasury yield",
   ];
-  const credibilityScore = credibleSources.some((s) =>
-    source?.toLowerCase().includes(s.toLowerCase())
-  )
-    ? 2
-    : 0;
+  const mediumKeywords = [
+    "earnings", "guidance", "merger", "acquisition", "bankruptcy", "ipo",
+    "dividend", "sector rotation", "yield curve",
+  ];
 
-  return Math.min(10, recencyScore + credibilityScore);
+  const highCount = highImpactKeywords.filter((kw) => combinedText.includes(kw)).length;
+  const mediumCount = mediumKeywords.filter((kw) => combinedText.includes(kw)).length;
+  let keywordScore = Math.min(3, highCount * 1.5 + mediumCount * 0.5);
+
+  // Crypto penalty: crypto-only news scores lower
+  const hasCrypto = combinedText.includes("crypto") || combinedText.includes("bitcoin");
+  const hasMajorMarket = highImpactKeywords.some((kw) => combinedText.includes(kw));
+  const cryptoPenalty = hasCrypto && !hasMajorMarket ? -2 : 0;
+
+  return Math.max(0, Math.min(10, recencyScore + credibilityScore + multiSourceScore + keywordScore + cryptoPenalty));
 }
 
 /**
