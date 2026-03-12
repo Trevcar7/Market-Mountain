@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { Redis } from "@upstash/redis";
 import {
   fetchFinnhubNews,
   fetchNewsAPINews,
@@ -11,11 +10,18 @@ import {
 import { synthesizeGroupedArticles } from "@/lib/news-synthesis";
 import { NewsCollection, ArchivedNewsCollection, NewsItem } from "@/lib/news-types";
 
-// Use /tmp for Vercel serverless compatibility (writable at runtime)
-const DATA_DIR = "/tmp";
-const ACTIVE_NEWS_FILE = path.join(DATA_DIR, "news.json");
-const ARCHIVE_NEWS_FILE = path.join(DATA_DIR, "news-archive.json");
 const RETENTION_DAYS = 30;
+
+// Initialize Upstash Redis client (Vercel injects KV_REST_API_URL and KV_REST_API_TOKEN)
+function getRedisClient(): Redis | null {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) {
+    console.warn("KV env vars not set — falling back to no-op storage");
+    return null;
+  }
+  return new Redis({ url, token });
+}
 
 /**
  * GET /api/fetch-news
@@ -35,7 +41,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/fetch-news
- * Vercel Cron trigger (authenticates via secret)
+ * GitHub Actions trigger (authenticates via Bearer token)
  */
 export async function POST(request: NextRequest) {
   // Verify GitHub Actions Bearer token
@@ -71,6 +77,8 @@ async function handleNewsFetch() {
   };
 
   try {
+    const kv = getRedisClient();
+
     // 1. Fetch from both sources in parallel
     const [finnhubArticles, newsapiArticles] = await Promise.all([
       fetchFinnhubNews(process.env.FINNHUB_API_KEY || ""),
@@ -106,7 +114,7 @@ async function handleNewsFetch() {
     stats.errors = synthStats.errors;
 
     // 6. Load existing news and archive old stories
-    const { active, archived } = loadNewsWithArchival();
+    const { active, archived } = await loadNewsWithArchival(kv);
 
     // 7. Merge new stories with existing (avoid duplicates)
     const allStories = mergeNewsWithDedup([...stories, ...active]);
@@ -139,7 +147,7 @@ async function handleNewsFetch() {
       })
       .slice(0, 5); // Hard cap at 5
 
-    // 10. Save active news
+    // 10. Save active news to KV
     const newsCollection: NewsCollection = {
       lastUpdated: new Date().toISOString(),
       source: "Finnhub + NewsAPI (synthesized via Gemini, fact-checked)",
@@ -151,9 +159,11 @@ async function handleNewsFetch() {
       },
     };
 
-    fs.writeFileSync(ACTIVE_NEWS_FILE, JSON.stringify(newsCollection, null, 2));
+    if (kv) {
+      await kv.set("news", newsCollection);
+    }
 
-    // 11. Save archive
+    // 11. Save archive to KV
     if (archiveStories.length > 0) {
       const archiveCollection: ArchivedNewsCollection = {
         lastUpdated: new Date().toISOString(),
@@ -174,10 +184,9 @@ async function handleNewsFetch() {
         },
       };
 
-      fs.writeFileSync(
-        ARCHIVE_NEWS_FILE,
-        JSON.stringify(archiveCollection, null, 2)
-      );
+      if (kv) {
+        await kv.set("news-archive", archiveCollection);
+      }
     }
 
     stats.executionMs = Date.now() - startTime;
@@ -204,32 +213,32 @@ async function handleNewsFetch() {
 }
 
 /**
- * Load existing news and archive
+ * Load existing news and archive from KV
  */
-function loadNewsWithArchival(): { active: NewsItem[]; archived: NewsItem[] } {
+async function loadNewsWithArchival(
+  kv: Redis | null
+): Promise<{ active: NewsItem[]; archived: NewsItem[] }> {
   let active: NewsItem[] = [];
   let archived: NewsItem[] = [];
 
+  if (!kv) return { active, archived };
+
   try {
-    if (fs.existsSync(ACTIVE_NEWS_FILE)) {
-      const data = JSON.parse(
-        fs.readFileSync(ACTIVE_NEWS_FILE, "utf-8")
-      ) as NewsCollection;
+    const data = await kv.get<NewsCollection>("news");
+    if (data) {
       active = data.news || [];
     }
   } catch (error) {
-    console.error("Error loading active news:", error);
+    console.error("Error loading active news from KV:", error);
   }
 
   try {
-    if (fs.existsSync(ARCHIVE_NEWS_FILE)) {
-      const data = JSON.parse(
-        fs.readFileSync(ARCHIVE_NEWS_FILE, "utf-8")
-      ) as ArchivedNewsCollection;
+    const data = await kv.get<ArchivedNewsCollection>("news-archive");
+    if (data) {
       archived = data.archivedNews?.map(({ archivedAt, ...item }) => item) || [];
     }
   } catch (error) {
-    console.error("Error loading archived news:", error);
+    console.error("Error loading archived news from KV:", error);
   }
 
   return { active, archived };

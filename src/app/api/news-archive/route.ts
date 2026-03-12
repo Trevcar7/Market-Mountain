@@ -1,17 +1,35 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { Redis } from "@upstash/redis";
+import { ArchivedNewsCollection } from "@/lib/news-types";
 
 /**
  * GET /api/news-archive
- * Serves archived news data (>30 days old)
+ * Serves archived news data (>30 days old) from Vercel KV (Upstash Redis)
  */
 export async function GET() {
-  const ARCHIVE_NEWS_FILE = path.join("/tmp", "news-archive.json");
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+
+  if (!url || !token) {
+    return NextResponse.json(
+      {
+        lastUpdated: new Date().toISOString(),
+        archivedNews: [],
+        meta: {
+          totalCount: 0,
+          oldestStory: "",
+          newestStory: "",
+        },
+      },
+      { status: 200 }
+    );
+  }
 
   try {
-    // Check if archive data exists
-    if (!fs.existsSync(ARCHIVE_NEWS_FILE)) {
+    const kv = new Redis({ url, token });
+    const archiveData = await kv.get<ArchivedNewsCollection>("news-archive");
+
+    if (!archiveData) {
       return NextResponse.json(
         {
           lastUpdated: new Date().toISOString(),
@@ -26,10 +44,6 @@ export async function GET() {
       );
     }
 
-    // Read and return archived news
-    const archiveData = JSON.parse(
-      fs.readFileSync(ARCHIVE_NEWS_FILE, "utf-8")
-    );
     return NextResponse.json(archiveData, {
       status: 200,
       headers: {
@@ -37,7 +51,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Error reading news archive:", error);
+    console.error("Error reading news archive from KV:", error);
     return NextResponse.json(
       {
         error: "Failed to read news archive",

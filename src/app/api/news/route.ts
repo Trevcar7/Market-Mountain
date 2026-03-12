@@ -1,18 +1,36 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { Redis } from "@upstash/redis";
+import { NewsCollection } from "@/lib/news-types";
 
 /**
  * GET /api/news
- * Serves cached news data from /tmp/news.json
- * Frontend fetches from this endpoint instead of static file
+ * Serves active news data from Vercel KV (Upstash Redis)
  */
 export async function GET() {
-  const ACTIVE_NEWS_FILE = path.join("/tmp", "news.json");
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+
+  if (!url || !token) {
+    return NextResponse.json(
+      {
+        lastUpdated: new Date().toISOString(),
+        source: "No news fetched yet",
+        news: [],
+        meta: {
+          totalCount: 0,
+          nextUpdate: new Date().toISOString(),
+          archiveUrl: "/api/news-archive",
+        },
+      },
+      { status: 200 }
+    );
+  }
 
   try {
-    // Check if news data exists
-    if (!fs.existsSync(ACTIVE_NEWS_FILE)) {
+    const kv = new Redis({ url, token });
+    const newsData = await kv.get<NewsCollection>("news");
+
+    if (!newsData) {
       return NextResponse.json(
         {
           lastUpdated: new Date().toISOString(),
@@ -28,8 +46,6 @@ export async function GET() {
       );
     }
 
-    // Read and return cached news
-    const newsData = JSON.parse(fs.readFileSync(ACTIVE_NEWS_FILE, "utf-8"));
     return NextResponse.json(newsData, {
       status: 200,
       headers: {
@@ -37,10 +53,10 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Error reading news cache:", error);
+    console.error("Error reading news from KV:", error);
     return NextResponse.json(
       {
-        error: "Failed to read news cache",
+        error: "Failed to read news",
         lastUpdated: new Date().toISOString(),
         news: [],
         meta: { totalCount: 0 },
