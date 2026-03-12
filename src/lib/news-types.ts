@@ -18,7 +18,7 @@ export interface NewsItem {
   sentiment?: "positive" | "negative" | "neutral";
   relatedTickers?: string[]; // e.g., ["SPY", "^GSPC", "BTC-USD"]
   sourcesUsed: NewsSource[]; // Original articles combined for synthesis
-  synthesizedBy: "Gemini"; // Could be extended for other models
+  synthesizedBy: "Claude" | "Gemini"; // AI model used for synthesis
   factCheckScore: number; // 0-100, confidence in accuracy
   verifiedClaims: string[]; // List of specific facts verified
   toneMatch?: string; // e.g., "Trevor's voice - analytical, measured"

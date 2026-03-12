@@ -168,7 +168,7 @@ export async function synthesizeGroupedArticles(
             source: formatted.source,
           };
         }),
-        synthesizedBy: "Claude Haiku",
+        synthesizedBy: "Claude",
         factCheckScore: overallScore,
         verifiedClaims: claims.slice(0, 3),
         toneMatch:
