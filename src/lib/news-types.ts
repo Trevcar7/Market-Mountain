@@ -23,6 +23,7 @@ export interface NewsItem {
   verifiedClaims: string[]; // List of specific facts verified
   toneMatch?: string; // e.g., "Trevor's voice - analytical, measured"
   failureReason?: string; // If story was rejected
+  imageUrl?: string; // Unsplash photo URL
 }
 
 export interface NewsCollection {

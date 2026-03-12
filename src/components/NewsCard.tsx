@@ -1,5 +1,6 @@
 import { NewsItem } from "@/lib/news-types";
 import Link from "next/link";
+import Image from "next/image";
 
 interface NewsCardProps {
   news: NewsItem;
@@ -40,11 +41,6 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
   // Excerpt: first sentence of the story
   const excerpt = news.story.split(/(?<=[.!?])\s/)[0] || news.story.substring(0, 180);
 
-  const sourceNames = news.sourcesUsed
-    .map((s) => s.source)
-    .filter((s, i, arr) => arr.indexOf(s) === i)
-    .join(", ");
-
   if (variant === "featured") {
     return (
       <Link
@@ -52,10 +48,20 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
         className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300"
         style={{ minHeight: 360 }}
       >
-        {/* Gradient background */}
-        <div
-          className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-60 group-hover:opacity-70 transition-opacity duration-500`}
-        />
+        {/* Cover: photo or gradient */}
+        {news.imageUrl ? (
+          <Image
+            src={news.imageUrl}
+            alt={news.title}
+            fill
+            className="object-cover opacity-50 group-hover:opacity-60 transition-opacity duration-500"
+            sizes="(max-width: 768px) 100vw, 80vw"
+          />
+        ) : (
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-60 group-hover:opacity-70 transition-opacity duration-500`}
+          />
+        )}
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
 
@@ -78,8 +84,6 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
 
           <div className="flex items-center gap-3 text-white/40 text-[11px] tracking-wide">
             <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
-            <span className="w-3 h-px bg-white/20" aria-hidden="true" />
-            <span>{sourceNames}</span>
             <span className="ml-auto flex items-center gap-1.5 text-accent-400 text-xs font-semibold group-hover:gap-2.5 transition-all duration-200">
               Read story
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -97,9 +101,19 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
       href={href}
       className="group flex flex-col rounded-lg bg-card border border-border hover:border-navy-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
     >
-      {/* Gradient "cover image" — 16:9 */}
+      {/* Cover: photo or gradient — 16:9 */}
       <div className={`relative w-full aspect-video overflow-hidden bg-gradient-to-br ${gradient}`}>
-        <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-500 bg-gradient-to-br opacity-100" />
+        {news.imageUrl ? (
+          <Image
+            src={news.imageUrl}
+            alt={news.title}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        ) : (
+          <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-500 bg-gradient-to-br opacity-100" />
+        )}
         {/* Category label in bottom-left */}
         <div className="absolute inset-0 flex items-end p-3">
           <span className="text-[10px] font-semibold tracking-widest uppercase text-white/50">
@@ -127,8 +141,6 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
 
         <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 pt-3 border-t border-border/60">
           <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
-          <span className="w-3 h-px bg-border-2" aria-hidden="true" />
-          <span className="truncate">{sourceNames}</span>
         </div>
       </div>
     </Link>

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { Redis } from "@upstash/redis";
 import { NewsCollection, NewsItem } from "@/lib/news-types";
 
@@ -86,10 +87,24 @@ export default async function NewsStoryPage({ params }: Props) {
     <>
       {/* Hero */}
       <div className="bg-navy-900 text-white">
-        {/* Gradient cover */}
-        <div className={`relative h-48 sm:h-64 md:h-80 overflow-hidden bg-gradient-to-br ${gradient}`}>
-          <div className="absolute inset-0 bg-gradient-to-t from-navy-900 via-navy-900/60 to-navy-900/20" />
-        </div>
+        {/* Cover: photo or gradient */}
+        {item.imageUrl ? (
+          <div className="relative h-48 sm:h-64 md:h-80 overflow-hidden">
+            <Image
+              src={item.imageUrl}
+              alt={item.title}
+              fill
+              className="object-cover opacity-50"
+              priority
+              sizes="100vw"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-navy-900 via-navy-900/60 to-navy-900/20" />
+          </div>
+        ) : (
+          <div className={`relative h-48 sm:h-64 md:h-80 overflow-hidden bg-gradient-to-br ${gradient}`}>
+            <div className="absolute inset-0 bg-gradient-to-t from-navy-900 via-navy-900/60 to-navy-900/20" />
+          </div>
+        )}
 
         <div className="mx-auto max-w-[680px] px-4 sm:px-6 py-10 sm:py-14">
           {/* Breadcrumb */}

@@ -160,11 +160,19 @@ export async function synthesizeGroupedArticles(
         continue;
       }
 
+      const { title: parsedTitle, story: parsedStory } = parseHeadlineAndStory(
+        synthesizedText,
+        group.topic
+      );
+
+      const imageUrl = await fetchUnsplashImage(parsedTitle);
+
       const newsItem: NewsItem = {
         id: generateId(group.topic),
-        title: extractTitle(synthesizedText, group.topic),
-        story: synthesizedText,
+        title: parsedTitle,
+        story: parsedStory,
         category: group.category,
+        imageUrl: imageUrl ?? undefined,
         publishedAt: new Date().toISOString(),
         importance: group.importance,
         sentiment: inferSentiment(synthesizedText),
@@ -222,7 +230,10 @@ RULES
 4 Synthesize the information — do not repeat the same fact across multiple paragraphs
 5 Write with analytical depth and measured tone, not sensationalism
 6 Do not invent any facts not present in the provided sources
-7 Start directly with the first paragraph — no headline
+7 Do NOT use any markdown formatting: no headers (#), no bullet points, no bold/italic markers, no horizontal rules
+8 Do NOT use dashes (em dash or hyphen) in your writing
+9 Write in third person only. Never use "I" or first-person perspective
+10 Write in plain prose paragraphs only
 
 Write for a financially literate reader who values accuracy and insight over hype.`;
 }
@@ -247,19 +258,55 @@ Summary: ${article.summary}`
 
 ${articleTexts}
 
-Write the story now.`;
+Format your response EXACTLY as:
+HEADLINE: [sharp, specific news headline, 8 to 12 words, no dashes]
+
+[story body paragraphs]`;
 }
 
 /**
- * Extract title
+ * Parse HEADLINE: prefix from synthesized text.
+ * Returns { title, story } with the headline stripped from the story body.
  */
-function extractTitle(story: string, fallback: string): string {
-  const firstSentence = story.split(/[.!?]/)[0];
+function parseHeadlineAndStory(
+  raw: string,
+  fallback: string
+): { title: string; story: string } {
+  const lines = raw.split("\n");
+  if (lines[0].startsWith("HEADLINE:")) {
+    const title = lines[0].replace("HEADLINE:", "").trim();
+    // Drop the headline line (and any immediately following blank line)
+    const rest = lines.slice(1);
+    const story = rest.join("\n").trim();
+    if (title.length > 5) return { title, story };
+  }
+  // Fallback: use first sentence as title, full text as story
+  const firstSentence = raw.split(/[.!?]/)[0].trim();
+  const title =
+    firstSentence.length > 10 && firstSentence.length < 150
+      ? firstSentence
+      : fallback;
+  return { title, story: raw };
+}
 
-  if (firstSentence && firstSentence.length > 10 && firstSentence.length < 150)
-    return firstSentence.trim();
-
-  return fallback;
+/**
+ * Fetch a relevant landscape photo from Unsplash for a given search query.
+ * Returns the `urls.regular` string, or null if unavailable.
+ */
+async function fetchUnsplashImage(query: string): Promise<string | null> {
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!key) return null;
+  try {
+    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Client-ID ${key}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.results?.[0]?.urls?.regular as string) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
