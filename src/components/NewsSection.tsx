@@ -26,12 +26,12 @@ export default function NewsSection({
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [category, setCategory] = useState<CategoryFilter>("all");
 
-  // Fetch news from /data/news.json
+  // Fetch news from /api/news (reads from /tmp/news.json)
   useEffect(() => {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/data/news.json", {
+        const response = await fetch("/api/news", {
           headers: { "Cache-Control": "max-age=300" }, // 5 min cache
         });
 

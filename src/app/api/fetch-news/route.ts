@@ -11,15 +11,11 @@ import {
 import { synthesizeGroupedArticles } from "@/lib/news-synthesis";
 import { NewsCollection, ArchivedNewsCollection, NewsItem } from "@/lib/news-types";
 
-const DATA_DIR = path.join(process.cwd(), "public/data");
+// Use /tmp for Vercel serverless compatibility (writable at runtime)
+const DATA_DIR = "/tmp";
 const ACTIVE_NEWS_FILE = path.join(DATA_DIR, "news.json");
 const ARCHIVE_NEWS_FILE = path.join(DATA_DIR, "news-archive.json");
 const RETENTION_DAYS = 30;
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 /**
  * GET /api/fetch-news
