@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { NewsCollection } from "@/lib/news-types";
-
-export const maxDuration = 10;
-export const runtime = "nodejs";
+import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 
 /**
  * GET /api/news
@@ -64,7 +62,11 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(newsData, {
+    // Filter out administratively suppressed articles
+    const filteredNews = newsData.news.filter((item) => !SUPPRESSED_ARTICLE_IDS.has(item.id));
+    const filtered = { ...newsData, news: filteredNews, meta: { ...newsData.meta, totalCount: filteredNews.length } };
+
+    return NextResponse.json(filtered, {
       status: 200,
       headers: {
         // CDN caches for 90s; serves stale for 30s while revalidating — new stories appear within ~90s

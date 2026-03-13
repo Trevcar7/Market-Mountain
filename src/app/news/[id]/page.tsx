@@ -4,12 +4,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { Redis } from "@upstash/redis";
 import { NewsCollection, NewsItem } from "@/lib/news-types";
+import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
 async function getNewsItem(id: string): Promise<NewsItem | null> {
+  // Return 404 immediately for suppressed articles
+  if (SUPPRESSED_ARTICLE_IDS.has(id)) return null;
+
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
