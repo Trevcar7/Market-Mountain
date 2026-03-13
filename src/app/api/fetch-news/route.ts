@@ -70,37 +70,66 @@ interface HealthStatus {
   status: "healthy" | "degraded" | "critical";
   missing: string[];
   warnings: string[];
+  optional: Record<string, boolean>;
 }
 
 function healthCheck(): HealthStatus {
   const missing: string[] = [];
   const warnings: string[] = [];
 
+  // Required — pipeline cannot run without these
   if (!process.env.ANTHROPIC_API_KEY) missing.push("ANTHROPIC_API_KEY");
   if (!process.env.KV_REST_API_URL) missing.push("KV_REST_API_URL");
   if (!process.env.KV_REST_API_TOKEN) missing.push("KV_REST_API_TOKEN");
   if (!process.env.FETCH_NEWS_SECRET) missing.push("FETCH_NEWS_SECRET");
 
+  // Conditionally required — each degrades one feature
   if (!process.env.FINNHUB_API_KEY) warnings.push("FINNHUB_API_KEY not set — Finnhub source disabled");
   if (!process.env.NEWSAPI_API_KEY) warnings.push("NEWSAPI_API_KEY not set — NewsAPI source disabled");
   if (!process.env.UNSPLASH_ACCESS_KEY) warnings.push("UNSPLASH_ACCESS_KEY not set — using fallback images");
 
+  // Optional enrichment API keys — presence/absence logged for diagnostics
+  const optional: Record<string, boolean> = {
+    FRED_API_KEY: !!process.env.FRED_API_KEY,
+    BLS_API_KEY: !!process.env.BLS_API_KEY,
+    EIA_API_KEY: !!process.env.EIA_API_KEY,
+    FMP_API_KEY: !!process.env.FMP_API_KEY,
+    ALPHAVANTAGE_API_KEY: !!process.env.ALPHAVANTAGE_API_KEY,
+    POLYGON_API_KEY: !!process.env.POLYGON_API_KEY,
+    NEXT_PUBLIC_SITE_URL: !!process.env.NEXT_PUBLIC_SITE_URL,
+  };
+
   const status =
     missing.length > 0 ? "critical" : warnings.length > 0 ? "degraded" : "healthy";
 
-  return { status, missing, warnings };
+  return { status, missing, warnings, optional };
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/fetch-news — manual trigger for testing
+// GET /api/fetch-news — health check (no token) OR manual trigger (with token)
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
   const token = request.headers.get("x-fetch-news-token");
   const expectedToken = process.env.FETCH_NEWS_SECRET;
 
-  if (token !== expectedToken && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // No token → return health/env-var status only (safe, no secret values exposed)
+  if (!token || token !== expectedToken) {
+    const health = healthCheck();
+    return NextResponse.json(
+      {
+        health: health.status,
+        required: {
+          set: ["ANTHROPIC_API_KEY", "KV_REST_API_URL", "KV_REST_API_TOKEN", "FETCH_NEWS_SECRET"].filter(
+            (k) => !health.missing.includes(k)
+          ),
+          missing: health.missing,
+        },
+        optional: health.optional,
+        warnings: health.warnings,
+      },
+      { status: health.missing.length > 0 ? 503 : 200 }
+    );
   }
 
   return handleNewsFetch();
