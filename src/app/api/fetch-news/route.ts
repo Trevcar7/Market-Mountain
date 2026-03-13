@@ -373,8 +373,11 @@ async function handleNewsFetch() {
     }
 
     // 5. Synthesize with Claude
+    // Pass existingActive so the synthesis can:
+    //   (a) prevent duplicate images vs. the current feed
+    //   (b) run the editorial QA gate against the full existing context
     console.log(`[fetch-news] Starting synthesis on ${groupsToSynthesize.length} groups`);
-    const { stories, stats: synthStats } = await synthesizeGroupedArticles(groupsToSynthesize);
+    const { stories, stats: synthStats } = await synthesizeGroupedArticles(groupsToSynthesize, existingActive);
     stats.posted = synthStats.posted;
     stats.rejected = synthStats.rejected;
     stats.errors = synthStats.errors;

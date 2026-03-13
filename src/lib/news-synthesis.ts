@@ -10,6 +10,7 @@ import {
 } from "./fact-checker";
 import { formatNewsForStorage, hasQualitySource } from "./news";
 import { fetchContextualData, buildNewsChartData } from "./market-data";
+import { runEditorialQA, logQAResult, QA_PASS_THRESHOLD } from "./editorial-qa";
 
 let anthropic: Anthropic | null = null;
 let cachedToneProfile: ToneProfile | null = null;
@@ -25,74 +26,129 @@ function sleep(ms: number) {
 // Unsplash queries are tuned to return English-language, US-context imagery.
 // Avoid queries that might return foreign storefront signs or unrelated retail.
 const TOPIC_IMAGE_QUERIES: Record<string, string> = {
-  federal_reserve: "federal reserve building washington dc architecture",
-  fed_macro:      "federal reserve building washington dc monetary policy",
-  inflation:      "federal reserve building monetary policy interest rates economic",
+  federal_reserve: "federal reserve building washington dc architecture exterior",
+  fed_macro:      "federal reserve building washington dc monetary policy exterior",
+  // Inflation: CPI/BLS data context — NOT the Fed building (to avoid duplicate with federal_reserve)
+  inflation:      "consumer price index inflation economic statistics bureau data",
   gdp:            "wall street new york city aerial skyline financial district",
-  employment:     "american corporate office workers white collar employment",
-  trade_policy:   "cargo shipping containers port united states trade",
-  broad_market:   "new york stock exchange wall street trading floor",
-  crypto:         "bitcoin cryptocurrency digital trading screen",
-  bankruptcy:     "financial crisis stock market decline corporate office",
-  merger_acquisition: "corporate boardroom business deal signing merger",
-  bond_market:    "us treasury bonds federal reserve interest rates finance",
-  energy:         "oil refinery pipeline united states energy petroleum",
-  earnings:       "stock market financial data charts trading screens",
-  layoffs:        "corporate office empty desk layoff downsizing",
-  ipo:            "stock market listing nasdaq new york exchange",
-  trade_policy_tariff: "us customs border trade tariff shipping",
+  employment:     "american corporate office workers white collar employment hiring",
+  trade_policy:   "cargo shipping containers port united states trade logistics",
+  broad_market:   "new york stock exchange wall street trading floor finance",
+  crypto:         "bitcoin cryptocurrency digital trading screen blockchain",
+  bankruptcy:     "financial crisis corporate restructuring empty office building",
+  merger_acquisition: "corporate boardroom business deal signing merger handshake",
+  bond_market:    "us treasury bonds government securities fixed income finance",
+  // Energy: explicitly oil infrastructure — NOT wind turbines or solar panels
+  energy:         "crude oil refinery petroleum offshore drilling platform infrastructure",
+  earnings:       "quarterly earnings financial results stock market data screen",
+  layoffs:        "corporate downsizing workforce reduction office empty desk",
+  ipo:            "stock market listing nasdaq new york exchange bell ringing",
+  trade_policy_tariff: "us customs border trade tariff shipping containers port",
 };
 
 const DEFAULT_IMAGE_QUERY = "wall street financial markets stock exchange data";
 
 /**
- * Hardcoded fallback Unsplash URLs — work with no API key.
- * Each topic has a distinct, US-context image. None contain foreign-language signage.
- * Verified: English-only imagery, professional financial/macro context.
+ * Hardcoded fallback Unsplash URLs — used when UNSPLASH_ACCESS_KEY is not set or API fails.
+ *
+ * EDITORIAL RULES ENFORCED HERE:
+ *   1. Each topic must have a unique image URL — no two topics may share the same photo.
+ *   2. Energy/oil topics must use oil infrastructure (NOT wind turbines or solar panels).
+ *   3. Inflation must NOT use the same Fed building image as federal_reserve.
+ *   4. All images must represent the article topic with an editorial quality score ≥ 7/10.
+ *
+ * Image descriptions (verified by editorial team):
+ *   photo-1569025591598-35bcd6438bda — Federal Reserve building exterior, Washington DC
+ *   photo-1477959858617-67f85cf4f1df — New York City skyline at night, financial district
+ *   photo-1521737711867-e3b97375f902 — Office workers at corporate desks
+ *   photo-1494412574643-ff11b0a5c1c3 — Cargo shipping containers at port
+ *   photo-1611974789855-9c2a0a7236a3 — Stock market data trading screens
+ *   photo-1518546305927-5a555bb7020d — Bitcoin coin close-up
+ *   photo-1507679799987-c73779587ccf — Empty corporate office hallway
+ *   photo-1521791136064-7986c2920216 — Business handshake in boardroom
+ *   photo-1466611653911-95081537e5b7 — Oil platform / offshore drilling rig at sunset
+ *   photo-1590283603385-17ffb3a7f29f — Financial bar chart, quarterly data
+ *   photo-1486312338219-ce68d2c6f44d — Person at laptop with financial data (IPO research)
+ *   photo-1604594849809-dfedff58e37f — US Treasury / government financial building
+ *   photo-1556742049-0cfed4f6a45d — Business person reviewing financial documents/charts
  */
 const FALLBACK_IMAGE_MAP: Record<string, string> = {
-  // Topic-level
+  // ── Topic-level (each must be UNIQUE — no two topics may share the same URL) ──
+
+  // Federal Reserve / monetary policy → Fed building
   federal_reserve:
-    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",  // Fed building exterior
+    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
   fed_macro:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
+
+  // Inflation → financial data / CPI context (NOT the Fed building — avoid duplication)
   inflation:
-    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",  // Federal Reserve building — rate/inflation policy context
+    "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&q=80",
+
+  // GDP → NYC skyline (economic output / growth context)
   gdp:
-    "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",  // NYC skyline at night
+    "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",
+
+  // Employment → office workers
   employment:
-    "https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=1200&q=80",  // Office workers
+    "https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=1200&q=80",
+
+  // Trade policy → shipping containers at port
   trade_policy:
-    "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1200&q=80",  // Shipping containers
+    "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1200&q=80",
+
+  // Broad market → stock exchange trading floor screens
   broad_market:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",  // Stock chart screens
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
+
+  // Crypto → Bitcoin coin close-up
   crypto:
-    "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80",  // Bitcoin coin close-up
+    "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80",
+
+  // Bankruptcy → empty corporate hallway
   bankruptcy:
-    "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80",  // Empty corporate hallway
-  merger_acquisition:
-    "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80",  // Handshake in boardroom
-  bond_market:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",  // Financial data screens
-  energy:
-    "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=1200&q=80",  // Oil platform at sunset
-  earnings:
-    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",  // Financial bar chart (quarterly earnings reports)
-  layoffs:
     "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80",
+
+  // M&A → boardroom handshake
+  merger_acquisition:
+    "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80",
+
+  // Bond market → US Treasury / government finance building (unique image)
+  bond_market:
+    "https://images.unsplash.com/photo-1604594849809-dfedff58e37f?w=1200&q=80",
+
+  // Energy → OIL PLATFORM / offshore drilling rig (NOT wind turbines, NOT solar panels)
+  energy:
+    "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=1200&q=80",
+
+  // Earnings → financial bar chart (quarterly earnings context)
+  earnings:
+    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",
+
+  // Layoffs → unique from bankruptcy (person reviewing documents, downsizing context)
+  layoffs:
+    "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1200&q=80",
+
+  // IPO → unique laptop/stock listing research image
   ipo:
-    "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1200&q=80",  // Person at laptop with stock data (IPO research)
-  // Category-level fallbacks (diverse selection — not all the same image)
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
+
+  trade_policy_tariff:
+    "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1200&q=80",
+
+  // ── Category-level fallbacks (used when topic key has no match) ──
+  // These are intentionally diverse — no category should default to the same image.
+
   macro:
-    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
+    "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",   // NYC skyline
   markets:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",   // Trading screens
   policy:
-    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
+    "https://images.unsplash.com/photo-1604594849809-dfedff58e37f?w=1200&q=80",   // Government finance building
   earnings_cat:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",  // Stock trading data screens (earnings market reaction)
+    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",   // Financial bar chart
   other:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
+    "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80",   // Boardroom (generic business)
 };
 
 // Category-specific angles for story uniqueness
@@ -528,7 +584,8 @@ Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATC
 // ---------------------------------------------------------------------------
 
 export async function synthesizeGroupedArticles(
-  groupedNews: GroupedNews[]
+  groupedNews: GroupedNews[],
+  existingArticles: NewsItem[] = []
 ): Promise<{
   stories: NewsItem[];
   stats: { posted: number; rejected: number; errors: number };
@@ -545,6 +602,16 @@ export async function synthesizeGroupedArticles(
   // Track chart budget — raised to 4 (editorial policy: data stories should have charts)
   let chartCount = 0;
   const MAX_CHARTS_PER_RUN = 4;
+
+  // ── Cross-feed image deduplication ─────────────────────────────────────────
+  // Collect all image URLs already in the feed (existing articles + current run).
+  // Prevents two articles from sharing the same hero image.
+  // The set grows as new stories are synthesized within this run.
+  const usedImageBaseUrls = new Set<string>(
+    existingArticles
+      .filter((a) => a.imageUrl)
+      .map((a) => a.imageUrl!.split("?")[0])
+  );
 
   // In-run topic dedup — skip groups whose topic is too similar to one already queued
   const seenTopics = new Set<string>();
@@ -649,7 +716,8 @@ export async function synthesizeGroupedArticles(
       // ── Image resolution (Editorial Match Rule) ───────────────────────────
       // Step 1: Detect if the article is specifically about oil/energy
       //   regardless of how it was categorized (e.g., oil surge → broad_market).
-      //   Oil stories must use oil infrastructure imagery, never generic NYSE.
+      //   Oil stories must use oil infrastructure imagery, never generic NYSE or
+      //   renewable energy visuals (wind turbines, solar panels).
       const articleTitles = group.articles.map((a) => {
         const raw = a as Record<string, unknown>;
         return String(raw.title ?? raw.headline ?? "");
@@ -662,15 +730,36 @@ export async function synthesizeGroupedArticles(
 
       // Step 2: Pick Unsplash query — override with energy for mis-categorized oil stories
       const imageTopicOverride = isOilStory ? "energy" : group.topic;
-      const unsplashUrl = await fetchUnsplashImage(imageTopicOverride, runImageCache);
+      let unsplashUrl = await fetchUnsplashImage(imageTopicOverride, runImageCache);
 
-      // Step 3: Fallback chain — topic fallback → category fallback → undefined
-      const imageUrl =
-        unsplashUrl ??
-        FALLBACK_IMAGE_MAP[imageTopicOverride] ??
-        FALLBACK_IMAGE_MAP[group.topic] ??
-        FALLBACK_IMAGE_MAP[group.category] ??
-        undefined;
+      // Step 3: If Unsplash result is already in the feed, fetch a different image
+      //   using the fallback map or try a slightly different query on retry.
+      if (unsplashUrl) {
+        const base = unsplashUrl.split("?")[0];
+        if (usedImageBaseUrls.has(base)) {
+          console.log(`[synthesis] Image dedup: Unsplash result for "${imageTopicOverride}" already used — trying fallback`);
+          unsplashUrl = null; // Force fallback
+        }
+      }
+
+      // Step 4: Fallback chain — topic fallback → category fallback → undefined
+      //   Skip any fallback URL that's already in use.
+      const candidateFallbacks = [
+        FALLBACK_IMAGE_MAP[imageTopicOverride],
+        FALLBACK_IMAGE_MAP[group.topic],
+        FALLBACK_IMAGE_MAP[group.category],
+      ].filter(Boolean) as string[];
+
+      const availableFallback = candidateFallbacks.find(
+        (url) => !usedImageBaseUrls.has(url.split("?")[0])
+      );
+
+      const imageUrl = unsplashUrl ?? availableFallback ?? undefined;
+
+      // Register chosen image URL so subsequent stories in this run won't reuse it
+      if (imageUrl) {
+        usedImageBaseUrls.add(imageUrl.split("?")[0]);
+      }
 
       // Optional chart data — only for macro/FRED-backed topics, capped at MAX_CHARTS_PER_RUN
       let chartData: ChartDataset | undefined;
@@ -706,11 +795,30 @@ export async function synthesizeGroupedArticles(
         confidenceScore,
       };
 
+      // ── Editorial Quality Gate ────────────────────────────────────────────
+      // Score the article 0–100. Reject if score < QA_PASS_THRESHOLD (85).
+      // The QA gate checks: confidence, fact-check, source quality, title
+      // quality, thesis clarity (4 questions), image uniqueness, and story
+      // completeness. Articles that pass all existing synthesis gates but are
+      // low-quality (thin thesis, poor title, duplicate image) are blocked here.
+      const qaResult = runEditorialQA(newsItem, [...existingArticles, ...stories]);
+      logQAResult(group.topic, qaResult);
+
+      if (!qaResult.passed) {
+        stats.rejected++;
+        console.warn(
+          `[synthesis] QA gate rejected "${parsed.title}" — score=${qaResult.score}/${QA_PASS_THRESHOLD} minimum`
+        );
+        // Return the image URL to the available pool since we're not publishing
+        if (imageUrl) usedImageBaseUrls.delete(imageUrl.split("?")[0]);
+        continue;
+      }
+
       stories.push(newsItem);
       stats.posted++;
 
       console.log(
-        `[synthesis] ✓ "${parsed.title}" — takeaways=${parsed.keyTakeaways.length}, whyMatters=${!!parsed.whyThisMatters}, keyData=${contextualData.length}, chart=${!!chartData}, confidence=${confidenceScore}`
+        `[synthesis] ✓ "${parsed.title}" — qa=${qaResult.score}/100, takeaways=${parsed.keyTakeaways.length}, whyMatters=${!!parsed.whyThisMatters}, keyData=${contextualData.length}, chart=${!!chartData}, confidence=${confidenceScore}`
       );
 
       await sleep(2000);

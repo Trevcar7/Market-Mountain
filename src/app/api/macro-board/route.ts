@@ -4,10 +4,8 @@ import { MacroBoardData, MacroIndicator } from "@/lib/news-types";
 import {
   fetchFredSeries,
   fetchWtiCrudePrice,
-  fetchBrentCrudePrice,
   BLS_SERIES,
   fetchBlsMultipleSeries,
-  fetchBitcoinPrice,
 } from "@/lib/market-data";
 
 export const runtime = "nodejs";
@@ -69,16 +67,23 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
   const validUntil = new Date(now.getTime() + CACHE_SECONDS * 1000);
 
   // Fetch all indicators in parallel — each gracefully degrades on failure
-  const [fedObs, tenYearObs, twoYearObs, cpiObs, coreCpiObs, wti, brent, blsObs, btcObs] = await Promise.allSettled([
+  //
+  // Indicators included (8 core macro + WTI energy):
+  //   1. Fed Funds Rate   5. CPI YoY
+  //   2. 10-Year Yield    6. Core CPI YoY
+  //   3. 2-Year Yield     7. WTI Crude (key energy/inflation input)
+  //   4. Yield Curve      8. Unemployment
+  //   9. Nonfarm Payrolls
+  //
+  // Removed: Bitcoin (not a macro indicator), Brent Crude (redundant with WTI)
+  const [fedObs, tenYearObs, twoYearObs, cpiObs, coreCpiObs, wtiObs, blsObs] = await Promise.allSettled([
     fetchFredSeries("DFEDTARU", 3),   // Fed Funds upper target
     fetchFredSeries("DGS10", 3),      // 10-Year Treasury
     fetchFredSeries("DGS2", 3),       // 2-Year Treasury
     fetchFredSeries("CPIAUCSL", 14),  // CPI index — 14 months for YoY
     fetchFredSeries("CPILFESL", 14),  // Core CPI index — 14 months for YoY
-    fetchWtiCrudePrice(),             // WTI crude oil ($/bbl)
-    fetchBrentCrudePrice(),           // Brent crude oil ($/bbl)
+    fetchWtiCrudePrice(),             // WTI crude oil ($/bbl) — primary energy input
     fetchBlsMultipleSeries([BLS_SERIES.NONFARM_PAYROLLS, BLS_SERIES.UNEMPLOYMENT], 1),
-    fetchBitcoinPrice(),              // Bitcoin price (USD)
   ]);
 
   const fedData     = fedObs.status      === "fulfilled" ? fedObs.value      : [];
@@ -86,10 +91,8 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
   const twoYearData = twoYearObs.status  === "fulfilled" ? twoYearObs.value  : [];
   const cpiData     = cpiObs.status      === "fulfilled" ? cpiObs.value      : [];
   const coreCpiData = coreCpiObs.status  === "fulfilled" ? coreCpiObs.value  : [];
-  const wtiData     = wti.status         === "fulfilled" ? wti.value         : null;
-  const brentData   = brent.status       === "fulfilled" ? brent.value       : null;
+  const wtiData     = wtiObs.status      === "fulfilled" ? wtiObs.value      : null;
   const blsRaw      = blsObs.status      === "fulfilled" ? blsObs.value      : {};
-  const btcData     = btcObs.status      === "fulfilled" ? btcObs.value      : null;
 
   const payrollsArr = blsRaw[BLS_SERIES.NONFARM_PAYROLLS] ?? [];
   const unemployArr = blsRaw[BLS_SERIES.UNEMPLOYMENT]     ?? [];
@@ -210,17 +213,6 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
     });
   }
 
-  // 8. Brent Crude Oil
-  if (brentData) {
-    indicators.push({
-      label: "Brent Crude",
-      value: `$${brentData.value.toFixed(2)}`,
-      direction: "flat",
-      source: "EIA",
-      updatedAt: brentData.period,
-    });
-  }
-
   // 9. Unemployment Rate
   if (unemployArr.length > 0) {
     const val = parseFloat(unemployArr[0].value);
@@ -247,30 +239,17 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
     });
   }
 
-  // 11. Bitcoin Price
-  if (btcData) {
-    const priceStr = btcData.price >= 1000
-      ? `$${(btcData.price / 1000).toFixed(1)}K`
-      : `$${btcData.price.toFixed(0)}`;
-    indicators.push({
-      label: "Bitcoin",
-      value: priceStr,
-      direction: "flat",
-      source: "AV",
-      updatedAt: btcData.updatedAt,
-    });
-  }
-
   // ---------------------------------------------------------------------------
   // Regime classification
   // ---------------------------------------------------------------------------
   const regimeTags: string[] = [];
 
-  const fedRate    = indicators.find((i) => i.label === "Fed Funds Rate");
-  const cpiYoy     = indicators.find((i) => i.label === "CPI (YoY)");
-  const wtiInd     = indicators.find((i) => i.label === "WTI Crude");
+  const fedRate      = indicators.find((i) => i.label === "Fed Funds Rate");
+  const cpiYoy       = indicators.find((i) => i.label === "CPI (YoY)");
+  const coreCpiYoy   = indicators.find((i) => i.label === "Core CPI (YoY)");
+  const wtiInd       = indicators.find((i) => i.label === "WTI Crude");
   const unemployment = indicators.find((i) => i.label === "Unemployment");
-  const yieldCurve = indicators.find((i) => i.label === "Yield Curve");
+  const yieldCurve   = indicators.find((i) => i.label === "Yield Curve");
 
   if (fedRate) {
     const rate = parseFloat(fedRate.value);
@@ -280,10 +259,14 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
     else if (fedRate.direction === "up") regimeTags.push("Policy Tightening");
   }
 
-  if (cpiYoy) {
-    const cpi = parseFloat(cpiYoy.value);
+  // Use Core CPI if available (Fed's preferred inflation signal); fall back to headline CPI
+  const inflationIndicator = coreCpiYoy ?? cpiYoy;
+  if (inflationIndicator) {
+    const cpi = parseFloat(inflationIndicator.value);
     if (cpi > 3.5) regimeTags.push("Inflation Persistent");
-    else if (cpi >= 2.0 && cpiYoy.direction === "down") regimeTags.push("Disinflation Trend");
+    else if (cpi > 2.5 && inflationIndicator.direction !== "down") regimeTags.push("Above-Target Inflation");
+    else if (cpi >= 2.0 && inflationIndicator.direction === "down") regimeTags.push("Disinflation Trend");
+    else if (cpi < 2.0) regimeTags.push("Inflation Near Target");
   }
 
   if (wtiInd) {
