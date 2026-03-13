@@ -46,6 +46,7 @@ const PER_CATEGORY_CAP: Record<string, number> = {
 
 const MIN_IMPORTANCE = 8;
 const MAX_GROUPS_PER_RUN = 3; // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
+const MIN_STORIES_TO_PUBLISH = 3; // Publish Decision Layer: require ≥3 quality stories
 
 // ---------------------------------------------------------------------------
 // Redis client
@@ -156,6 +157,9 @@ async function handleNewsFetch() {
     errors: 0,
     crossRunSuppressed: 0,
     executionMs: 0,
+    publishDecision: "pending" as "pending" | "published" | "skipped" | "insufficient",
+    storiesWithWhyMatters: 0,
+    storiesWithKeyData: 0,
   };
 
   try {
@@ -271,6 +275,31 @@ async function handleNewsFetch() {
 
     console.log(`[fetch-news] Synthesis complete: posted=${synthStats.posted}, rejected=${synthStats.rejected}, errors=${synthStats.errors}`);
 
+    // 5b. Publish Decision Layer — require ≥3 quality stories with whyThisMatters
+    const qualityStories = stories.filter(
+      (s) => s.whyThisMatters && s.whyThisMatters.length > 10
+    );
+    stats.storiesWithWhyMatters = qualityStories.length;
+    stats.storiesWithKeyData = stories.filter((s) => (s.keyDataPoints?.length ?? 0) > 0).length;
+
+    if (stories.length < MIN_STORIES_TO_PUBLISH && existingActive.length === 0) {
+      stats.publishDecision = "insufficient";
+      stats.executionMs = Date.now() - startTime;
+      console.warn(
+        `[fetch-news] Publish decision: SKIP — only ${stories.length} new stories (need ${MIN_STORIES_TO_PUBLISH})`
+      );
+      return NextResponse.json({
+        success: true,
+        message: `Only ${stories.length} new stories synthesized — publish threshold not met, existing feed preserved`,
+        stats,
+        health: health.warnings,
+      });
+    }
+    stats.publishDecision = "published";
+    console.log(
+      `[fetch-news] Publish decision: PUBLISH — ${stories.length} new stories (${stats.storiesWithWhyMatters} with why-matters, ${stats.storiesWithKeyData} with key data)`
+    );
+
     // 5a. Write newly covered topics to Redis for cross-run memory
     if (stories.length > 0) {
       const topicUpdates: Record<string, string> = {};
@@ -370,6 +399,22 @@ async function handleNewsFetch() {
       }
     }
 
+    // 11. Trigger briefing generation asynchronously (fire-and-forget, don't block response)
+    if (stats.posted > 0) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
+      const secret = process.env.FETCH_NEWS_SECRET ?? "";
+      fetch(`${siteUrl}/api/briefing`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${secret}`,
+          "Content-Type": "application/json",
+        },
+      }).catch((err) => {
+        console.warn("[fetch-news] Briefing trigger failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      });
+      console.log("[fetch-news] Briefing generation triggered");
+    }
+
     stats.executionMs = Date.now() - startTime;
 
     console.log(`[fetch-news] FINAL STATS: ${JSON.stringify(stats)}`);
@@ -380,6 +425,7 @@ async function handleNewsFetch() {
       stats,
       health: health.warnings,
       nextUpdate: newsCollection.meta.nextUpdate,
+      publishDecision: stats.publishDecision,
     });
   } catch (error) {
     console.error("[fetch-news] Fatal error:", error);

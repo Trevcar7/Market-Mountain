@@ -78,16 +78,28 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
             {news.title}
           </h2>
 
-          <p className="text-white/55 text-sm leading-relaxed mb-5 line-clamp-2 hidden sm:block">
-            {excerpt}
-          </p>
+          {/* Why this matters — featured variant */}
+          {news.whyThisMatters ? (
+            <div className="mb-3 hidden sm:flex items-start gap-2">
+              <span className="shrink-0 text-[9px] font-bold tracking-widest uppercase text-accent-400 mt-0.5">
+                Why it matters
+              </span>
+              <p className="text-white/65 text-xs leading-relaxed line-clamp-2">
+                {news.whyThisMatters}
+              </p>
+            </div>
+          ) : (
+            <p className="text-white/55 text-sm leading-relaxed mb-5 line-clamp-2 hidden sm:block">
+              {excerpt}
+            </p>
+          )}
 
           <div className="flex items-center gap-3 text-white/40 text-[11px] tracking-wide">
             <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
             <span className="ml-auto flex items-center gap-1.5 text-accent-400 text-xs font-semibold group-hover:gap-2.5 transition-all duration-200">
               Read story
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
           </div>
@@ -137,8 +149,27 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
           {excerpt}
         </p>
 
+        {/* Why this matters strip */}
+        {news.whyThisMatters && (
+          <div className="mt-3 pt-3 border-t border-border/60">
+            <div className="flex items-start gap-1.5">
+              <span className="shrink-0 text-[9px] font-bold tracking-widest uppercase text-accent-600 mt-0.5">
+                Why it matters
+              </span>
+              <p className="text-text-muted text-xs leading-relaxed line-clamp-2">
+                {news.whyThisMatters}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 pt-3 border-t border-border/60">
           <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
+          {news.keyDataPoints && news.keyDataPoints.length > 0 && (
+            <span className="ml-auto text-[9px] font-semibold tracking-widest uppercase text-text-light bg-slate-100 px-1.5 py-0.5 rounded">
+              {news.keyDataPoints[0].label}: {news.keyDataPoints[0].value}
+            </span>
+          )}
         </div>
       </div>
     </Link>

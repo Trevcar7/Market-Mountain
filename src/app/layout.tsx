@@ -20,6 +20,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com"
+  ),
   title: {
     template: "%s | Market Mountain",
     default: "Market Mountain | Independent Equity Research",
@@ -29,6 +32,10 @@ export const metadata: Metadata = {
   openGraph: {
     siteName: "Market Mountain",
     type: "website",
+    url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com",
+  },
+  alternates: {
+    canonical: "/",
   },
 };
 

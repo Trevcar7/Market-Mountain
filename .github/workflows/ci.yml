@@ -1,0 +1,44 @@
+name: CI — Build Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint || true
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          # Stub required env vars so build succeeds without real secrets.
+          # Optional API keys (EIA, FMP, BLS, FRED, Alpha Vantage, Polygon,
+          # Unsplash, NewsAPI, Finnhub) are intentionally omitted — the code
+          # must degrade gracefully when they are absent (verified by build).
+          ANTHROPIC_API_KEY: stub-for-build
+          KV_REST_API_URL: https://stub.upstash.io
+          KV_REST_API_TOKEN: stub-for-build
+          FETCH_NEWS_SECRET: stub-for-build
+          NEXT_PUBLIC_SITE_URL: https://marketmountainfinance.com

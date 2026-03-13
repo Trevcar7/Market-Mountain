@@ -8,6 +8,23 @@ export interface NewsSource {
   source: string; // e.g., "Reuters", "Bloomberg", "CNBC"
 }
 
+export interface KeyDataPoint {
+  label: string;    // e.g., "Fed Funds Rate"
+  value: string;    // e.g., "5.25–5.50%"
+  change?: string;  // e.g., "+25bps" or "-0.3%"
+  source?: string;  // e.g., "FRED", "Bloomberg"
+}
+
+export interface ChartDataset {
+  title: string;
+  type: "bar" | "line";
+  labels: string[];   // x-axis labels (dates, tickers, etc.)
+  values: number[];   // y-axis values
+  unit?: string;      // e.g., "%" or "$B" or "bps"
+  source: string;     // Data source attribution
+  timeRange?: string; // e.g., "Jan 2024 – Mar 2026"
+}
+
 export interface NewsItem {
   id: string; // UUID or hash of story
   title: string;
@@ -25,11 +42,18 @@ export interface NewsItem {
   toneMatch?: string; // e.g., "Trevor's voice - analytical, measured"
   failureReason?: string; // If story was rejected
   imageUrl?: string; // Unsplash photo URL
+
+  // Editorial enrichment fields
+  whyThisMatters?: string;         // One-sentence significance explanation for homepage cards
+  whatToWatchNext?: string;        // Forward-looking signal for investors
+  secondOrderImplication?: string; // Beyond-the-headline market impact
+  keyDataPoints?: KeyDataPoint[];  // Important numbers with sources
+  chartData?: ChartDataset;        // Optional chart for data-driven stories
 }
 
 export interface NewsCollection {
   lastUpdated: string; // ISO 8601 timestamp
-  source: string; // "Finnhub + NewsAPI (synthesized via Gemini)"
+  source: string; // "Finnhub + NewsAPI (synthesized via Claude, fact-checked)"
   news: NewsItem[];
   meta: {
     totalCount: number;
@@ -51,6 +75,39 @@ export interface ArchivedNewsCollection {
     newestStory: string;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Daily Briefing
+// ---------------------------------------------------------------------------
+
+export interface DailyBriefing {
+  date: string;          // YYYY-MM-DD
+  generatedAt: string;   // ISO 8601
+  leadStory: {
+    id: string;
+    title: string;
+    whyItMatters: string;
+    summary: string;
+  };
+  topDevelopments: Array<{
+    id: string;
+    headline: string;
+    summary: string;
+    category: NewsItem["category"];
+  }>;
+  keyData: KeyDataPoint[];
+  whatToWatch: Array<{
+    event: string;
+    timing: string;
+    significance: string;
+  }>;
+  storiesPublished: number;
+  generatedFrom: string[]; // Story IDs used to generate briefing
+}
+
+// ---------------------------------------------------------------------------
+// Raw API types
+// ---------------------------------------------------------------------------
 
 export interface FinnhubArticle {
   headline?: string;
@@ -117,8 +174,8 @@ export function isNewsAPIArticle(article: unknown): article is NewsAPIArticle {
     typeof article === "object" &&
     article !== null &&
     "source" in article &&
-    typeof (article as any).source === "object" &&
-    "name" in (article as any).source
+    typeof (article as Record<string, unknown>).source === "object" &&
+    "name" in ((article as Record<string, unknown>).source as Record<string, unknown>)
   );
 }
 

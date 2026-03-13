@@ -26,6 +26,13 @@ jobs:
     steps:
       - name: Fetch news from Market Mountain API
         run: |
+          SITE_URL="${{ secrets.SITE_URL }}"
+          if [ -z "$SITE_URL" ]; then
+            SITE_URL="https://marketmountainfinance.com"
+          fi
+
+          echo "Triggering news fetch at $SITE_URL/api/fetch-news"
+
           # Capture both response body and HTTP status code
           body=$(curl -s \
             --max-time 90 \
@@ -33,7 +40,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${{ secrets.FETCH_NEWS_SECRET }}" \
             -H "Content-Type: application/json" \
-            https://marketmountainfinance.com/api/fetch-news)
+            "$SITE_URL/api/fetch-news")
 
           # Split status from body
           http_code=$(echo "$body" | tail -n1)
@@ -57,5 +64,6 @@ jobs:
           # Log stories posted count
           posted=$(echo "$response_body" | grep -o '"posted":[0-9]*' | head -1)
           suppressed=$(echo "$response_body" | grep -o '"crossRunSuppressed":[0-9]*' | head -1)
-          echo "Stories posted: $posted | Cross-run suppressed: $suppressed"
+          published=$(echo "$response_body" | grep -o '"publishDecision":"[^"]*"' | head -1)
+          echo "Stories posted: $posted | Cross-run suppressed: $suppressed | $published"
           echo "News fetch completed successfully"

@@ -29,11 +29,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!item) return {};
   return {
     title: `${item.title} | Market Mountain`,
-    description: item.story.split(".")[0] + ".",
+    description: item.whyThisMatters ?? item.story.split(".")[0] + ".",
+    alternates: { canonical: `/news/${id}` },
     openGraph: {
       title: item.title,
+      description: item.whyThisMatters ?? item.story.split(".")[0] + ".",
       type: "article",
       publishedTime: item.publishedAt,
+      ...(item.imageUrl ? { images: [{ url: item.imageUrl, width: 1200, height: 630 }] } : {}),
     },
   };
 }
@@ -72,10 +75,10 @@ export default async function NewsStoryPage({ params }: Props) {
   const gradient = categoryGradients[item.category] ?? categoryGradients.other;
   const categoryLabel = categoryLabels[item.category] ?? "Market News";
 
-  const sourceNames = item.sourcesUsed
-    .map((s) => s.source)
-    .filter((s, i, arr) => arr.indexOf(s) === i)
-    .join(", ");
+  // Unique sources for attribution
+  const uniqueSources = item.sourcesUsed
+    .filter((s, i, arr) => arr.findIndex((x) => x.source === s.source) === i)
+    .slice(0, 6);
 
   // Split story into paragraphs
   const paragraphs = item.story
@@ -106,7 +109,7 @@ export default async function NewsStoryPage({ params }: Props) {
           </div>
         )}
 
-        <div className="mx-auto max-w-[680px] px-4 sm:px-6 py-10 sm:py-14">
+        <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-[11px] text-white/35 mb-5" aria-label="Breadcrumb">
             <Link href="/" className="hover:text-white/60 transition-colors">Home</Link>
@@ -131,6 +134,16 @@ export default async function NewsStoryPage({ params }: Props) {
             {item.title}
           </h1>
 
+          {/* Why this matters — hero callout */}
+          {item.whyThisMatters && (
+            <div className="border-l-2 border-accent-500 pl-4 mb-6">
+              <p className="text-accent-300 text-[10px] font-bold tracking-widest uppercase mb-1">
+                Why it matters
+              </p>
+              <p className="text-white/75 text-sm leading-relaxed">{item.whyThisMatters}</p>
+            </div>
+          )}
+
           {/* Meta */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-white/40 text-[11px] tracking-widest uppercase">
             <span className="text-white/55 normal-case tracking-normal text-xs font-medium">
@@ -154,48 +167,146 @@ export default async function NewsStoryPage({ params }: Props) {
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       {/* Story body */}
-      <article className="mx-auto max-w-[680px] px-4 sm:px-6 py-10 sm:py-14">
-        <div className="prose prose-slate max-w-none">
-          {paragraphs.map((para, i) => (
-            <p key={i}>{para}</p>
-          ))}
-        </div>
+      <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
+        <div className="lg:grid lg:grid-cols-3 lg:gap-12">
+          {/* Main story column */}
+          <article className="lg:col-span-2">
+            <div className="prose prose-slate max-w-none">
+              {paragraphs.map((para, i) => (
+                <p key={i}>{para}</p>
+              ))}
+            </div>
 
-        {/* Tickers */}
-        {item.relatedTickers && item.relatedTickers.length > 0 && (
-          <div className="mt-8 flex flex-wrap gap-2">
-            {item.relatedTickers.map((ticker) => (
-              <span
-                key={ticker}
-                className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded text-xs font-mono font-semibold"
+            {/* Tickers */}
+            {item.relatedTickers && item.relatedTickers.length > 0 && (
+              <div className="mt-8 flex flex-wrap gap-2">
+                {item.relatedTickers.map((ticker) => (
+                  <span
+                    key={ticker}
+                    className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded text-xs font-mono font-semibold"
+                  >
+                    {ticker}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Second-order implication */}
+            {item.secondOrderImplication && (
+              <div className="mt-8 p-5 rounded-lg bg-navy-50 border border-border">
+                <p className="text-[10px] font-bold tracking-widest uppercase text-navy-600 mb-1.5">
+                  Second-Order Implication
+                </p>
+                <p className="text-navy-900 text-sm leading-relaxed">
+                  {item.secondOrderImplication}
+                </p>
+              </div>
+            )}
+
+            {/* What to watch next */}
+            {item.whatToWatchNext && (
+              <div className="mt-4 p-5 rounded-lg bg-accent-50 border border-accent-200">
+                <p className="text-[10px] font-bold tracking-widest uppercase text-accent-700 mb-1.5">
+                  What to Watch Next
+                </p>
+                <p className="text-navy-900 text-sm leading-relaxed">{item.whatToWatchNext}</p>
+              </div>
+            )}
+
+            {/* Source attribution */}
+            <div className="mt-8 pt-6 border-t border-border">
+              <p className="text-xs font-semibold tracking-widest uppercase text-text-light mb-3">
+                Data Sources
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {uniqueSources.map((src) =>
+                  src.url ? (
+                    <a
+                      key={src.source}
+                      href={src.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-accent-600 hover:text-accent-700 hover:underline transition-colors"
+                    >
+                      {src.source}
+                    </a>
+                  ) : (
+                    <span key={src.source} className="text-sm text-text-muted">
+                      {src.source}
+                    </span>
+                  )
+                )}
+              </div>
+              {item.keyDataPoints && item.keyDataPoints.length > 0 && (
+                <p className="text-xs text-text-light mt-2">
+                  Market data:{" "}
+                  {item.keyDataPoints
+                    .map((d) => d.source)
+                    .filter(Boolean)
+                    .filter((s, i, a) => a.indexOf(s) === i)
+                    .join(", ")}
+                </p>
+              )}
+            </div>
+
+            {/* Footer: back link */}
+            <div className="mt-8 pt-6 border-t border-border flex items-center justify-between">
+              <Link
+                href="/news"
+                className="inline-flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
               >
-                {ticker}
-              </span>
-            ))}
-          </div>
-        )}
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M12 7H2M6 3L2 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back to Market News
+              </Link>
+              <Link
+                href="/briefing"
+                className="text-sm font-medium text-text-muted hover:text-navy-900 transition-colors"
+              >
+                Today&apos;s Briefing
+              </Link>
+            </div>
+          </article>
 
-        {/* Source attribution */}
-        <div className="mt-8 pt-6 border-t border-border">
-          <p className="text-sm text-text-muted">
-            <span className="font-medium text-navy-900">Based on analysis of </span>
-            {sourceNames}
-          </p>
+          {/* Key Data sidebar (desktop only) */}
+          {item.keyDataPoints && item.keyDataPoints.length > 0 && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-6">
+                <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-4">
+                  Key Data
+                </p>
+                <div className="bg-navy-900 rounded-xl overflow-hidden">
+                  <div className="divide-y divide-white/10">
+                    {item.keyDataPoints.map((dp, i) => (
+                      <div key={i} className="px-4 py-3.5">
+                        <p className="text-white/40 text-[9px] font-semibold tracking-wider uppercase mb-0.5">
+                          {dp.label}
+                        </p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-white font-bold text-base">{dp.value}</span>
+                          {dp.change && (
+                            <span
+                              className={`text-xs font-semibold ${
+                                dp.change.startsWith("-") ? "text-red-400" : "text-accent-400"
+                              }`}
+                            >
+                              {dp.change}
+                            </span>
+                          )}
+                        </div>
+                        {dp.source && (
+                          <p className="text-white/25 text-[9px] mt-0.5">{dp.source}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </aside>
+          )}
         </div>
-
-        {/* Footer: back link */}
-        <div className="mt-8 pt-6 border-t border-border flex items-center justify-end">
-          <Link
-            href="/news"
-            className="inline-flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M12 7H2M6 3L2 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Back to Market News
-          </Link>
-        </div>
-      </article>
+      </div>
     </>
   );
 }
