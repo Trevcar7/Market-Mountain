@@ -54,7 +54,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
 
           <div className="flex items-center gap-3 text-white/40 text-[11px] tracking-wide">
             <time dateTime={article.date}>{formatDate(article.date)}</time>
-            <span className="w-3 h-px bg-white/20" aria-hidden="true" />
+            <span className="text-white/30" aria-hidden="true">·</span>
             <span>{article.readTime}</span>
             <span className="ml-auto flex items-center gap-1.5 text-accent-400 text-xs font-semibold group-hover:gap-2.5 transition-all duration-200">
               Read article
@@ -109,7 +109,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
 
         <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 sm:mt-4 sm:pt-4 sm:border-t sm:border-border/60">
           <time dateTime={article.date}>{formatDate(article.date)}</time>
-          <span className="w-3 h-px bg-border-2" aria-hidden="true" />
+          <span className="text-text-light" aria-hidden="true">·</span>
           <span>{article.readTime}</span>
         </div>
       </div>
