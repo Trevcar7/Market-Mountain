@@ -44,9 +44,11 @@ const PER_CATEGORY_CAP: Record<string, number> = {
   other: 2,
 };
 
-const MIN_IMPORTANCE = 8;
-const MAX_GROUPS_PER_RUN = 3; // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
-const MIN_STORIES_TO_PUBLISH = 3; // Publish Decision Layer: require ≥3 quality stories
+const MIN_IMPORTANCE = 8;               // Multi-source groups must meet this floor
+const MIN_IMPORTANCE_SINGLE_SOURCE = 6; // Single-source fallback has a lower floor
+const MAX_GROUPS_PER_RUN = 3;           // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
+const MAX_GROUPS_FALLBACK = 2;          // Fewer groups when running in single-source fallback mode
+const MIN_STORIES_TO_PUBLISH = 3;       // Publish Decision Layer: require ≥3 quality stories
 
 // ---------------------------------------------------------------------------
 // Redis client
@@ -214,13 +216,14 @@ async function handleNewsFetch() {
 
     console.log(`[fetch-news] Fetched: Finnhub=${finnhubArticles.length}, NewsAPI=${newsapiArticles.length}`);
 
-    // 2. Age-filter (12h) then relevance-filter
+    // 2. Age-filter (48h) then relevance-filter — 48h accommodates NewsAPI free-tier's ~24h delay
     const allArticles = [...finnhubArticles, ...newsapiArticles];
-    const fresh = filterByAge(allArticles, 12);
+    const fresh = filterByAge(allArticles, 48);
     const relevant = filterByRelevance(fresh);
     stats.filtered = relevant.length;
 
-    console.log(`[fetch-news] After age+relevance filter: ${relevant.length} articles (${allArticles.length - fresh.length} dropped as stale)`);
+    console.log(`[fetch-news] After age filter (48h): ${fresh.length} articles (${allArticles.length - fresh.length} dropped as stale)`);
+    console.log(`[fetch-news] After relevance filter: ${relevant.length} articles (${fresh.length - relevant.length} dropped as irrelevant)`);
 
     // 3. Deduplicate
     const unique = deduplicateNews(relevant);
@@ -237,13 +240,33 @@ async function handleNewsFetch() {
     const grouped = groupRelatedArticles(unique);
     console.log(`[fetch-news] Grouped into ${grouped.length} topic groups`);
 
-    // 4a. Require minimum 2 sources per group
-    const qualifiedGroups = grouped.filter((g) => g.articles.length >= 2);
-    console.log(`[fetch-news] ${qualifiedGroups.length} groups have 2+ sources (${grouped.length - qualifiedGroups.length} dropped)`);
+    // 4a. Prefer multi-source groups (2+ articles); fall back to single-source
+    //     if none are available. The importance scorer already favors multi-source
+    //     stories via multiSourceScore, so quality is maintained downstream.
+    const multiSourceGroups = grouped.filter((g) => g.articles.length >= 2);
+    const singleSourceGroups = grouped.filter((g) => g.articles.length === 1);
 
-    if (qualifiedGroups.length === 0) {
-      console.warn("[fetch-news] No qualified groups (2+ sources) — skipping synthesis this run");
-      return NextResponse.json({ message: "No qualified groups found", stats, health: health.warnings });
+    console.log(
+      `[fetch-news] ${multiSourceGroups.length} multi-source groups, ` +
+      `${singleSourceGroups.length} single-source groups`
+    );
+
+    let qualifiedGroups: typeof grouped;
+    let usingFallback = false;
+
+    if (multiSourceGroups.length > 0) {
+      qualifiedGroups = multiSourceGroups;
+      console.log(`[fetch-news] Using multi-source path (${multiSourceGroups.length} groups)`);
+    } else if (singleSourceGroups.length > 0) {
+      qualifiedGroups = singleSourceGroups;
+      usingFallback = true;
+      console.log(
+        `[fetch-news] No multi-source groups — falling back to single-source path ` +
+        `(${singleSourceGroups.length} groups, importance floor=${MIN_IMPORTANCE_SINGLE_SOURCE})`
+      );
+    } else {
+      console.warn("[fetch-news] No groups found — skipping synthesis this run");
+      return NextResponse.json({ message: "No groups found after dedup", stats, health: health.warnings });
     }
 
     // 4b. LOAD existing stories early — needed for cross-run topic dedup
@@ -275,19 +298,25 @@ async function handleNewsFetch() {
       return true;
     });
 
-    // 4e. Minimum importance floor
+    // 4e. Minimum importance floor (lower in single-source fallback mode)
+    const importanceFloor = usingFallback ? MIN_IMPORTANCE_SINGLE_SOURCE : MIN_IMPORTANCE;
     const afterImportanceFloor = afterCategoryCap.filter((g) => {
-      if (g.importance < MIN_IMPORTANCE) {
-        console.log(`[fetch-news] Low importance: dropping "${g.topic}" (score=${g.importance})`);
+      if (g.importance < importanceFloor) {
+        console.log(`[fetch-news] Low importance: dropping "${g.topic}" (score=${g.importance} < floor=${importanceFloor})`);
         return false;
       }
       return true;
     });
 
-    // 4f. Cap total groups per run
-    const groupsToSynthesize = afterImportanceFloor.slice(0, MAX_GROUPS_PER_RUN);
+    // 4f. Cap total groups per run (fewer allowed in fallback mode)
+    const groupCap = usingFallback ? MAX_GROUPS_FALLBACK : MAX_GROUPS_PER_RUN;
+    const groupsToSynthesize = afterImportanceFloor.slice(0, groupCap);
 
-    console.log(`[fetch-news] Final groups to synthesize: ${groupsToSynthesize.length} (cross-run suppressed=${stats.crossRunSuppressed})`);
+    console.log(
+      `[fetch-news] Final groups to synthesize: ${groupsToSynthesize.length} ` +
+      `(mode=${usingFallback ? "single-source-fallback" : "multi-source"}, ` +
+      `cap=${groupCap}, cross-run suppressed=${stats.crossRunSuppressed})`
+    );
 
     if (groupsToSynthesize.length === 0) {
       console.warn("[fetch-news] No groups remain after filters — skipping synthesis this run");

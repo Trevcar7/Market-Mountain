@@ -5,54 +5,150 @@ import {
 } from "./news-types";
 
 /**
- * Financial market keywords for filtering relevance
+ * Financial market keywords for filtering relevance.
+ * Keep this list broad — the importance scorer handles quality ranking downstream.
  */
 const MARKET_KEYWORDS = [
+  // Central bank / monetary policy
   "federal reserve",
-  "fed",
+  "fed ",           // trailing space avoids "confederate", "alfred", etc.
   "rate hike",
   "rate cut",
+  "rate pause",
   "interest rate",
+  "fomc",
+  "powell",
+
+  // Macro indicators
   "inflation",
   "gdp",
-  "earnings",
-  "earnings beat",
-  "earnings miss",
-  "market crash",
-  "market rally",
-  "bull market",
-  "bear market",
   "recession",
   "supply chain",
+  "cpi",
+  "ppi",
+  "jobs report",
+  "employment",
+  "unemployment",
+  "treasury",
+  "yield curve",
+  "bond market",
+  "economy",
+  "economic",
+  "deficit",
+  "debt ceiling",
+  "stimulus",
+
+  // Broad market terms (surprisingly absent before)
+  "market",
+  "markets",
+  "stock",
+  "stocks",
+  "shares",
+  "equity",
+  "equities",
+  "wall street",
+  "s&p",
+  "nasdaq",
+  "dow jones",
+  "dow ",           // trailing space avoids "shadow", etc.
   "sector rotation",
-  "ipo",
-  "merger",
-  "acquisition",
-  "bankruptcy",
-  "dividend",
-  "stock split",
+  "market rally",
+  "market crash",
+  "bull market",
+  "bear market",
   "market volatility",
   "trading halt",
   "circuit breaker",
   "vix",
-  "inflation data",
-  "jobs report",
-  "employment",
-  "unemployment",
-  "cpi",
-  "ppi",
-  "treasury",
-  "yield curve",
-  "bond market",
+  "rally",
+  "selloff",
+  "sell-off",
+
+  // Company financials / earnings
+  "earnings",
+  "earnings beat",
+  "earnings miss",
+  "revenue",
+  "revenues",
+  "profit",
+  "profits",
+  "quarterly",
+  "quarter",
+  "guidance",
+  "outlook",
+  "forecast",
+  "analyst",
+  "analysts",
+  "price target",
+  "upgrade",
+  "downgrade",
+  "dividend",
+  "stock split",
+  "buyback",
+  "share repurchase",
+  "profit margin",
+  "ebitda",
+  "eps",
+
+  // Corporate events
+  "ipo",
+  "merger",
+  "acquisition",
+  "bankruptcy",
+  "chapter 11",
+  "layoff",
+  "layoffs",
+  "job cuts",
+  "restructuring",
+
+  // Investors / funds
+  "investor",
+  "investors",
+  "hedge fund",
+  "private equity",
+  "etf",
+  "fund manager",
+  "portfolio",
+
+  // Commodities / energy
+  "oil price",
+  "oil prices",
+  "crude oil",
+  "commodity",
+  "commodities",
+  "gold price",
+  "silver",
+  "opec",
+
+  // Crypto
   "crypto",
   "bitcoin",
   "ethereum",
+  "digital asset",
+  "blockchain",
+
+  // Trade & policy
   "regulatory",
   "sec",
-  "fomc",
+  "tariff",
+  "tariffs",
+  "trade war",
+  "trade deal",
+  "sanctions",
+  "currency",
+  "dollar",
+  "inflation data",
+
+  // Credit / debt
+  "credit rating",
+  "default",
+
+  // Notable people / companies
   "elon musk",
   "berkshire hathaway",
   "warren buffett",
+  "jerome powell",
+  "janet yellen",
 ];
 
 const BLOCKED_DOMAINS = [
@@ -63,6 +159,38 @@ const BLOCKED_DOMAINS = [
   "tiktok.com",
   "stocktwits.com",
   "seekingalpha.com/article", // SA community articles, not news
+];
+
+/**
+ * Trusted financial news sources — articles from these outlets bypass keyword
+ * filtering and are always considered relevant.
+ * Matched against source name (Finnhub) or source.name (NewsAPI), lowercase.
+ */
+const TRUSTED_FINANCIAL_SOURCES = [
+  "reuters",
+  "bloomberg",
+  "wall street journal",
+  "wsj",
+  "financial times",
+  "ft.com",
+  "ap news",
+  "associated press",
+  "cnbc",
+  "marketwatch",
+  "barron",
+  "morningstar",
+  "yahoo finance",
+  "motley fool",
+  "seeking alpha",
+  "benzinga",
+  "investopedia",
+  "the street",
+  "thestreet",
+  "zacks",
+  "market watch",
+  "business insider",
+  "fortune",
+  "forbes",
 ];
 
 /**
@@ -172,8 +300,9 @@ export function filterByAge(
 }
 
 /**
- * Filter articles by relevance to financial markets
- * Checks headlines, descriptions, and URLs against keyword lists
+ * Filter articles by relevance to financial markets.
+ * Articles from trusted financial sources auto-pass.
+ * All others are checked against the MARKET_KEYWORDS list.
  */
 export function filterByRelevance(articles: (FinnhubArticle | NewsAPIArticle)[]): (FinnhubArticle | NewsAPIArticle)[] {
   return articles.filter((article) => {
@@ -189,19 +318,33 @@ export function filterByRelevance(articles: (FinnhubArticle | NewsAPIArticle)[])
       ? (article as FinnhubArticle).url || ""
       : (article as NewsAPIArticle).url || "";
 
+    const source = (
+      isFinnhub(article)
+        ? (article as FinnhubArticle).source || ""
+        : (article as NewsAPIArticle).source?.name || ""
+    ).toLowerCase();
+
+    const lowerUrl = url.toLowerCase();
     const combinedText = `${headline} ${summary}`.toLowerCase();
 
-    // Check if blocked domain
-    if (BLOCKED_DOMAINS.some((domain) => url.toLowerCase().includes(domain))) {
+    // Hard block — social media / forums
+    if (BLOCKED_DOMAINS.some((domain) => lowerUrl.includes(domain))) {
       return false;
     }
 
-    // Check for market relevance keywords
-    const isRelevant = MARKET_KEYWORDS.some((keyword) =>
+    // Auto-pass known financial publishers — no keyword check needed
+    if (
+      TRUSTED_FINANCIAL_SOURCES.some(
+        (s) => source.includes(s) || lowerUrl.includes(s)
+      )
+    ) {
+      return true;
+    }
+
+    // Keyword check for all other sources
+    return MARKET_KEYWORDS.some((keyword) =>
       combinedText.includes(keyword.toLowerCase())
     );
-
-    return isRelevant;
   });
 }
 
@@ -340,23 +483,28 @@ export function groupRelatedArticles(articles: (FinnhubArticle | NewsAPIArticle)
  * Extract topic key from headline for grouping.
  * Consolidates semantically related terms so articles about the same
  * broad subject land in the same group rather than spawning near-duplicate stories.
+ * Priority order: broad macro → company → corporate event → fallback (3 words).
  */
 function extractTopicKey(headline: string): string {
   const lower = headline.toLowerCase();
 
+  // 1. Broad macro / market topics — checked first so company-specific news
+  //    about, e.g., the Fed still lands in the right bucket
   const topicMappings: [string[], string][] = [
-    [["federal reserve", "fed ", "fomc", "powell", "rate hike", "rate cut", "rate pause", "interest rate"], "federal_reserve"],
-    [["inflation", "cpi", "ppi", "consumer price index", "producer price"], "inflation"],
+    [["federal reserve", "fed ", "fomc", "powell", "jerome powell", "rate hike", "rate cut", "rate pause", "interest rate"], "federal_reserve"],
+    [["inflation", "cpi", "ppi", "consumer price index", "producer price", "core inflation"], "inflation"],
     [["gdp", "gross domestic product", "economic growth", "economic output"], "gdp"],
-    [["jobs report", "nonfarm payroll", "unemployment rate", "employment report"], "employment"],
-    [["tariff", "trade war", "trade policy", "import duty", "trade deal"], "trade_policy"],
-    [["s&p 500", "nasdaq", "dow jones", "stock market", "market rally", "market selloff", "market decline", "market gains"], "broad_market"],
-    [["bitcoin", "crypto", "ethereum", "digital asset", "blockchain"], "crypto"],
-    [["bankruptcy", "chapter 11", "debt restructuring", "default"], "bankruptcy"],
-    [["merger", "acquisition", "takeover", "buyout", "deal worth"], "merger_acquisition"],
-    [["treasury yield", "bond yield", "yield curve", "10-year", "2-year"], "bond_market"],
-    [["oil price", "crude oil", "brent", "wti", "opec"], "energy"],
-    [["earnings", "quarterly results", "revenue beat", "revenue miss", "eps beat", "eps miss"], "earnings"],
+    [["jobs report", "nonfarm payroll", "unemployment rate", "employment report", "jobless claims"], "employment"],
+    [["tariff", "trade war", "trade policy", "import duty", "trade deal", "trade deficit"], "trade_policy"],
+    [["s&p 500", "nasdaq composite", "dow jones", "stock market", "market rally", "market selloff", "market decline", "market gains", "broad market", "equities rise", "equities fall"], "broad_market"],
+    [["bitcoin", "crypto", "ethereum", "digital asset", "blockchain", "defi", "nft"], "crypto"],
+    [["bankruptcy", "chapter 11", "debt restructuring", "debt default", "insolvency"], "bankruptcy"],
+    [["merger", "acquisition", "takeover", "buyout", "deal worth", "acquires", "buys out"], "merger_acquisition"],
+    [["treasury yield", "bond yield", "yield curve", "10-year", "2-year", "bond market"], "bond_market"],
+    [["oil price", "crude oil", "brent crude", "wti crude", "opec", "energy prices"], "energy"],
+    [["earnings", "quarterly results", "quarterly earnings", "revenue beat", "revenue miss", "eps beat", "eps miss", "profit beat", "profit miss"], "earnings"],
+    [["layoff", "layoffs", "job cuts", "workforce reduction", "headcount reduction"], "layoffs"],
+    [["ipo", "initial public offering", "goes public", "stock debut", "listing on"], "ipo"],
   ];
 
   for (const [keywords, topicKey] of topicMappings) {
@@ -365,8 +513,34 @@ function extractTopicKey(headline: string): string {
     }
   }
 
-  // Default: use first 4 words as a specific topic key
-  return headline.split(" ").slice(0, 4).join(" ").toLowerCase();
+  // 2. Company-level clustering — maps well-known companies to a canonical key
+  //    so multiple articles about the same company group together
+  const companyMappings: [string[], string][] = [
+    [["apple", "aapl", "iphone", "ipad", "mac ", "tim cook", "apple inc"], "co_apple"],
+    [["nvidia", "nvda", "jensen huang", "geforce"], "co_nvidia"],
+    [["microsoft", "msft", "azure", "windows ", "github", "satya nadella"], "co_microsoft"],
+    [["amazon", "amzn", "aws ", "jeff bezos", "andy jassy"], "co_amazon"],
+    [["alphabet", "google", "googl", "goog ", "youtube", "sundar pichai", "deepmind"], "co_alphabet"],
+    [["meta ", "facebook", "instagram", "whatsapp", "mark zuckerberg", "threads"], "co_meta"],
+    [["tesla", "tsla", "elon musk", "cybertruck", "ev maker"], "co_tesla"],
+    [["jpmorgan", "jp morgan", "jpm ", "jamie dimon", "chase bank"], "co_jpmorgan"],
+    [["berkshire", "warren buffett"], "co_berkshire"],
+    [["bank of america", "bofa", "bac "], "co_bofa"],
+    [["goldman sachs", "goldman ", " gs "], "co_goldman"],
+    [["netflix", "nflx"], "co_netflix"],
+    [["uber", "lyft", "rideshare"], "co_rideshare"],
+    [["boeing", "ba ", "aircraft maker"], "co_boeing"],
+    [["openai", "chatgpt", "gpt-4", "sam altman"], "co_openai"],
+  ];
+
+  for (const [keywords, companyKey] of companyMappings) {
+    if (keywords.some((kw) => lower.includes(kw))) {
+      return companyKey;
+    }
+  }
+
+  // 3. Fallback: use first 3 words (down from 4) to increase grouping odds
+  return headline.split(" ").slice(0, 3).join(" ").toLowerCase();
 }
 
 /**
