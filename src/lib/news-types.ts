@@ -18,11 +18,13 @@ export interface KeyDataPoint {
 export interface ChartDataset {
   title: string;
   type: "bar" | "line";
-  labels: string[];   // x-axis labels (dates, tickers, etc.)
-  values: number[];   // y-axis values
-  unit?: string;      // e.g., "%" or "$B" or "bps"
-  source: string;     // Data source attribution
-  timeRange?: string; // e.g., "Jan 2024 – Mar 2026"
+  labels: string[];        // x-axis labels (dates, tickers, etc.)
+  values: number[];        // y-axis values
+  unit?: string;           // e.g., "%" or "$B" or "bps"
+  source: string;          // Data source attribution
+  timeRange?: string;      // e.g., "Jan 2024 – Mar 2026"
+  referenceValue?: number; // Optional benchmark line (e.g., 2.0 for Fed 2% target)
+  referenceLabel?: string; // Label for reference line (e.g., "Fed 2% Target")
 }
 
 export interface NewsItem {

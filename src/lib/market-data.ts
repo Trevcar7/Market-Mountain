@@ -1229,6 +1229,7 @@ export async function fetchChartSeriesForTopic(
 
 /**
  * Build a complete ChartDataset for use in NewsItem.chartData.
+ * Attaches editorial reference lines where appropriate (e.g., Fed 2% target).
  * Returns undefined if no chart data is available.
  */
 export async function buildNewsChartData(
@@ -1238,7 +1239,7 @@ export async function buildNewsChartData(
     const result = await fetchChartSeriesForTopic(topicKey);
     if (!result || result.values.length < 3) return undefined;
 
-    return {
+    const dataset: ChartDataset = {
       title: result.title,
       type: result.type,
       labels: result.labels,
@@ -1247,6 +1248,14 @@ export async function buildNewsChartData(
       source: result.source,
       timeRange: result.timeRange,
     };
+
+    // Attach well-known benchmark reference lines for editorial context
+    if (topicKey === "inflation") {
+      dataset.referenceValue = 2.0;
+      dataset.referenceLabel = "Fed 2% Target";
+    }
+
+    return dataset;
   } catch {
     return undefined;
   }

@@ -27,7 +27,7 @@ function sleep(ms: number) {
 const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   federal_reserve: "federal reserve building washington dc architecture",
   fed_macro:      "federal reserve building washington dc monetary policy",
-  inflation:      "grocery store supermarket prices food retail consumer spending",
+  inflation:      "federal reserve building monetary policy interest rates economic",
   gdp:            "wall street new york city aerial skyline financial district",
   employment:     "american corporate office workers white collar employment",
   trade_policy:   "cargo shipping containers port united states trade",
@@ -57,7 +57,7 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   fed_macro:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
   inflation:
-    "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80",  // Grocery store / supermarket (consumer prices, CPI context)
+    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",  // Federal Reserve building — rate/inflation policy context
   gdp:
     "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",  // NYC skyline at night
   employment:
@@ -542,9 +542,9 @@ export async function synthesizeGroupedArticles(
   // Per-run image cache — avoid duplicate Unsplash API calls for same topic
   const runImageCache = new Map<string, string>();
 
-  // Track chart budget — limit to 2 chart-enriched stories per batch to avoid API overload
+  // Track chart budget — raised to 4 (editorial policy: data stories should have charts)
   let chartCount = 0;
-  const MAX_CHARTS_PER_RUN = 2;
+  const MAX_CHARTS_PER_RUN = 4;
 
   // In-run topic dedup — skip groups whose topic is too similar to one already queued
   const seenTopics = new Set<string>();
@@ -646,10 +646,28 @@ export async function synthesizeGroupedArticles(
         continue;
       }
 
-      // Image resolution: Unsplash → topic fallback → category fallback → undefined
-      const unsplashUrl = await fetchUnsplashImage(group.topic, runImageCache);
+      // ── Image resolution (Editorial Match Rule) ───────────────────────────
+      // Step 1: Detect if the article is specifically about oil/energy
+      //   regardless of how it was categorized (e.g., oil surge → broad_market).
+      //   Oil stories must use oil infrastructure imagery, never generic NYSE.
+      const articleTitles = group.articles.map((a) => {
+        const raw = a as Record<string, unknown>;
+        return String(raw.title ?? raw.headline ?? "");
+      }).join(" ");
+      const isOilStory =
+        group.topic !== "energy" &&
+        /\boil\b|crude\b|WTI\b|brent\b|OPEC\b|petroleum\b|refiner/i.test(
+          group.topic + " " + articleTitles
+        );
+
+      // Step 2: Pick Unsplash query — override with energy for mis-categorized oil stories
+      const imageTopicOverride = isOilStory ? "energy" : group.topic;
+      const unsplashUrl = await fetchUnsplashImage(imageTopicOverride, runImageCache);
+
+      // Step 3: Fallback chain — topic fallback → category fallback → undefined
       const imageUrl =
         unsplashUrl ??
+        FALLBACK_IMAGE_MAP[imageTopicOverride] ??
         FALLBACK_IMAGE_MAP[group.topic] ??
         FALLBACK_IMAGE_MAP[group.category] ??
         undefined;
