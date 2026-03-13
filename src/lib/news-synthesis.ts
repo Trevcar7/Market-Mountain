@@ -97,17 +97,17 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
 
 // Category-specific angles for story uniqueness
 const CATEGORY_ANGLES: Record<string, string> = {
-  macro: "Explore what this means for rate-sensitive sectors or the yield curve.",
+  macro: "Explore what this data point means for rate-sensitive sectors (utilities, REITs, housing), the yield curve shape, and the Fed's projected path. Cite the specific number from the source and compare it to prior period or consensus estimate.",
   earnings:
-    "Focus on the gap between guidance and actual results, or the forward-looking signals in management commentary.",
+    "Focus on three things: (1) the gap between guidance and actual results, (2) the specific revenue or EPS figure versus analyst consensus, and (3) the most revealing forward-looking signal in management commentary. Don't just report the beat/miss — explain what it signals about the sector.",
   markets:
-    "Identify the sector rotation or market breadth implications beneath the index-level move.",
+    "Identify the sector rotation or market breadth implications beneath the index-level move. Name the specific sectors gaining or losing, and explain whether this is risk-on or risk-off positioning. Use specific index or ETF performance figures.",
   policy:
-    "Examine who bears the regulatory or fiscal burden and who benefits.",
+    "Examine three angles: (1) who bears the regulatory or fiscal burden, (2) who benefits, and (3) what the market-pricing implication is. Include any affected companies or sectors by name. Avoid vague political editorializing.",
   crypto:
-    "Weigh institutional adoption signals against on-chain fundamentals or macro headwinds.",
+    "Anchor the story in concrete data: specific price levels, network metrics, ETF flows, or on-chain statistics. Weigh institutional adoption signals against macro headwinds. Always note the correlation (or divergence) with broader risk assets.",
   other:
-    "Find the second-order market implication beyond the headline event.",
+    "Find the second-order market implication beyond the headline event. Ask: what does this mean for equity positioning, sector allocation, or credit spreads? Ground the analysis in a specific number from the sources.",
 };
 
 // ---------------------------------------------------------------------------
@@ -415,7 +415,14 @@ These rules prevent stale or fabricated numbers:
 - If the sources and MARKET DATA conflict, prefer MARKET DATA for quantitative claims
 - Remove or soften any unverifiable numeric claim — write "around", "approximately", or omit
 
-SOURCE ATTRIBUTION (Step 12)
+SOURCE CONFLICT RESOLUTION (Step 12a)
+When two sources report different numbers for the same metric:
+- Prefer the higher-quality source: Reuters > Bloomberg > WSJ > CNBC > Tier 2
+- If sources conflict with MARKET DATA, always prefer MARKET DATA for quantitative claims
+- When you cannot resolve a conflict, omit the disputed figure or qualify it: "reports varied on the exact figure"
+- Do not average conflicting numbers or invent a middle ground
+
+SOURCE ATTRIBUTION (Step 12b)
 Where data points are used from MARKET DATA, attribute them. Examples:
   "CPI rose 2.4% year over year in February, according to the Bureau of Labor Statistics."
   "The 10-year Treasury yield stood near 4.28%, per Treasury data."
@@ -448,6 +455,15 @@ Geopolitical restraint: For international tensions and conflict, prefer measured
 - Use "tensions", "concerns", "friction", "trade dispute" where accurate
 - Avoid "war", "escalation", "crisis" unless directly quoting officials or reporting established facts
 - Do not editorialize on geopolitical outcomes — state what happened, not what it means politically
+
+ANALYTICAL DEPTH RULE (Step 15)
+Every story must contain:
+- At least one specific percentage, dollar figure, or basis-point figure
+- A named sector or asset class that is affected (not just "markets")
+- A comparison to prior period, consensus, or historical context
+- A forward-looking signal grounded in the data (not speculation)
+
+If the sources do not support all four requirements, scale back the claims — do not invent data.
 
 LEDE RULE: The opening sentence must NOT begin with the company or topic name as the grammatical subject.
 Lead with the key number, consequence, or market implication instead.
@@ -590,9 +606,9 @@ export async function synthesizeGroupedArticles(
         }
       }
 
-      // Reject if adjusted score too low (threshold=40 allows most well-formed stories through
-      // while blocking obvious fabrications or nonsense outputs)
-      const FACT_CHECK_THRESHOLD = 40;
+      // Reject if adjusted score too low — threshold=55 blocks low-confidence outputs
+      // while allowing well-formed financial journalism through
+      const FACT_CHECK_THRESHOLD = 55;
       if (shouldRejectStory(adjustedScore, FACT_CHECK_THRESHOLD)) {
         stats.rejected++;
         console.warn(`[synthesis] Rejected "${group.topic}" — fact-check score ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`);

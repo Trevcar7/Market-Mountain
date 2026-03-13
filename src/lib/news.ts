@@ -162,21 +162,29 @@ const BLOCKED_DOMAINS = [
 ];
 
 /**
- * Blocked source names — low-quality, non-financial, or press-release outlets.
+ * Blocked source names — low-quality, non-financial, or pure press-release outlets.
  * Matched case-insensitively against source name.
+ *
+ * Note: BusinessWire and GlobeNewswire are NOT blocked — they carry official earnings
+ * releases and IR disclosures that are valid primary sources. Their tier-0 status means
+ * they can't anchor a story alone (confidence gate handles quality control).
  */
 const BLOCKED_SOURCES = [
+  // Indian regional / non-financial press
   "times of india",
   "the times of india",
+  "hindustan times",
+  "the hindu",
   "businessline",
+  "livemint",
+  "ndtv profit",
+  // Tech/general aggregators with minimal financial editorial value
   "slashdot",
+  "digg",
+  "flipboard",
+  "msn",                // MSN aggregates but adds no original reporting
+  // Entertainment / tabloid
   "yahoo entertainment",
-  "prweb",
-  "business wire",
-  "businesswire",
-  "globe newswire",
-  "globenewswire",
-  "accesswire",
   "tmz",
   "buzzfeed",
   "huffpost",
@@ -185,6 +193,21 @@ const BLOCKED_SOURCES = [
   "the sun",
   "new york post",
   "national enquirer",
+  "people magazine",
+  "variety",
+  "hollywood reporter",
+  // Pure PR wire services (no editorial review; corporate self-promotion only)
+  "prweb",
+  "accesswire",
+  "prnewswire",         // PR Newswire — pure press release distribution
+  "ein presswire",
+  "einpresswire",
+  "openpr",
+  "newswire",           // generic newswire aggregator (not Reuters)
+  // Low-quality financial clickbait
+  "the motley fool blog",
+  "wisesheets",
+  "stockanalysis",
 ];
 
 /**
@@ -204,20 +227,44 @@ export const TIER_1_SOURCES = [
   "marketwatch",
   "market watch",
   "barron",
+  "the economist",
+  "economist.com",
 ];
 
 /**
- * Tier 2 — Official government data sources and specialized financial outlets.
+ * Tier 2 — Official government data sources, institutional research, and
+ * specialized financial/business outlets.
  */
 export const TIER_2_SOURCES = [
+  // US government data agencies
   "fred",
   "bls",
   "eia",
+  "census.gov",
+  "bea.gov",             // Bureau of Economic Analysis
+  "federalreserve.gov",
+  "treasury.gov",
+  "sec.gov",
+  "cbo.gov",             // Congressional Budget Office
+  // International institutional
   "imf",
   "world bank",
-  "us treasury",
+  "worldbank",
+  "bis.org",             // Bank for International Settlements
+  "oecd",
+  // Quality financial outlets (below Tier 1 but reliable)
+  "morningstar",
+  "seeking alpha",       // SA editorial (not community articles)
+  "investopedia",
+  "the street",
+  "thestreet",
+  "fortune",
+  "forbes",
+  "business insider",
+  // Crypto-specific quality outlets
   "coindesk",
   "the block",
+  "cointelegraph",
 ];
 
 /**
@@ -248,8 +295,10 @@ export function hasQualitySource(
  * Trusted financial news sources — articles from these outlets bypass keyword
  * filtering and are always considered relevant.
  * Matched against source name (Finnhub) or source.name (NewsAPI), lowercase.
+ * Must overlap with TIER_1_SOURCES + TIER_2_SOURCES + reputable general business press.
  */
 const TRUSTED_FINANCIAL_SOURCES = [
+  // Tier 1 premium outlets (also listed in TIER_1_SOURCES)
   "reuters",
   "bloomberg",
   "wall street journal",
@@ -260,20 +309,33 @@ const TRUSTED_FINANCIAL_SOURCES = [
   "associated press",
   "cnbc",
   "marketwatch",
+  "market watch",
   "barron",
+  "the economist",
+  // Government/institutional (Tier 2)
+  "federal reserve",
+  "sec.gov",
+  "treasury.gov",
+  "bls.gov",
+  "eia.gov",
+  // Quality financial publications
   "morningstar",
-  "yahoo finance",
-  "motley fool",
   "seeking alpha",
   "benzinga",
   "investopedia",
   "the street",
   "thestreet",
   "zacks",
-  "market watch",
   "business insider",
   "fortune",
   "forbes",
+  "yahoo finance",
+  // Wire services (legitimate primary-source distribution)
+  "business wire",
+  "businesswire",
+  "globe newswire",
+  "globenewswire",
+  "dow jones",
 ];
 
 /**
@@ -604,21 +666,52 @@ function extractTopicKey(headline: string): string {
   // 2. Company-level clustering — maps well-known companies to a canonical key
   //    so multiple articles about the same company group together
   const companyMappings: [string[], string][] = [
+    // Mega-cap tech
     [["apple", "aapl", "iphone", "ipad", "mac ", "tim cook", "apple inc"], "co_apple"],
-    [["nvidia", "nvda", "jensen huang", "geforce"], "co_nvidia"],
-    [["microsoft", "msft", "azure", "windows ", "github", "satya nadella"], "co_microsoft"],
-    [["amazon", "amzn", "aws ", "jeff bezos", "andy jassy"], "co_amazon"],
-    [["alphabet", "google", "googl", "goog ", "youtube", "sundar pichai", "deepmind"], "co_alphabet"],
-    [["meta ", "facebook", "instagram", "whatsapp", "mark zuckerberg", "threads"], "co_meta"],
-    [["tesla", "tsla", "elon musk", "cybertruck", "ev maker"], "co_tesla"],
-    [["jpmorgan", "jp morgan", "jpm ", "jamie dimon", "chase bank"], "co_jpmorgan"],
-    [["berkshire", "warren buffett"], "co_berkshire"],
+    [["nvidia", "nvda", "jensen huang", "geforce", "gpu maker", "ai chip"], "co_nvidia"],
+    [["microsoft", "msft", "azure", "windows ", "github", "satya nadella", "copilot"], "co_microsoft"],
+    [["amazon", "amzn", "aws ", "jeff bezos", "andy jassy", "prime "], "co_amazon"],
+    [["alphabet", "google", "googl", "goog ", "youtube", "sundar pichai", "deepmind", "waymo"], "co_alphabet"],
+    [["meta ", "facebook", "instagram", "whatsapp", "mark zuckerberg", "threads", "meta platforms"], "co_meta"],
+    [["tesla", "tsla", "elon musk", "cybertruck", "ev maker", "gigafactory"], "co_tesla"],
+    [["openai", "chatgpt", "gpt-4", "gpt-5", "sam altman", "o1 ", "o3 "], "co_openai"],
+    [["anthropic", "claude ai", "claude model"], "co_anthropic"],
+    // Financial sector
+    [["jpmorgan", "jp morgan", "jpm ", "jamie dimon", "chase bank", "jpmc"], "co_jpmorgan"],
+    [["berkshire hathaway", "berkshire", "warren buffett"], "co_berkshire"],
     [["bank of america", "bofa", "bac "], "co_bofa"],
     [["goldman sachs", "goldman ", " gs "], "co_goldman"],
+    [["morgan stanley", " ms ", "james gorman", "ted pick"], "co_morganstanley"],
+    [["wells fargo", "wfc "], "co_wellsfargo"],
+    [["citigroup", "citi ", "citi bank", "jane fraser"], "co_citi"],
+    [["blackrock", "larry fink", "blk "], "co_blackrock"],
+    [["visa ", "visa inc", " v "], "co_visa"],
+    [["mastercard", "ma "], "co_mastercard"],
+    // Healthcare / pharma
+    [["unitedhealth", "unitedhealthcare", "unh "], "co_unitedhealth"],
+    [["pfizer", "pfe "], "co_pfizer"],
+    [["johnson & johnson", "j&j", "jnj "], "co_jnj"],
+    [["eli lilly", "lly ", "tirzepatide", "mounjaro", "ozempic"], "co_lilly"],
+    // Industrial / energy
+    [["boeing", " ba ", "737 max", "aircraft maker", "737 ", "787 "], "co_boeing"],
+    [["exxon", "exxonmobil", "xom "], "co_exxon"],
+    [["chevron", "cvx "], "co_chevron"],
+    // Consumer / retail
+    [["walmart", "wmt "], "co_walmart"],
+    [["target ", " tgt "], "co_target"],
+    [["home depot", " hd "], "co_homedepot"],
+    [["costco", "cost "], "co_costco"],
+    // Entertainment / media
     [["netflix", "nflx"], "co_netflix"],
-    [["uber", "lyft", "rideshare"], "co_rideshare"],
-    [["boeing", "ba ", "aircraft maker"], "co_boeing"],
-    [["openai", "chatgpt", "gpt-4", "sam altman"], "co_openai"],
+    [["disney", "dis ", "walt disney", "espn", "hulu"], "co_disney"],
+    [["spotify", "spot "], "co_spotify"],
+    // Other notable
+    [["uber", " lyft ", "rideshare"], "co_rideshare"],
+    [["salesforce", "crm "], "co_salesforce"],
+    [["oracle", "orcl "], "co_oracle"],
+    [["amd", "advanced micro", "lisa su"], "co_amd"],
+    [["intel", "intc ", "pat gelsinger"], "co_intel"],
+    [["palantir", "pltr "], "co_palantir"],
   ];
 
   for (const [keywords, companyKey] of companyMappings) {
