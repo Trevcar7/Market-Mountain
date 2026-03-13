@@ -14,6 +14,21 @@ interface NewsSectionProps {
 type SortOption = "recent" | "importance" | "sentiment";
 type CategoryFilter = "all" | "macro" | "earnings" | "markets" | "policy" | "crypto";
 
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins === 1) return "1 minute ago";
+  if (mins < 60) return `${mins} minutes ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs === 1) return "1 hour ago";
+  return `${hrs} hours ago`;
+}
+
+function isStale(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() > 10 * 60 * 1000; // >10 min
+}
+
 export default function NewsSection({
   initialNews = [],
   limit = 50,
@@ -25,20 +40,19 @@ export default function NewsSection({
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [category, setCategory] = useState<CategoryFilter>("all");
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-  // Fetch news from /api/news (reads from /tmp/news.json)
   useEffect(() => {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/news", {
-          headers: { "Cache-Control": "max-age=300" }, // 5 min cache
-        });
+        const response = await fetch("/api/news");
 
         if (!response.ok) throw new Error("Failed to fetch news");
 
         const data = await response.json();
         setNews(data.news || []);
+        setLastUpdated(data.lastUpdated || null);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -49,8 +63,8 @@ export default function NewsSection({
     };
 
     fetchNews();
-    // Refetch every 5 minutes
-    const interval = setInterval(fetchNews, 5 * 60 * 1000);
+    // Refetch every 2 minutes (aligns with 90s CDN cache TTL)
+    const interval = setInterval(fetchNews, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -130,6 +144,18 @@ export default function NewsSection({
           </select>
         )}
       </div>
+
+      {/* Last updated indicator */}
+      {lastUpdated && !loading && (
+        <div className="flex items-center gap-2 text-xs text-slate-400 mb-4">
+          <span>Last updated {formatRelativeTime(lastUpdated)}</span>
+          {isStale(lastUpdated) && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 font-medium">
+              Refresh delayed
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Status messages */}
       {loading && (

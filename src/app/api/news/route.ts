@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { NewsCollection } from "@/lib/news-types";
 
+export const maxDuration = 10;
+export const runtime = "nodejs";
+
 /**
  * GET /api/news
  * Serves active news data from Vercel KV (Upstash Redis)
@@ -64,7 +67,8 @@ export async function GET() {
     return NextResponse.json(newsData, {
       status: 200,
       headers: {
-        "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+        // CDN caches for 90s; serves stale for 30s while revalidating — new stories appear within ~90s
+        "Cache-Control": "public, s-maxage=90, stale-while-revalidate=30, max-age=30",
       },
     });
   } catch (error) {
@@ -76,7 +80,7 @@ export async function GET() {
         news: [],
         meta: { totalCount: 0 },
       },
-      { status: 200 }
+      { status: 500 }
     );
   }
 }

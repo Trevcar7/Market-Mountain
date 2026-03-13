@@ -21,6 +21,7 @@ export interface NewsItem {
   synthesizedBy: "Claude" | "Gemini"; // AI model used for synthesis
   factCheckScore: number; // 0-100, confidence in accuracy
   verifiedClaims: string[]; // List of specific facts verified
+  topicKey?: string; // Canonical topic bucket (e.g. "federal_reserve") — used for cross-run dedup
   toneMatch?: string; // e.g., "Trevor's voice - analytical, measured"
   failureReason?: string; // If story was rejected
   imageUrl?: string; // Unsplash photo URL

@@ -118,8 +118,8 @@ export async function analyzeTone(): Promise<ToneProfile> {
       longAnalytical: longAnalytical.map((s) => s.trim()),
     },
     perspective: {
-      voiceType: "First-person investor perspective—uses 'I view', 'I bought', 'my analysis'",
-      personalReferences: true,
+      voiceType: "Third-person analytical—'the Fed', 'the company', 'investors', 'analysts'",
+      personalReferences: false,
       authorityLevel:
         "Confident but measured—acknowledges risks and limitations, avoids overstatement",
     },
