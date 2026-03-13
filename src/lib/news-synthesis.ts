@@ -27,7 +27,7 @@ function sleep(ms: number) {
 const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   federal_reserve: "federal reserve building washington dc architecture",
   fed_macro:      "federal reserve building washington dc monetary policy",
-  inflation:      "consumer price index cpi inflation economic data financial charts",
+  inflation:      "grocery store supermarket prices food retail consumer spending",
   gdp:            "wall street new york city aerial skyline financial district",
   employment:     "american corporate office workers white collar employment",
   trade_policy:   "cargo shipping containers port united states trade",
@@ -57,7 +57,7 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   fed_macro:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
   inflation:
-    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",  // Financial bar chart data
+    "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80",  // Grocery store / supermarket (consumer prices, CPI context)
   gdp:
     "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",  // NYC skyline at night
   employment:
@@ -77,11 +77,11 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   energy:
     "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=1200&q=80",  // Oil platform at sunset
   earnings:
-    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",  // Financial bar chart close-up
+    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",  // Financial bar chart (quarterly earnings reports)
   layoffs:
     "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80",
   ipo:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
+    "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1200&q=80",  // Person at laptop with stock data (IPO research)
   // Category-level fallbacks (diverse selection — not all the same image)
   macro:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
@@ -90,7 +90,7 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   policy:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
   earnings_cat:
-    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",  // Stock trading data screens (earnings market reaction)
   other:
     "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
 };

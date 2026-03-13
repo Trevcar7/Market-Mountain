@@ -1093,6 +1093,33 @@ export interface ChartSeriesConfig {
 }
 
 /**
+ * Convert a CPI index time series into year-over-year % change.
+ * Requires at least 13 data points (12 months + 1 prior-year anchor).
+ * Returns null if insufficient data.
+ */
+function computeYoyChange(
+  labels: string[],
+  values: number[],
+  decimals = 1
+): { labels: string[]; values: number[] } | null {
+  if (values.length < 13) return null;
+
+  const yoyLabels: string[] = [];
+  const yoyValues: number[] = [];
+
+  for (let i = 12; i < values.length; i++) {
+    const current = values[i];
+    const prevYear = values[i - 12];
+    if (!prevYear || isNaN(current) || isNaN(prevYear)) continue;
+
+    yoyValues.push(parseFloat(((current - prevYear) / prevYear * 100).toFixed(decimals)));
+    yoyLabels.push(labels[i]);
+  }
+
+  return yoyValues.length >= 3 ? { labels: yoyLabels, values: yoyValues } : null;
+}
+
+/**
  * Fetch a chart-ready time series for a given topic key.
  * Returns { config, labels, values } or null if data unavailable.
  * Tries EIA first for energy topics, BLS for labor/inflation, FRED for macro.
@@ -1117,13 +1144,40 @@ export async function fetchChartSeriesForTopic(
     }
 
     case "inflation": {
-      // Prefer BLS for CPI (more authoritative), fall back to FRED
+      // Fetch 2 years of BLS CPI data to compute YoY % change (much more readable than raw index)
       const blsSeries = await fetchBlsChartSeries(BLS_SERIES.CPI_ALL, 2);
-      if (blsSeries) return { ...blsSeries, title: "CPI — All Urban Consumers", unit: "Index", source: "BLS — Bureau of Labor Statistics", timeRange: "Last 2 years", type: "line" };
+      if (blsSeries) {
+        const yoy = computeYoyChange(blsSeries.labels, blsSeries.values);
+        if (yoy) {
+          return {
+            ...yoy,
+            title: "CPI Inflation Rate (Year-over-Year)",
+            unit: "%",
+            source: "BLS — Bureau of Labor Statistics",
+            timeRange: "Last 12 months",
+            type: "line",
+          };
+        }
+        // Not enough data for YoY — fall back to raw index with context
+        return { ...blsSeries, title: "CPI — All Urban Consumers (Index)", unit: "Index", source: "BLS — Bureau of Labor Statistics", timeRange: "Last 2 years", type: "line" };
+      }
 
-      const fredSeries = await fetchFredChartSeries("CPIAUCSL", 12);
-      if (!fredSeries) return null;
-      return { ...fredSeries, title: "CPI — All Urban Consumers", unit: "Index", source: "FRED — St. Louis Fed", timeRange: "Last 12 months", type: "line" };
+      // BLS unavailable — try FRED CPIAUCSL as backup
+      const fredSeries = await fetchFredChartSeries("CPIAUCSL", 24);
+      if (fredSeries) {
+        const yoy = computeYoyChange(fredSeries.labels, fredSeries.values);
+        if (yoy) {
+          return {
+            ...yoy,
+            title: "CPI Inflation Rate (Year-over-Year)",
+            unit: "%",
+            source: "FRED — St. Louis Fed",
+            timeRange: "Last 12 months",
+            type: "line",
+          };
+        }
+      }
+      return null;
     }
 
     case "employment": {
@@ -1158,6 +1212,14 @@ export async function fetchChartSeriesForTopic(
       );
       if (series) return { ...series, title: "Brent Crude — Monthly Avg", unit: "$/bbl", source: "EIA — U.S. Energy Information Administration", timeRange: "Last 12 months", type: "line" };
       return null;
+    }
+
+    case "broad_market":
+    case "markets": {
+      // S&P 500 index level — FRED daily series (SP500)
+      const series = await fetchFredChartSeries("SP500", 12);
+      if (!series) return null;
+      return { ...series, title: "S&P 500 Index", unit: "Points", source: "FRED — St. Louis Fed", timeRange: "Last 12 months", type: "line" };
     }
 
     default:
