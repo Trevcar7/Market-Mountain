@@ -169,7 +169,7 @@ const BLOCKED_DOMAINS = [
  * releases and IR disclosures that are valid primary sources. Their tier-0 status means
  * they can't anchor a story alone (confidence gate handles quality control).
  */
-const BLOCKED_SOURCES = [
+export const BLOCKED_SOURCES = [
   // Indian regional / non-financial press
   "times of india",
   "the times of india",

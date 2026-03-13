@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Redis } from "@upstash/redis";
 import { NewsCollection, NewsItem } from "@/lib/news-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
+import { BLOCKED_SOURCES } from "@/lib/news";
 import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
 
 interface Props {
@@ -86,9 +87,13 @@ export default async function NewsStoryPage({ params }: Props) {
   const gradient = categoryGradients[item.category] ?? categoryGradients.other;
   const categoryLabel = categoryLabels[item.category] ?? "Market News";
 
-  // Unique sources for attribution
+  // Unique sources for attribution — exclude blocked/low-quality outlets
   const uniqueSources = item.sourcesUsed
     .filter((s, i, arr) => arr.findIndex((x) => x.source === s.source) === i)
+    .filter((s) => {
+      const lower = s.source.toLowerCase();
+      return !BLOCKED_SOURCES.some((blocked) => lower.includes(blocked));
+    })
     .slice(0, 6);
 
   // Split story into paragraphs
