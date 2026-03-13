@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import {
   fetchFinnhubNews,
-  fetchNewsAPINews,
+  fetchNewsAPIMultiple,
   filterByRelevance,
+  filterByAge,
   deduplicateNews,
   groupRelatedArticles,
 } from "@/lib/news";
@@ -79,10 +80,10 @@ async function handleNewsFetch() {
   try {
     const kv = getRedisClient();
 
-    // 1. Fetch from both sources in parallel
+    // 1. Fetch from both sources in parallel (NewsAPI uses multiple topic queries)
     const [finnhubArticles, newsapiArticles] = await Promise.all([
       fetchFinnhubNews(process.env.FINNHUB_API_KEY || ""),
-      fetchNewsAPINews(process.env.NEWSAPI_API_KEY || ""),
+      fetchNewsAPIMultiple(process.env.NEWSAPI_API_KEY || ""),
     ]);
 
     stats.fetchedFinnhub = finnhubArticles.length;
@@ -90,12 +91,13 @@ async function handleNewsFetch() {
 
     console.log(`[fetch-news] Fetched: Finnhub=${finnhubArticles.length}, NewsAPI=${newsapiArticles.length}`);
 
-    // 2. Combine and filter
+    // 2. Combine, age-filter (last 12 hours only), then relevance-filter
     const allArticles = [...finnhubArticles, ...newsapiArticles];
-    const relevant = filterByRelevance(allArticles);
+    const fresh = filterByAge(allArticles, 12);
+    const relevant = filterByRelevance(fresh);
     stats.filtered = relevant.length;
 
-    console.log(`[fetch-news] After filterByRelevance: ${relevant.length} articles passed filter`);
+    console.log(`[fetch-news] After age+relevance filter: ${relevant.length} articles (${allArticles.length - fresh.length} dropped as stale)`);
 
     // 3. Deduplicate
     const unique = deduplicateNews(relevant);
@@ -115,9 +117,18 @@ async function handleNewsFetch() {
     const grouped = groupRelatedArticles(unique);
     console.log(`[fetch-news] Grouped into ${grouped.length} topic groups`);
 
-    // 5. Synthesize with Claude
-    console.log(`[fetch-news] Starting synthesis on ${grouped.length} groups (max 5 will be processed)`);
-    const { stories, stats: synthStats } = await synthesizeGroupedArticles(grouped);
+    // 4a. Require minimum 2 sources per group — single-source groups produce weak stories
+    const qualifiedGroups = grouped.filter((g) => g.articles.length >= 2);
+    console.log(`[fetch-news] ${qualifiedGroups.length} groups have 2+ sources (${grouped.length - qualifiedGroups.length} dropped)`);
+
+    if (qualifiedGroups.length === 0) {
+      console.warn("[fetch-news] No qualified groups (2+ sources) — skipping synthesis this run");
+      return NextResponse.json({ message: "No qualified groups found", stats });
+    }
+
+    // 5. Synthesize with Claude — quality gates inside determine how many stories are produced
+    console.log(`[fetch-news] Starting synthesis on ${qualifiedGroups.length} qualified groups`);
+    const { stories, stats: synthStats } = await synthesizeGroupedArticles(qualifiedGroups);
     stats.posted = synthStats.posted;
     stats.rejected = synthStats.rejected;
     stats.errors = synthStats.errors;
@@ -146,17 +157,16 @@ async function handleNewsFetch() {
 
     stats.archived = archiveStories.length;
 
-    // 9. Hard cap at 5 articles per day (keep only top 5 by importance + recency)
+    // 9. Sort by recency first, then importance — keep up to 30 stories in the active pool
     const sortedStories = activeStories
       .sort((a, b) => {
-        // Primary: importance score (descending)
-        if (b.importance !== a.importance) {
-          return b.importance - a.importance;
-        }
-        // Secondary: recency (descending)
-        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+        // Primary: recency (most recent first)
+        const timeDiff = new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        // Secondary: importance score
+        return b.importance - a.importance;
       })
-      .slice(0, 5); // Hard cap at 5
+      .slice(0, 30); // Keep up to 30 recent stories in the active pool
 
     // 10. Save active news to KV
     const newsCollection: NewsCollection = {

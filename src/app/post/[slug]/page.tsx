@@ -103,13 +103,13 @@ export default async function ArticlePage({ params }: Props) {
             <Link href="/about" className="text-white/55 hover:text-white/80 transition-colors font-medium normal-case tracking-normal text-xs">
               By Trevor Carnovsky
             </Link>
-            <span className="w-3 h-px bg-white/20" aria-hidden="true" />
+            <span className="text-white/30" aria-hidden="true">·</span>
             <time dateTime={article.date}>{formatDate(article.date)}</time>
-            <span className="w-3 h-px bg-white/20" aria-hidden="true" />
+            <span className="text-white/30" aria-hidden="true">·</span>
             <span>{article.readTime}</span>
             {article.updated && article.updated !== article.date && (
               <>
-                <span className="w-3 h-px bg-white/20" aria-hidden="true" />
+                <span className="text-white/30" aria-hidden="true">·</span>
                 <span>Updated {formatDate(article.updated)}</span>
               </>
             )}

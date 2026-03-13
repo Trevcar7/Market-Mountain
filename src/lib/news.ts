@@ -95,7 +95,7 @@ export async function fetchFinnhubNews(
 }
 
 /**
- * Fetch news from NewsAPI
+ * Fetch news from NewsAPI for a single query
  * Requires NEWSAPI_API_KEY env var
  */
 export async function fetchNewsAPINews(
@@ -122,6 +122,54 @@ export async function fetchNewsAPINews(
     console.error("Error fetching NewsAPI news:", error);
     return [];
   }
+}
+
+/**
+ * Fetch news from NewsAPI across multiple topic queries in parallel.
+ * Covers macro, earnings, crypto, energy, and general markets for breadth.
+ */
+export async function fetchNewsAPIMultiple(
+  apiKey: string
+): Promise<NewsAPIArticle[]> {
+  const queries = [
+    "federal reserve interest rate inflation",
+    "stock earnings revenue quarterly results",
+    "cryptocurrency bitcoin ethereum",
+    "oil energy commodities opec",
+    "S&P 500 nasdaq stock market",
+  ];
+
+  const results = await Promise.allSettled(
+    queries.map((q) => fetchNewsAPINews(apiKey, q))
+  );
+
+  const all: NewsAPIArticle[] = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      all.push(...result.value);
+    }
+  }
+
+  return all;
+}
+
+/**
+ * Filter articles to only those published within the last maxAgeHours hours.
+ * Drops stale articles that would produce repetitive/outdated stories.
+ */
+export function filterByAge(
+  articles: (FinnhubArticle | NewsAPIArticle)[],
+  maxAgeHours = 12
+): (FinnhubArticle | NewsAPIArticle)[] {
+  const cutoff = Date.now() - maxAgeHours * 60 * 60 * 1000;
+
+  return articles.filter((article) => {
+    const timeMs = isFinnhub(article)
+      ? ((article as FinnhubArticle).datetime || 0) * 1000
+      : new Date((article as NewsAPIArticle).publishedAt || 0).getTime();
+
+    return timeMs >= cutoff;
+  });
 }
 
 /**

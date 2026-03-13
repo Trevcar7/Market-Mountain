@@ -72,7 +72,7 @@ async function synthesizeWithClaude(
 ): Promise<string> {
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 500,
+    max_tokens: 800,
     temperature: 0.7,
     system: systemPrompt,
     messages: [
@@ -110,15 +110,17 @@ export async function synthesizeGroupedArticles(
   const toneProfile = await getToneProfile();
   const client = initAnthropicClient();
 
-  // Deduplicate by category — at most 1 story per category to avoid covering the same topic repeatedly
-  const seenCategories = new Set<string>();
-  const groupsToProcess = groupedNews
-    .filter((group) => {
-      if (seenCategories.has(group.category)) return false;
-      seenCategories.add(group.category);
-      return true;
-    })
-    .slice(0, 5);
+  // Deduplicate by topic key — skip groups whose topic is too similar to one already queued.
+  // This prevents near-duplicate stories even when they land in different category buckets.
+  const seenTopics = new Set<string>();
+  const groupsToProcess = groupedNews.filter((group) => {
+    const key = group.topic.toLowerCase().replace(/[_\s]+/g, "_");
+    for (const seen of seenTopics) {
+      if (key === seen || key.startsWith(seen) || seen.startsWith(key)) return false;
+    }
+    seenTopics.add(key);
+    return true;
+  });
 
   for (const group of groupsToProcess) {
     try {
@@ -135,9 +137,9 @@ export async function synthesizeGroupedArticles(
         userPrompt
       );
 
-      if (!synthesizedText || synthesizedText.length < 50) {
+      if (!synthesizedText || synthesizedText.length < 200) {
         stats.errors++;
-        console.error(`[synthesis] Synthesis failed for "${group.topic}" - text length: ${synthesizedText?.length || 0}`);
+        console.error(`[synthesis] Synthesis too short for "${group.topic}" - text length: ${synthesizedText?.length || 0}`);
         continue;
       }
 

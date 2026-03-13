@@ -1,4 +1,5 @@
 import { NewsItem } from "@/lib/news-types";
+import Image from "next/image";
 import Link from "next/link";
 
 interface NewsCardProps {
@@ -47,10 +48,20 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
         className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300"
         style={{ minHeight: 360 }}
       >
-        {/* Gradient background */}
-        <div
-          className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-60 group-hover:opacity-70 transition-opacity duration-500`}
-        />
+        {/* Background: photo if available, else gradient */}
+        {news.imageUrl ? (
+          <Image
+            src={news.imageUrl}
+            alt={news.title}
+            fill
+            className="object-cover opacity-40 group-hover:opacity-50 group-hover:scale-105 transition-all duration-500"
+            sizes="(max-width: 768px) 100vw, 66vw"
+          />
+        ) : (
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-60 group-hover:opacity-70 transition-opacity duration-500`}
+          />
+        )}
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
 
@@ -90,12 +101,20 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
       href={href}
       className="group flex flex-col rounded-lg bg-card border border-border hover:border-navy-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
     >
-      {/* Gradient cover — 16:9 */}
+      {/* Cover: photo if available, else gradient — 16:9 */}
       <div className={`relative w-full aspect-video overflow-hidden bg-gradient-to-br ${gradient}`}>
-        <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-500" />
+        {news.imageUrl && (
+          <Image
+            src={news.imageUrl}
+            alt={news.title}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        )}
         {/* Category label in bottom-left */}
         <div className="absolute inset-0 flex items-end p-3">
-          <span className="text-[10px] font-semibold tracking-widest uppercase text-white/50">
+          <span className="text-[10px] font-semibold tracking-widest uppercase text-white/70">
             {categoryLabel}
           </span>
         </div>
