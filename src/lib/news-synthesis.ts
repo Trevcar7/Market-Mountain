@@ -8,7 +8,7 @@ import {
   shouldRejectStory,
   logRejection,
 } from "./fact-checker";
-import { formatNewsForStorage } from "./news";
+import { formatNewsForStorage, hasQualitySource } from "./news";
 import { fetchContextualData, buildNewsChartData } from "./market-data";
 
 let anthropic: Anthropic | null = null;
@@ -178,6 +178,55 @@ interface ParsedArticle {
   whyThisMatters: string;
   whatToWatchNext: string;
   secondOrderImplication: string;
+  keyTakeaways: string[];
+}
+
+// Minimum confidence score required to publish (0–1). Articles below this are rejected.
+const CONFIDENCE_THRESHOLD = 0.70;
+
+/**
+ * Compute a 0–1 editorial confidence score for a story group.
+ * Gates: source quality, corroboration, recency, fact-check score.
+ */
+function computeConfidenceScore(
+  group: GroupedNews,
+  factCheckScore: number,
+  hasTier1: boolean
+): number {
+  let score = 0;
+
+  // Source quality: Tier 1 source present (0.30)
+  if (hasTier1) score += 0.30;
+
+  // Multi-source corroboration (max 0.30)
+  const uniqueSourceCount = new Set(
+    group.articles.map((a) => {
+      const raw = a as Record<string, unknown>;
+      if (typeof raw.source === "string") return raw.source as string;
+      return ((raw.source as { name?: string })?.name) || "unknown";
+    })
+  ).size;
+  if (uniqueSourceCount >= 3) score += 0.30;
+  else if (uniqueSourceCount >= 2) score += 0.20;
+
+  // Recency: use most recent article timestamp (max 0.20)
+  const latestMs = group.articles.reduce((max, a) => {
+    const raw = a as Record<string, unknown>;
+    const ms =
+      typeof raw.datetime === "number"
+        ? (raw.datetime as number) * 1000
+        : new Date((raw.publishedAt as string) || 0).getTime();
+    return Math.max(max, ms);
+  }, 0);
+  const hoursOld = (Date.now() - latestMs) / (1000 * 60 * 60);
+  if (hoursOld < 12) score += 0.20;
+  else if (hoursOld < 24) score += 0.10;
+
+  // Fact-check score (max 0.20)
+  if (factCheckScore >= 60) score += 0.20;
+  else if (factCheckScore >= 40) score += 0.10;
+
+  return Math.round(Math.min(1.0, score) * 100) / 100;
 }
 
 /**
@@ -185,6 +234,10 @@ interface ParsedArticle {
  *
  * Expected format:
  *   HEADLINE: [headline]
+ *   KEY_TAKEAWAYS:
+ *   • [takeaway 1]
+ *   • [takeaway 2]
+ *   • [takeaway 3]
  *   WHY_MATTERS: [one sentence]
  *   SECOND_ORDER: [one sentence]
  *   WHAT_WATCH: [one sentence]
@@ -192,34 +245,86 @@ interface ParsedArticle {
  *   [story paragraphs]
  */
 function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticle {
-  const lines = raw.split("\n");
   const result: ParsedArticle = {
     title: fallbackTitle,
     story: "",
     whyThisMatters: "",
     whatToWatchNext: "",
     secondOrderImplication: "",
+    keyTakeaways: [],
   };
 
+  const lines = raw.split("\n");
   const storyLines: string[] = [];
   let inStory = false;
+  let inKeyTakeaways = false;
+
+  const HEADER_PREFIXES = [
+    "HEADLINE:", "KEY_TAKEAWAYS:", "WHY_MATTERS:", "SECOND_ORDER:", "WHAT_WATCH:",
+  ];
 
   for (const line of lines) {
     const trimmed = line.trim();
 
+    // Named section headers — always processed first
     if (trimmed.startsWith("HEADLINE:")) {
+      inKeyTakeaways = false;
       result.title = trimmed.replace("HEADLINE:", "").trim();
-    } else if (trimmed.startsWith("WHY_MATTERS:")) {
+      continue;
+    }
+    if (trimmed.startsWith("KEY_TAKEAWAYS:")) {
+      inKeyTakeaways = true;
+      // Handle inline bullet on same line: "KEY_TAKEAWAYS: • First point"
+      const remainder = trimmed.replace("KEY_TAKEAWAYS:", "").trim();
+      if (remainder) {
+        const bullet = remainder.replace(/^[•\-\*]\s*/, "").trim();
+        if (bullet) result.keyTakeaways.push(bullet);
+      }
+      continue;
+    }
+    if (trimmed.startsWith("WHY_MATTERS:")) {
+      inKeyTakeaways = false;
       result.whyThisMatters = trimmed.replace("WHY_MATTERS:", "").trim();
-    } else if (trimmed.startsWith("SECOND_ORDER:")) {
+      continue;
+    }
+    if (trimmed.startsWith("SECOND_ORDER:")) {
+      inKeyTakeaways = false;
       result.secondOrderImplication = trimmed.replace("SECOND_ORDER:", "").trim();
-    } else if (trimmed.startsWith("WHAT_WATCH:")) {
+      continue;
+    }
+    if (trimmed.startsWith("WHAT_WATCH:")) {
+      inKeyTakeaways = false;
       result.whatToWatchNext = trimmed.replace("WHAT_WATCH:", "").trim();
-    } else if (trimmed === "" && !inStory && result.title !== fallbackTitle) {
-      // Blank line after header section signals story start
+      continue;
+    }
+
+    // Inside KEY_TAKEAWAYS block: collect bullet lines
+    if (inKeyTakeaways) {
+      if (trimmed === "") {
+        // Blank line ends the takeaways block
+        inKeyTakeaways = false;
+        continue;
+      }
+      if (trimmed.startsWith("•") || trimmed.startsWith("-") || trimmed.startsWith("*")) {
+        const bullet = trimmed.replace(/^[•\-\*]\s*/, "").trim();
+        if (bullet) result.keyTakeaways.push(bullet);
+      } else {
+        // Non-bullet text inside KEY_TAKEAWAYS block — treat as unlabeled takeaway
+        result.keyTakeaways.push(trimmed);
+      }
+      continue;
+    }
+
+    // Blank line after header block signals story start
+    if (trimmed === "" && !inStory && result.title !== fallbackTitle) {
       inStory = true;
-    } else if (inStory || (!trimmed.startsWith("HEADLINE:") && !trimmed.startsWith("WHY_MATTERS:") && !trimmed.startsWith("SECOND_ORDER:") && !trimmed.startsWith("WHAT_WATCH:"))) {
-      if (trimmed.length > 0) {
+      continue;
+    }
+
+    // Story body — any non-header non-empty line
+    if (trimmed.length > 0) {
+      const isHeader = HEADER_PREFIXES.some((p) => trimmed.startsWith(p));
+      if (!isHeader) {
         storyLines.push(trimmed);
         inStory = true;
       }
@@ -231,16 +336,21 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
   // Fallbacks if parsing missed sections
   if (!result.title || result.title.length < 5) {
     const firstSentence = raw.split(/[.!?]/)[0].trim();
-    result.title = firstSentence.length > 10 && firstSentence.length < 150
-      ? firstSentence
-      : fallbackTitle;
+    result.title =
+      firstSentence.length > 10 && firstSentence.length < 150
+        ? firstSentence
+        : fallbackTitle;
   }
 
   if (!result.story || result.story.length < 100) {
-    // Use raw text minus any header lines
     const bodyLines = lines.filter(
-      (l) => !l.startsWith("HEADLINE:") && !l.startsWith("WHY_MATTERS:") &&
-              !l.startsWith("SECOND_ORDER:") && !l.startsWith("WHAT_WATCH:")
+      (l) =>
+        !l.startsWith("HEADLINE:") &&
+        !l.startsWith("KEY_TAKEAWAYS:") &&
+        !l.startsWith("WHY_MATTERS:") &&
+        !l.startsWith("SECOND_ORDER:") &&
+        !l.startsWith("WHAT_WATCH:") &&
+        !l.trim().startsWith("•")
     );
     result.story = bodyLines.join("\n").trim();
   }
@@ -269,6 +379,10 @@ STRUCTURE
 Output your response in this exact format — no deviations:
 
 HEADLINE: [sharp, specific news headline, 8–12 words, no dashes]
+KEY_TAKEAWAYS:
+• [Most important fact or number from the story]
+• [Key market implication or sector impact]
+• [Most important forward-looking signal to monitor]
 WHY_MATTERS: [one sentence explaining why this story matters to investors]
 SECOND_ORDER: [one sentence identifying the second-order market implication beyond the headline]
 WHAT_WATCH: [one sentence on the most important forward-looking signal to monitor]
@@ -373,7 +487,7 @@ ${dataContext}
 
 Editorial angle: ${angle}
 
-Output HEADLINE, WHY_MATTERS, SECOND_ORDER, WHAT_WATCH first, then one blank line, then the 3-paragraph story.`;
+Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH first, then one blank line, then the 3-paragraph story.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +546,7 @@ export async function synthesizeGroupedArticles(
       const systemPrompt = createSystemPrompt(toneProfile);
       const userPrompt = createUserPrompt(group, formattedArticles, contextualData);
 
-      const synthesizedText = await callClaude(client, systemPrompt, userPrompt, 1200);
+      const synthesizedText = await callClaude(client, systemPrompt, userPrompt, 1600);
 
       if (!synthesizedText || synthesizedText.length < 200) {
         stats.errors++;
@@ -468,6 +582,20 @@ export async function synthesizeGroupedArticles(
         logRejection(group.topic, `Fact check score: ${adjustedScore}`, adjustedScore);
         continue;
       }
+
+      // Confidence score — composite quality gate (source tier + corroboration + recency + fact-check)
+      const groupHasTier1 = hasQualitySource(group.articles);
+      const confidenceScore = computeConfidenceScore(group, overallScore, groupHasTier1);
+      if (confidenceScore < CONFIDENCE_THRESHOLD) {
+        stats.rejected++;
+        console.warn(
+          `[synthesis] Rejected "${group.topic}" — confidence ${confidenceScore} < ${CONFIDENCE_THRESHOLD} ` +
+          `(tier1=${groupHasTier1}, sources=${group.articles.length}, factCheck=${overallScore})`
+        );
+        logRejection(group.topic, `Confidence score: ${confidenceScore}`, adjustedScore);
+        continue;
+      }
+      console.log(`[synthesis] Confidence check passed: "${group.topic}" — score=${confidenceScore}`);
 
       // Parse structured output
       const parsed = parseStructuredOutput(synthesizedText, group.topic);
@@ -525,13 +653,15 @@ export async function synthesizeGroupedArticles(
         secondOrderImplication: parsed.secondOrderImplication || undefined,
         keyDataPoints: contextualData.length > 0 ? contextualData : undefined,
         chartData,
+        keyTakeaways: parsed.keyTakeaways.length > 0 ? parsed.keyTakeaways : undefined,
+        confidenceScore,
       };
 
       stories.push(newsItem);
       stats.posted++;
 
       console.log(
-        `[synthesis] ✓ "${parsed.title}" — whyMatters=${!!parsed.whyThisMatters}, keyData=${contextualData.length}, chart=${!!chartData}`
+        `[synthesis] ✓ "${parsed.title}" — takeaways=${parsed.keyTakeaways.length}, whyMatters=${!!parsed.whyThisMatters}, keyData=${contextualData.length}, chart=${!!chartData}, confidence=${confidenceScore}`
       );
 
       await sleep(2000);

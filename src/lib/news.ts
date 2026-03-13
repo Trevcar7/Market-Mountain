@@ -162,6 +162,89 @@ const BLOCKED_DOMAINS = [
 ];
 
 /**
+ * Blocked source names — low-quality, non-financial, or press-release outlets.
+ * Matched case-insensitively against source name.
+ */
+const BLOCKED_SOURCES = [
+  "times of india",
+  "the times of india",
+  "businessline",
+  "slashdot",
+  "yahoo entertainment",
+  "prweb",
+  "business wire",
+  "businesswire",
+  "globe newswire",
+  "globenewswire",
+  "accesswire",
+  "tmz",
+  "buzzfeed",
+  "huffpost",
+  "huffington post",
+  "daily mail",
+  "the sun",
+  "new york post",
+  "national enquirer",
+];
+
+/**
+ * Tier 1 — Premium English-language financial news sources.
+ * Articles from these sources carry the highest credibility weight.
+ */
+export const TIER_1_SOURCES = [
+  "reuters",
+  "bloomberg",
+  "wall street journal",
+  "wsj",
+  "financial times",
+  "ft.com",
+  "ap news",
+  "associated press",
+  "cnbc",
+  "marketwatch",
+  "market watch",
+  "barron",
+];
+
+/**
+ * Tier 2 — Official government data sources and specialized financial outlets.
+ */
+export const TIER_2_SOURCES = [
+  "fred",
+  "bls",
+  "eia",
+  "imf",
+  "world bank",
+  "us treasury",
+  "coindesk",
+  "the block",
+];
+
+/**
+ * Return the source tier (0 = unknown, 1 = premium news, 2 = official data).
+ */
+export function getSourceTier(sourceName: string): 0 | 1 | 2 {
+  const lower = sourceName.toLowerCase();
+  if (TIER_1_SOURCES.some((s) => lower.includes(s))) return 1;
+  if (TIER_2_SOURCES.some((s) => lower.includes(s))) return 2;
+  return 0;
+}
+
+/**
+ * Return true if at least one article in the group comes from a Tier 1 or Tier 2 source.
+ */
+export function hasQualitySource(
+  articles: (FinnhubArticle | NewsAPIArticle)[]
+): boolean {
+  return articles.some((article) => {
+    const source = isFinnhub(article)
+      ? (article as FinnhubArticle).source || ""
+      : (article as NewsAPIArticle).source?.name || "";
+    return getSourceTier(source) >= 1;
+  });
+}
+
+/**
  * Trusted financial news sources — articles from these outlets bypass keyword
  * filtering and are always considered relevant.
  * Matched against source name (Finnhub) or source.name (NewsAPI), lowercase.
@@ -329,6 +412,11 @@ export function filterByRelevance(articles: (FinnhubArticle | NewsAPIArticle)[])
 
     // Hard block — social media / forums
     if (BLOCKED_DOMAINS.some((domain) => lowerUrl.includes(domain))) {
+      return false;
+    }
+
+    // Hard block — known low-quality or non-financial sources
+    if (BLOCKED_SOURCES.some((s) => source.includes(s))) {
       return false;
     }
 

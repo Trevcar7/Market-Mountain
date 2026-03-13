@@ -1,19 +1,12 @@
-name: Fetch News (10x Daily)
+name: Fetch News (Hourly, 7AM–9PM ET)
 
 on:
   schedule:
-    # 10x daily during market hours (UTC times, EST = UTC-5 in winter / UTC-4 in summer)
-    # 12,14,15,17,18,19,20,21,23,1 UTC = 7am,9am,10am,12pm,1pm,2pm,3pm,4pm,6pm,8pm EST
-    - cron: '0 12 * * *'
-    - cron: '0 14 * * *'
-    - cron: '0 15 * * *'
-    - cron: '0 17 * * *'
-    - cron: '0 18 * * *'
-    - cron: '0 19 * * *'
-    - cron: '0 20 * * *'
-    - cron: '0 21 * * *'
-    - cron: '0 23 * * *'
-    - cron: '0 1 * * *'
+    # Hourly during operating hours — 7AM to 9PM Eastern Time
+    # EDT (UTC-4, Mar–Nov): 11:00–01:00 UTC | EST (UTC-5, Nov–Mar): 12:00–02:00 UTC
+    # Combined range covers both: 11,12,...,23,0,1,2 UTC (16 triggers/day)
+    # Max published = 5/day enforced by MAX_ARTICLES_PER_DAY in the pipeline
+    - cron: '0 11,12,13,14,15,16,17,18,19,20,21,22,23,0,1,2 * * *'
 
   # Manual trigger for testing
   workflow_dispatch:

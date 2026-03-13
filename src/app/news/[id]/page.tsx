@@ -138,6 +138,23 @@ export default async function NewsStoryPage({ params }: Props) {
             {item.title}
           </h1>
 
+          {/* Key Takeaways — 3-bullet summary */}
+          {item.keyTakeaways && item.keyTakeaways.length > 0 && (
+            <div className="mb-6">
+              <p className="text-accent-300 text-[10px] font-bold tracking-widest uppercase mb-2">
+                Key Takeaways
+              </p>
+              <ul className="space-y-1.5">
+                {item.keyTakeaways.map((takeaway, i) => (
+                  <li key={i} className="flex items-start gap-2 text-white/75 text-sm leading-relaxed">
+                    <span className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-accent-500" aria-hidden="true" />
+                    {takeaway}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Why this matters — hero callout */}
           {item.whyThisMatters && (
             <div className="border-l-2 border-accent-500 pl-4 mb-6">

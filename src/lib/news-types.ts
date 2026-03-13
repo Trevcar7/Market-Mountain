@@ -49,6 +49,8 @@ export interface NewsItem {
   secondOrderImplication?: string; // Beyond-the-headline market impact
   keyDataPoints?: KeyDataPoint[];  // Important numbers with sources
   chartData?: ChartDataset;        // Optional chart for data-driven stories
+  keyTakeaways?: string[];         // 3-bullet editorial summary (displayed below headline)
+  confidenceScore?: number;        // 0–1 editorial confidence gate (≥ 0.70 required to publish)
 }
 
 export interface NewsCollection {
@@ -188,4 +190,45 @@ export function isNewsItem(item: unknown): item is NewsItem {
     "story" in item &&
     "category" in item
   );
+}
+
+// ---------------------------------------------------------------------------
+// Market Signals
+// ---------------------------------------------------------------------------
+
+export interface MarketSignal {
+  id: string;
+  signal: string;                                    // One-sentence signal statement
+  direction: "bullish" | "bearish" | "neutral";
+  asset: string;                                     // e.g., "S&P 500", "Oil", "Bitcoin", "Bonds"
+  timeframe: string;                                 // e.g., "Near-term", "1–2 weeks"
+  confidence: "high" | "medium" | "low";
+  generatedAt: string;                               // ISO 8601
+}
+
+export interface SignalsCollection {
+  signals: MarketSignal[];
+  generatedAt: string;   // ISO 8601
+  validUntil: string;    // ISO 8601 — 1h TTL
+}
+
+// ---------------------------------------------------------------------------
+// Macro Board
+// ---------------------------------------------------------------------------
+
+export interface MacroIndicator {
+  label: string;         // e.g., "Fed Funds Rate"
+  value: string;         // e.g., "4.25–4.50%"
+  change?: string;       // e.g., "-25bps"
+  direction: "up" | "down" | "flat";
+  source: string;        // e.g., "FRED"
+  updatedAt: string;     // ISO 8601
+}
+
+export interface MacroBoardData {
+  indicators: MacroIndicator[];
+  regime: string;        // e.g., "Policy Restrictive, Disinflation Trend"
+  regimeTags: string[];  // e.g., ["Policy Restrictive", "Disinflation Trend"]
+  generatedAt: string;   // ISO 8601
+  validUntil: string;    // ISO 8601 — 15min TTL
 }

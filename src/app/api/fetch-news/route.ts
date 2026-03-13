@@ -7,6 +7,7 @@ import {
   filterByAge,
   deduplicateNews,
   groupRelatedArticles,
+  hasQualitySource,
 } from "@/lib/news";
 import { synthesizeGroupedArticles } from "@/lib/news-synthesis";
 import { NewsCollection, ArchivedNewsCollection, NewsItem } from "@/lib/news-types";
@@ -49,6 +50,7 @@ const MIN_IMPORTANCE_SINGLE_SOURCE = 6; // Single-source fallback has a lower fl
 const MAX_GROUPS_PER_RUN = 3;           // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
 const MAX_GROUPS_FALLBACK = 2;          // Fewer groups when running in single-source fallback mode
 const MIN_STORIES_TO_PUBLISH = 3;       // Publish Decision Layer: require ≥3 quality stories
+const MAX_ARTICLES_PER_DAY = 5;        // Editorial daily publishing cap — keeps feed curated
 
 // ---------------------------------------------------------------------------
 // Redis client
@@ -269,8 +271,32 @@ async function handleNewsFetch() {
       return NextResponse.json({ message: "No groups found after dedup", stats, health: health.warnings });
     }
 
-    // 4b. LOAD existing stories early — needed for cross-run topic dedup
+    // 4b. LOAD existing stories early — needed for cross-run topic dedup and daily cap
     const { active: existingActive } = await loadNewsWithArchival(kv);
+
+    // 4b.1. Daily publishing cap — count stories already published today (UTC date)
+    const todayUTC = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const storiesPublishedToday = existingActive.filter((s) =>
+      s.publishedAt.startsWith(todayUTC)
+    ).length;
+    const remainingDailyBudget = Math.max(0, MAX_ARTICLES_PER_DAY - storiesPublishedToday);
+
+    console.log(
+      `[fetch-news] Daily budget: ${storiesPublishedToday}/${MAX_ARTICLES_PER_DAY} articles published today, ` +
+      `${remainingDailyBudget} remaining`
+    );
+
+    if (remainingDailyBudget === 0) {
+      stats.publishDecision = "skipped";
+      stats.executionMs = Date.now() - startTime;
+      console.log(`[fetch-news] Daily cap reached — skipping synthesis`);
+      return NextResponse.json({
+        success: true,
+        message: `Daily publishing cap reached (${MAX_ARTICLES_PER_DAY} articles already published today)`,
+        stats,
+        health: health.warnings,
+      });
+    }
 
     // 4c. Cross-run topic dedup — skip topics covered within their cooldown window
     const recentTopics = extractRecentTopicKeys(existingActive, TOPIC_DEDUP_HOURS, DEFAULT_DEDUP_HOURS);
@@ -285,9 +311,31 @@ async function handleNewsFetch() {
     });
     stats.crossRunSuppressed = qualifiedGroups.length - afterCrossRunDedup.length;
 
+    // 4c.5. Tier-1 source filter — require at least one Tier 1 or Tier 2 source per group
+    const afterTierCheck = afterCrossRunDedup.filter((g) => {
+      if (!hasQualitySource(g.articles)) {
+        console.log(`[fetch-news] Tier check: dropping "${g.topic}" (no Tier 1/2 source among ${g.articles.length} articles)`);
+        return false;
+      }
+      return true;
+    });
+
+    if (afterTierCheck.length === 0 && afterCrossRunDedup.length > 0) {
+      // All groups dropped by tier check — log clearly so we know why
+      console.warn(
+        `[fetch-news] All ${afterCrossRunDedup.length} groups failed tier check — ` +
+        `no Tier 1/2 sources found. Skipping synthesis this run.`
+      );
+      return NextResponse.json({
+        message: "No groups with quality Tier 1/2 sources — synthesis skipped",
+        stats,
+        health: health.warnings,
+      });
+    }
+
     // 4d. Per-category cap
     const categoryCount: Record<string, number> = {};
-    const afterCategoryCap = afterCrossRunDedup.filter((g) => {
+    const afterCategoryCap = afterTierCheck.filter((g) => {
       const cat = g.category;
       categoryCount[cat] = (categoryCount[cat] ?? 0) + 1;
       const cap = PER_CATEGORY_CAP[cat] ?? 2;
@@ -308,8 +356,9 @@ async function handleNewsFetch() {
       return true;
     });
 
-    // 4f. Cap total groups per run (fewer allowed in fallback mode)
-    const groupCap = usingFallback ? MAX_GROUPS_FALLBACK : MAX_GROUPS_PER_RUN;
+    // 4f. Cap total groups per run — respects both mode cap and daily budget
+    const modeCap = usingFallback ? MAX_GROUPS_FALLBACK : MAX_GROUPS_PER_RUN;
+    const groupCap = Math.min(modeCap, remainingDailyBudget);
     const groupsToSynthesize = afterImportanceFloor.slice(0, groupCap);
 
     console.log(
@@ -614,27 +663,28 @@ function mergeNewsWithDedup(stories: NewsItem[]): NewsItem[] {
 }
 
 /**
- * Calculate next update time (10x daily: 7am, 9am, 10am, 12pm–4pm, 6pm, 8pm EST)
+ * Calculate next update time (hourly 7AM–9PM ET).
  */
 function getNextUpdateTime(): string {
   const now = new Date();
-  const estTime = new Date(
-    now.toLocaleString("en-US", { timeZone: "America/New_York" })
-  );
+  const estOffset = -4; // Use EDT (UTC-4) as conservative estimate; -5 in winter is fine to approximate
+  const estHour = (now.getUTCHours() + 24 + estOffset) % 24;
+  const estMinute = now.getUTCMinutes();
 
-  const hour = estTime.getHours();
-  const updateHours = [7, 9, 10, 12, 13, 14, 15, 16, 18, 20];
-
-  for (const updateHour of updateHours) {
-    if (hour < updateHour) {
-      const nextUpdate = new Date(estTime);
-      nextUpdate.setHours(updateHour, 0, 0, 0);
-      return nextUpdate.toISOString();
+  // Find next whole hour within 7AM–9PM ET window
+  let nextHour = estMinute > 0 ? estHour + 1 : estHour; // current hour if on the dot, else next
+  if (nextHour > estHour) {
+    // Next hour is within today
+    if (nextHour >= 7 && nextHour <= 21) {
+      const next = new Date(now);
+      next.setUTCHours(now.getUTCHours() + (nextHour - estHour), 0, 0, 0);
+      return next.toISOString();
     }
   }
 
+  // Outside operating window — next run is 7AM ET tomorrow
   const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(7, 0, 0, 0);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  tomorrow.setUTCHours(7 - estOffset, 0, 0, 0); // 7AM ET = 11 UTC (EDT) or 12 UTC (EST)
   return tomorrow.toISOString();
 }
