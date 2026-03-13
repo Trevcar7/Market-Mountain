@@ -3,6 +3,8 @@ import ArticleCard from "@/components/ArticleCard";
 import Logo from "@/components/Logo";
 import Link from "next/link";
 import NewsSection from "@/components/NewsSection";
+import MacroBoard from "@/components/MacroBoard";
+import SignalBar from "@/components/SignalBar";
 
 export default function HomePage() {
   const articles = getAllArticles();
@@ -38,8 +40,45 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Divider strip */}
+      {/* Market Signal Bar — AI-generated directional signals */}
+      <SignalBar />
+
+      {/* Macro Board — live indicators + regime classification */}
+      <MacroBoard />
+
+      {/* Accent divider */}
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
+
+      {/* Morning Brief — link to today's curated briefing */}
+      <section className="bg-navy-50 border-b border-border">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-navy-900 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="5.5" stroke="#22C55E" strokeWidth="1.5" />
+                <path d="M7 4v3l2 2" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-accent-600 mb-0.5">
+                Morning Brief
+              </p>
+              <p className="text-navy-900 text-sm font-medium">
+                Today&apos;s curated summary — lead story, key data, and what to watch
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/briefing"
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-navy-900 hover:bg-navy-800 text-white font-medium text-xs transition-colors"
+          >
+            Read Briefing
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </div>
+      </section>
 
       {/* Market News */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
@@ -81,8 +120,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Latest Posts */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+      {/* Latest Analysis — Trevor's original research posts */}
+      <section className="bg-navy-50 border-t border-border">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
         <div className="flex items-baseline justify-between mb-8 sm:mb-10">
           <h2
             className="text-2xl sm:text-3xl font-bold text-navy-900"
@@ -135,10 +175,11 @@ export default function HomePage() {
             </svg>
           </Link>
         </div>
+        </div>{/* /max-w-7xl */}
       </section>
 
       {/* About strip */}
-      <section className="bg-navy-50 border-y border-border">
+      <section className="bg-white border-t border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 flex flex-col md:flex-row items-center gap-8 md:gap-12">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold tracking-widest uppercase text-accent-600 mb-2">
