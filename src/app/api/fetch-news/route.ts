@@ -45,7 +45,7 @@ const PER_CATEGORY_CAP: Record<string, number> = {
 };
 
 const MIN_IMPORTANCE = 8;
-const MAX_GROUPS_PER_RUN = 5;
+const MAX_GROUPS_PER_RUN = 3; // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
 
 // ---------------------------------------------------------------------------
 // Redis client

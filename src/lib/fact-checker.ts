@@ -51,13 +51,14 @@ export async function verifyClaims(claims: string[]): Promise<{
 
   for (const claim of claims) {
     try {
-      // Use Google Fact Check API
-      // Note: This API requires a developer key from Google
-      const url = new URL("https://factchecktools.googleapis.com/v1alpha1/claims:search");
-
-      if (googleFactCheckApiKey) {
-        url.searchParams.set("key", googleFactCheckApiKey);
+      // Use Google Fact Check API only if key is configured
+      if (!googleFactCheckApiKey) {
+        results.push(heuristicFactCheck(claim));
+        continue;
       }
+
+      const url = new URL("https://factchecktools.googleapis.com/v1alpha1/claims:search");
+      url.searchParams.set("key", googleFactCheckApiKey);
       url.searchParams.set("query", claim);
 
       const response = await fetch(url.toString());
