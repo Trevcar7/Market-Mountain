@@ -521,6 +521,28 @@ Every story must contain:
 
 If the sources do not support all four requirements, scale back the claims — do not invent data.
 
+EDITORIAL SELF-CRITIQUE (Step 16)
+Before delivering your final output, perform an internal editorial review. Ask:
+"If I were a senior macro editor at the Financial Times, would I stake my reputation on publishing this?"
+
+Review checklist:
+□ Is the thesis sharp and non-obvious — not just restating the headline?
+□ Does every sentence earn its place — could any be deleted without loss?
+□ Are all numeric claims traceable to a SOURCE or MARKET DATA entry above?
+□ Is the forward-looking signal specific and actionable — not just "watch for volatility"?
+□ Is this story meaningfully different from generic macro uncertainty coverage?
+□ For earnings stories: is the sector or index read-through clearly stated?
+
+Strengthen any weak section before delivering. If sources are too thin to support the thesis, scale back claims — do not pad with qualifiers instead of facts.
+
+CHART ANCHOR RULE (Step 17)
+For inflation, energy, labor, rates, GDP, and earnings topics:
+Write one sentence in the analysis paragraph that explicitly references the trend data.
+Anchor it with a specific figure from the MARKET DATA section above.
+Example:
+"WTI crude averaged above $85 per barrel over the past year, sustaining cost pressure on transportation-dependent sectors."
+This sentence must cite a specific number — not a vague directional description.
+
 LEDE RULE: The opening sentence must NOT begin with the company or topic name as the grammatical subject.
 Lead with the key number, consequence, or market implication instead.
 
@@ -580,6 +602,120 @@ Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATC
 }
 
 // ---------------------------------------------------------------------------
+// Pre-synthesis story worthiness gate
+// ---------------------------------------------------------------------------
+
+/** Topics that map to known market-impacting categories. */
+const SYNTHESIS_MARKET_TOPICS = new Set([
+  "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
+  "bond_market", "trade_policy", "trade_policy_tariff", "broad_market",
+  "markets", "crypto", "energy", "earnings", "merger_acquisition",
+  "bankruptcy", "ipo", "layoffs", "commodities", "currency",
+]);
+
+/** Earnings signals that allow a company-specific story past the market-impact test. */
+const EARNINGS_WORTHINESS_PATTERNS: RegExp[] = [
+  /\b(beat|miss|exceed|surpass|disappoint)\b/i,
+  /\bguidance\b/i,
+  /\b(eps|earnings per share|revenue|profit|margin)\b/i,
+  /\b(nvidia|apple|microsoft|meta|alphabet|google|amazon|jpmorgan|tesla|goldman|berkshire|netflix|salesforce|broadcom|tsm|tsmc)\b/i,
+  /\b(semiconductor|artificial intelligence|consumer demand|banking|energy sector)\b/i,
+];
+
+/** Catalyst keywords that indicate a concrete market driver exists. */
+const CATALYST_KEYWORDS =
+  /\bcut|hike|miss|beat|shock|surge|crash|guidance|regulation|data|report|OPEC|Fed|CPI|NFP|jobs|earnings|tariff|sanction|default|bankruptcy|rate\b/i;
+
+/** Speculative language patterns — stories that are all opinion with no data. */
+const SPECULATIVE_PATTERNS: RegExp[] = [
+  /\bmight\b|\bcould\b|\bwould\b/,
+  /\banalysts?\s+(say|predict|expect|believe)\b/i,
+  /\bexperts?\s+(say|predict|warn)\b/i,
+  /\buncert(ain|y)\b/i,
+  /\bquestion[s]?\b/i,
+];
+
+/**
+ * Pre-synthesis story worthiness gate.
+ * Called BEFORE invoking Claude — rejects groups that would produce weak articles
+ * and saves Anthropic API credits.
+ *
+ * Tests (in order):
+ *   1. Market Impact   — topic maps to a known market category
+ *   2. Move Threshold  — small moves require a major catalyst
+ *   3. Catalyst Clarity — must have concrete data, not pure speculation
+ *   4. News Significance — importance floor
+ */
+function checkStoryWorthiness(
+  group: GroupedNews
+): { worthy: boolean; reason: string } {
+  const allTitles = group.articles
+    .map((a) => {
+      const raw = a as Record<string, unknown>;
+      return String(raw.title ?? raw.headline ?? "").toLowerCase();
+    })
+    .join(" ");
+
+  // ── Test 1: Market Impact ─────────────────────────────────────────────────
+  const topicInSet = SYNTHESIS_MARKET_TOPICS.has(group.topic);
+
+  // Earnings lane: company-specific story allowed if ≥2 earnings signals present
+  const isEarningsLane =
+    group.topic === "earnings" &&
+    EARNINGS_WORTHINESS_PATTERNS.filter((p) => p.test(allTitles)).length >= 2;
+
+  if (!topicInSet && !isEarningsLane && group.importance < 9) {
+    return {
+      worthy: false,
+      reason: `topic "${group.topic}" does not map to a market-impacting category (importance=${group.importance})`,
+    };
+  }
+
+  // ── Test 2: Market Move Threshold Filter ─────────────────────────────────
+  // Detect small percentage moves (0.1–0.29%) or tiny bps moves (1–5 bps)
+  const hasSmallMove =
+    /\b0\.[0-2]\d*\s*%/.test(allTitles) ||
+    /\b[1-5]\s*(bps|basis points)\b/i.test(allTitles);
+  const hasCatalyst = CATALYST_KEYWORDS.test(allTitles);
+
+  if (hasSmallMove && !hasCatalyst) {
+    return {
+      worthy: false,
+      reason: "low-signal market move with no identifiable catalyst — too incremental to publish",
+    };
+  }
+
+  // ── Test 3: Catalyst Clarity ──────────────────────────────────────────────
+  // Require at least one concrete market signal (number, move, event verb)
+  const hasConcreteSignal =
+    /\d+%|\d+\.\d+|rose|fell|gained|dropped|surged|tumbled|cut|raised|hiked|missed|beat/i.test(
+      allTitles
+    );
+
+  const speculativeCount = SPECULATIVE_PATTERNS.filter((p) =>
+    p.test(allTitles)
+  ).length;
+
+  if (!hasConcreteSignal && speculativeCount >= 3) {
+    return {
+      worthy: false,
+      reason: "all source titles are speculative opinion with no concrete event or market data",
+    };
+  }
+
+  // ── Test 4: News Significance ─────────────────────────────────────────────
+  const WORTHINESS_IMPORTANCE_FLOOR = 7;
+  if (group.importance < WORTHINESS_IMPORTANCE_FLOOR) {
+    return {
+      worthy: false,
+      reason: `importance score ${group.importance} below worthiness threshold ${WORTHINESS_IMPORTANCE_FLOOR}`,
+    };
+  }
+
+  return { worthy: true, reason: "passes all story worthiness tests" };
+}
+
+// ---------------------------------------------------------------------------
 // MAIN SYNTHESIS FUNCTION
 // ---------------------------------------------------------------------------
 
@@ -588,10 +724,10 @@ export async function synthesizeGroupedArticles(
   existingArticles: NewsItem[] = []
 ): Promise<{
   stories: NewsItem[];
-  stats: { posted: number; rejected: number; errors: number };
+  stats: { posted: number; rejected: number; errors: number; preRejected: number };
 }> {
   const stories: NewsItem[] = [];
-  const stats = { posted: 0, rejected: 0, errors: 0 };
+  const stats = { posted: 0, rejected: 0, errors: 0, preRejected: 0 };
 
   const toneProfile = await getToneProfile();
   const client = initAnthropicClient();
@@ -626,6 +762,17 @@ export async function synthesizeGroupedArticles(
 
   for (const group of groupsToProcess) {
     try {
+      // ── Pre-synthesis story worthiness gate (hard stop) ───────────────────
+      // Reject unworthy groups BEFORE calling Claude to save API credits.
+      const worthiness = checkStoryWorthiness(group);
+      if (!worthiness.worthy) {
+        stats.preRejected++;
+        console.warn(
+          `[synthesis] Pre-synthesis reject "${group.topic}": ${worthiness.reason}`
+        );
+        continue;
+      }
+
       const formattedArticles = formatNewsForStorage(group.articles);
 
       console.log(
@@ -832,7 +979,7 @@ export async function synthesizeGroupedArticles(
   }
 
   console.log(
-    `[synthesis] Done: processed=${groupsToProcess.length}, posted=${stats.posted}, rejected=${stats.rejected}, errors=${stats.errors}`
+    `[synthesis] Done: processed=${groupsToProcess.length}, preRejected=${stats.preRejected}, posted=${stats.posted}, rejected=${stats.rejected}, errors=${stats.errors}`
   );
 
   return { stories, stats };

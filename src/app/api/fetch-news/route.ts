@@ -17,23 +17,24 @@ export const runtime = "nodejs";
 
 const RETENTION_DAYS = 30;
 
-// Per-topic cooldown windows (hours) — prevents re-synthesizing the same topic
+// Per-topic cooldown windows (hours) — prevents re-synthesizing the same topic.
+// Core macro clusters now use 24h windows to reduce repetitive Fed/inflation/GDP coverage.
 const TOPIC_DEDUP_HOURS: Record<string, number> = {
-  federal_reserve: 8,
-  fed_macro: 8,
-  inflation: 8,
-  gdp: 12,
-  employment: 8,
-  bond_market: 6,
-  trade_policy: 6,
-  broad_market: 4,
-  crypto: 4,
-  earnings: 4,
-  energy: 6,
-  merger_acquisition: 8,
-  bankruptcy: 12,
+  federal_reserve: 24,  // was 8 — core macro cluster: suppress for 24h
+  fed_macro:       24,  // was 8
+  inflation:       24,  // was 8
+  gdp:             24,  // was 12
+  employment:      12,  // was 8
+  bond_market:     12,  // was 6
+  trade_policy:    12,  // was 6
+  energy:          12,  // was 6
+  broad_market:    4,   // unchanged — market moves update frequently
+  crypto:          4,   // unchanged
+  earnings:        4,   // unchanged — company stories refresh faster
+  merger_acquisition: 12, // was 8
+  bankruptcy:      24,  // was 12
 };
-const DEFAULT_DEDUP_HOURS = 6;
+const DEFAULT_DEDUP_HOURS = 8; // was 6
 
 // Per-category cap per run — prevents 3 macro stories when only 1 event happened
 const PER_CATEGORY_CAP: Record<string, number> = {
@@ -186,6 +187,7 @@ async function handleNewsFetch() {
     deduplicated: 0,
     posted: 0,
     rejected: 0,
+    preRejected: 0,       // Groups rejected before Claude synthesis (story worthiness gate)
     archived: 0,
     errors: 0,
     crossRunSuppressed: 0,
@@ -380,6 +382,7 @@ async function handleNewsFetch() {
     const { stories, stats: synthStats } = await synthesizeGroupedArticles(groupsToSynthesize, existingActive);
     stats.posted = synthStats.posted;
     stats.rejected = synthStats.rejected;
+    stats.preRejected = synthStats.preRejected ?? 0;
     stats.errors = synthStats.errors;
 
     console.log(`[fetch-news] Synthesis complete: posted=${synthStats.posted}, rejected=${synthStats.rejected}, errors=${synthStats.errors}`);
