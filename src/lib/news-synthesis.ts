@@ -27,7 +27,7 @@ function sleep(ms: number) {
 const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   federal_reserve: "federal reserve building washington dc architecture",
   fed_macro:      "federal reserve building washington dc monetary policy",
-  inflation:      "us dollar bills treasury inflation monetary policy",
+  inflation:      "consumer price index cpi inflation economic data financial charts",
   gdp:            "wall street new york city aerial skyline financial district",
   employment:     "american corporate office workers white collar employment",
   trade_policy:   "cargo shipping containers port united states trade",
@@ -57,7 +57,7 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   fed_macro:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
   inflation:
-    "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1200&q=80",  // US dollar bills
+    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",  // Financial bar chart data
   gdp:
     "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",  // NYC skyline at night
   employment:
