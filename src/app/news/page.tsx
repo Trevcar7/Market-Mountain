@@ -25,9 +25,8 @@ export default function NewsPage() {
               Market News
             </h1>
             <p className="text-lg text-gray-300">
-              Daily market updates synthesized from reputable financial sources.
-              Get insights on macroeconomic events, earnings reports, and market
-              movements that matter.
+              Curated daily market coverage — macroeconomic updates, Fed policy,
+              earnings, and market-moving events that matter.
             </p>
           </div>
         </div>

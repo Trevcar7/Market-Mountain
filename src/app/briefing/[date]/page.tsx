@@ -301,7 +301,7 @@ export default async function BriefingDatePage({ params }: Props) {
             </Link>
           </div>
           <p className="text-xs text-text-light">
-            Synthesized by Claude from reputable financial sources
+            Market Mountain Research
           </p>
         </div>
       </div>

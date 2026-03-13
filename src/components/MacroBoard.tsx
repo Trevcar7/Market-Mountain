@@ -36,11 +36,11 @@ function DirectionArrow({ direction }: { direction: MacroIndicator["direction"] 
 function RegimeBadge({ tag }: { tag: string }) {
   let colorClass = "bg-white/10 text-white/60";
 
-  if (tag.includes("Restrictive") || tag.includes("Tightening") || tag.includes("Shock")) {
+  if (tag.includes("Inverted") || tag.includes("Restrictive") || tag.includes("Tightening") || tag.includes("Shock") || tag.includes("Persistent")) {
     colorClass = "bg-red-500/15 text-red-300";
   } else if (tag.includes("Easing") || tag.includes("Accommodative") || tag.includes("Disinflation")) {
     colorClass = "bg-accent-500/15 text-accent-300";
-  } else if (tag.includes("Tight")) {
+  } else if (tag.includes("Tight") || tag.includes("Flattening")) {
     colorClass = "bg-amber-500/15 text-amber-300";
   } else if (tag.includes("Cooling") || tag.includes("Deflationary")) {
     colorClass = "bg-blue-500/15 text-blue-300";
@@ -104,24 +104,34 @@ export default function MacroBoard() {
 
         {/* Indicator grid */}
         <div className="bg-white/5 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-white/10">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-white/10">
             {loading
-              ? Array.from({ length: 6 }).map((_, i) => <IndicatorSkeleton key={i} />)
+              ? Array.from({ length: 12 }).map((_, i) => <IndicatorSkeleton key={i} />)
               : data?.indicators.map((indicator) => {
-                  const isUp = indicator.direction === "up";
+                  const isUp   = indicator.direction === "up";
                   const isDown = indicator.direction === "down";
-                  const changeColor = isUp
-                    ? "text-red-400"   // Up rate/inflation = bad (red)
+
+                  // Yield Curve: if spread is negative (inverted), always show red
+                  const isYieldCurve = indicator.label === "Yield Curve";
+                  const isInverted   = isYieldCurve && indicator.value.startsWith("-");
+
+                  const baseColor = isInverted
+                    ? "text-red-400"
+                    : isUp
+                    ? "text-red-400"    // Up rate/inflation = bad
                     : isDown
-                    ? "text-accent-400" // Down rate/inflation = good (green)
+                    ? "text-accent-400" // Down rate/inflation = good
                     : "text-white/40";
 
-                  // For indicators where "up" is good (e.g., Payrolls), invert the color
+                  // For indicators where "up" is good (Payrolls), invert the color logic
                   const positiveUpLabels = ["Nonfarm Payrolls"];
                   const isPositiveUp = positiveUpLabels.includes(indicator.label);
                   const displayColor = isPositiveUp
                     ? isUp ? "text-accent-400" : isDown ? "text-red-400" : "text-white/40"
-                    : changeColor;
+                    : baseColor;
+
+                  // For Yield Curve, also color the main value red when inverted
+                  const valueColor = isInverted ? "text-red-400" : "text-white";
 
                   return (
                     <div key={indicator.label} className="px-4 py-3.5">
@@ -129,7 +139,7 @@ export default function MacroBoard() {
                         {indicator.label}
                       </p>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-white font-bold text-base leading-tight">
+                        <span className={`font-bold text-base leading-tight ${valueColor}`}>
                           {indicator.value}
                         </span>
                         {indicator.change && (

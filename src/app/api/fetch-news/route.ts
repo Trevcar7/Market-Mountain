@@ -456,7 +456,7 @@ async function handleNewsFetch() {
     // 9. Save active news to KV
     const newsCollection: NewsCollection = {
       lastUpdated: new Date().toISOString(),
-      source: "Finnhub + NewsAPI (synthesized via Claude, fact-checked)",
+      source: "Market Mountain Financial Newswire",
       news: sortedStories,
       meta: {
         totalCount: sortedStories.length,

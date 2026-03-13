@@ -92,7 +92,7 @@ export default async function BriefingPage() {
           </h1>
           <p className="text-white/55 text-sm">
             {briefing
-              ? `Compiled from ${briefing.storiesPublished} market stories · Updated ${formatUpdateTime(briefing.generatedAt)}`
+              ? `Today's market briefing · Updated ${formatUpdateTime(briefing.generatedAt)}`
               : "Curated editorial summary of the day's key market developments"}
           </p>
         </div>
@@ -281,7 +281,7 @@ export default async function BriefingPage() {
               View all market news
             </Link>
             <p className="text-xs text-text-light">
-              Synthesized by Claude from reputable financial sources
+              Market Mountain Research
             </p>
           </div>
         </div>
@@ -304,8 +304,8 @@ function NoBriefingState() {
           Briefing not yet available
         </h2>
         <p className="text-text-muted text-sm mb-6">
-          Today&apos;s markets briefing is generated automatically after the first news
-          batch publishes. Check back shortly, or browse the full news feed.
+          Today&apos;s briefing will be available once the morning market coverage
+          is ready. Check back shortly, or browse the full news feed.
         </p>
         <Link
           href="/news"

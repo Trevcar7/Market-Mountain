@@ -432,6 +432,23 @@ Prefer:
 - Evidence-based conclusions tied to cited data
 - Concise financial journalism style (no padding, no throat-clearing)
 
+EDITORIAL LANGUAGE STANDARDS (Step 14)
+Probabilistic language: Use hedged language for forward-looking claims. Write "may", "could",
+"suggests", "appears to", or "data indicate" rather than stating conclusions as certain fact.
+
+Banned phrases — never use these exact expressions:
+- "structural shift" (use "longer-term change" or describe specifically)
+- "parabolic adoption" (use actual growth figures instead)
+- "macro headwinds testing conviction"
+- "creates opportunity" (state the specific catalyst)
+- "unprecedented" (unless directly quoting a source)
+- "game-changer" or "paradigm shift"
+
+Geopolitical restraint: For international tensions and conflict, prefer measured language.
+- Use "tensions", "concerns", "friction", "trade dispute" where accurate
+- Avoid "war", "escalation", "crisis" unless directly quoting officials or reporting established facts
+- Do not editorialize on geopolitical outcomes — state what happened, not what it means politically
+
 LEDE RULE: The opening sentence must NOT begin with the company or topic name as the grammatical subject.
 Lead with the key number, consequence, or market implication instead.
 

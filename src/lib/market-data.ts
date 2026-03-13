@@ -745,6 +745,46 @@ export async function fetchStockQuote(
   }
 }
 
+interface AlphaVantageCurrencyRate {
+  "Realtime Currency Exchange Rate"?: {
+    "5. Exchange Rate"?: string;
+    "6. Last Refreshed"?: string;
+  };
+}
+
+/** Fetch Bitcoin price in USD via Alpha Vantage CURRENCY_EXCHANGE_RATE. Returns null if unavailable. */
+export async function fetchBitcoinPrice(): Promise<{ price: number; updatedAt: string } | null> {
+  const apiKey = process.env.ALPHAVANTAGE_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const url =
+      `https://www.alphavantage.co/query` +
+      `?function=CURRENCY_EXCHANGE_RATE` +
+      `&from_currency=BTC` +
+      `&to_currency=USD` +
+      `&apikey=${apiKey}`;
+
+    const res = await fetch(url, { signal: withTimeout() });
+    if (!res.ok) return null;
+
+    const data: AlphaVantageCurrencyRate = await res.json();
+    const rate = data["Realtime Currency Exchange Rate"];
+    if (!rate?.["5. Exchange Rate"]) return null;
+
+    const price = parseFloat(rate["5. Exchange Rate"]);
+    if (isNaN(price)) return null;
+
+    return {
+      price,
+      updatedAt: rate["6. Last Refreshed"] ?? new Date().toISOString(),
+    };
+  } catch (err) {
+    logWarn("AlphaVantage", `Bitcoin price fetch failed: ${String(err)}`);
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // SECTION 6 — Polygon (optional advanced tick data)
 // ---------------------------------------------------------------------------

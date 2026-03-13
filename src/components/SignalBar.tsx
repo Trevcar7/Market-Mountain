@@ -34,34 +34,35 @@ function DirectionIcon({ direction }: { direction: MarketSignal["direction"] }) 
 // ---------------------------------------------------------------------------
 
 function SignalCard({ signal }: { signal: MarketSignal }) {
-  const isUp = signal.direction === "bullish";
+  const isUp   = signal.direction === "bullish";
   const isDown = signal.direction === "bearish";
 
-  const accentColor = isUp
-    ? "text-accent-400 bg-accent-500/10 border-accent-500/20"
+  const cardClass = isUp
+    ? "bg-accent-500/10 border-accent-500/20"
     : isDown
-    ? "text-red-400 bg-red-500/10 border-red-500/20"
-    : "text-amber-400 bg-amber-500/10 border-amber-500/20";
+    ? "bg-red-500/10 border-red-500/20"
+    : "bg-amber-500/10 border-amber-500/20";
 
   const iconColor = isUp ? "text-accent-400" : isDown ? "text-red-400" : "text-amber-400";
 
-  const confidenceDots = signal.confidence === "high" ? 3 : signal.confidence === "medium" ? 2 : 1;
+  const badgeClass = isUp
+    ? "text-accent-400 bg-accent-500/15"
+    : isDown
+    ? "text-red-400 bg-red-500/15"
+    : "text-amber-400 bg-amber-500/15";
+
+  const badgeLabel = isUp ? "Bullish" : isDown ? "Bearish" : "Neutral";
 
   return (
-    <div className={`flex-shrink-0 w-56 sm:w-64 rounded-lg border p-3.5 ${accentColor}`}>
-      {/* Header: asset + direction */}
+    <div className={`flex-shrink-0 w-56 sm:w-64 rounded-lg border p-3.5 ${cardClass}`}>
+      {/* Header: asset + direction badge */}
       <div className="flex items-center gap-1.5 mb-2">
         <span className={iconColor}>
           <DirectionIcon direction={signal.direction} />
         </span>
         <span className="text-white text-xs font-bold truncate">{signal.asset}</span>
-        <span className="ml-auto flex gap-0.5">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <span
-              key={i}
-              className={`w-1 h-1 rounded-full ${i < confidenceDots ? (isUp ? "bg-accent-400" : isDown ? "bg-red-400" : "bg-amber-400") : "bg-white/15"}`}
-            />
-          ))}
+        <span className={`ml-auto text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded ${badgeClass}`}>
+          {badgeLabel}
         </span>
       </div>
 
@@ -120,10 +121,15 @@ export default function SignalBar() {
   return (
     <div className="bg-navy-900 border-t border-white/5">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
-        {/* Label */}
-        <p className="text-[10px] font-bold tracking-widest uppercase text-white/35 mb-3">
-          Market Signals
-        </p>
+        {/* Label + subtitle */}
+        <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 mb-3">
+          <p className="text-[10px] font-bold tracking-widest uppercase text-white/35">
+            Market Signals
+          </p>
+          <p className="text-white/25 text-[11px]">
+            Key macro signals shaping near-term market direction
+          </p>
+        </div>
 
         {/* Horizontal scroll container */}
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">

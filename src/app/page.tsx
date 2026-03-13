@@ -40,11 +40,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Market Signal Bar — AI-generated directional signals */}
-      <SignalBar />
-
       {/* Macro Board — live indicators + regime classification */}
       <MacroBoard />
+
+      {/* Market Signal Bar — directional signals */}
+      <SignalBar />
 
       {/* Accent divider */}
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
