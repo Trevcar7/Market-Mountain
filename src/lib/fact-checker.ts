@@ -1,5 +1,24 @@
 import { FactCheckResult } from "./news-types";
 
+// ---------------------------------------------------------------------------
+// Google Fact Check Tools API response shape
+// https://developers.google.com/fact-check/tools/api/reference/rest/v1alpha1/claims/search
+// ---------------------------------------------------------------------------
+
+interface GoogleClaimReview {
+  url?: string;
+  textualRating?: string;
+  languageCode?: string;
+}
+
+interface GoogleClaim {
+  claimReview?: GoogleClaimReview[];
+}
+
+interface GoogleFactCheckResponse {
+  claims?: GoogleClaim[];
+}
+
 /**
  * Extract verifiable claims/facts from synthesized story text
  * Looks for statements that can be fact-checked
@@ -69,13 +88,13 @@ export async function verifyClaims(claims: string[]): Promise<{
         continue;
       }
 
-      const data = (await response.json()) as any;
-      const claims_data = data.claims || [];
+      const data = (await response.json()) as GoogleFactCheckResponse;
+      const claims_data = data.claims ?? [];
 
       if (claims_data.length > 0) {
         // Check if Google found verification
         const topClaim = claims_data[0];
-        const rating = topClaim.claimReview?.[0]?.textualRating || "UNKNOWN";
+        const rating = topClaim.claimReview?.[0]?.textualRating ?? "UNKNOWN";
 
         const verified =
           rating === "TRUE" || rating === "MOSTLY_TRUE" || rating === "SUPPORTED";
@@ -84,7 +103,7 @@ export async function verifyClaims(claims: string[]): Promise<{
           claim,
           verified,
           confidence: verified ? 90 : 30,
-          sources: topClaim.claimReview?.map((r: any) => r.url) || [],
+          sources: topClaim.claimReview?.map((r: GoogleClaimReview) => r.url ?? "") ?? [],
           explanation: topClaim.claimReview?.[0]?.languageCode,
         });
       } else {

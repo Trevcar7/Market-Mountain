@@ -435,7 +435,7 @@ export async function synthesizeGroupedArticles(
       // Optional chart data — only for macro/FRED-backed topics, capped at MAX_CHARTS_PER_RUN
       let chartData: ChartDataset | undefined;
       if (chartCount < MAX_CHARTS_PER_RUN) {
-        chartData = await buildChartData(group.topic, group.category);
+        chartData = await buildChartData(group.topic);
         if (chartData) chartCount++;
       }
 
@@ -500,10 +500,7 @@ export async function synthesizeGroupedArticles(
  * (EIA for energy, BLS for labor/inflation, FRED for macro/bond).
  * Returns undefined if no API key is set or the topic has no chart mapping.
  */
-async function buildChartData(
-  topicKey: string,
-  _category: string
-): Promise<ChartDataset | undefined> {
+async function buildChartData(topicKey: string): Promise<ChartDataset | undefined> {
   return buildNewsChartData(topicKey);
 }
 

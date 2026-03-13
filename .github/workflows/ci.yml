@@ -13,9 +13,14 @@ jobs:
 
     steps:
       - name: Checkout
+        # @v4 is the maintained major-version tag. GitHub will ship a Node 24
+        # action runtime update to this tag before the June 2, 2026 deprecation
+        # deadline — no SHA pin required for this use case.
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        # @v4 same as above. node-version: '22' controls the project build
+        # toolchain; it is independent of the action's own runtime version.
         uses: actions/setup-node@v4
         with:
           node-version: '22'

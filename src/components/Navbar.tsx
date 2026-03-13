@@ -24,10 +24,13 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  // Close menu on route change
-  useEffect(() => {
+  // Close menu on route change — derived during render (React-recommended pattern
+  // for resetting state when a dependency changes, avoids a cascading useEffect).
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
     setMenuOpen(false);
-  }, [pathname]);
+  }
 
   const isHeroPage = pathname === "/";
 

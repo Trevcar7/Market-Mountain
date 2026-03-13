@@ -2,7 +2,6 @@ import {
   FinnhubArticle,
   NewsAPIArticle,
   GroupedNews,
-  RawNews,
 } from "./news-types";
 
 /**
@@ -289,7 +288,7 @@ export function scoreByImportance(articles: (FinnhubArticle | NewsAPIArticle)[],
 
   const highCount = highImpactKeywords.filter((kw) => combinedText.includes(kw)).length;
   const mediumCount = mediumKeywords.filter((kw) => combinedText.includes(kw)).length;
-  let keywordScore = Math.min(3, highCount * 1.5 + mediumCount * 0.5);
+  const keywordScore = Math.min(3, highCount * 1.5 + mediumCount * 0.5);
 
   // Crypto penalty: crypto-only news scores lower
   const hasCrypto = combinedText.includes("crypto") || combinedText.includes("bitcoin");

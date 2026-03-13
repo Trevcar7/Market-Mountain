@@ -247,8 +247,7 @@ async function handleNewsFetch() {
     }
 
     // 4b. LOAD existing stories early — needed for cross-run topic dedup
-    const { active: existingActive, archived: existingArchived } =
-      await loadNewsWithArchival(kv);
+    const { active: existingActive } = await loadNewsWithArchival(kv);
 
     // 4c. Cross-run topic dedup — skip topics covered within their cooldown window
     const recentTopics = extractRecentTopicKeys(existingActive, TOPIC_DEDUP_HOURS, DEFAULT_DEDUP_HOURS);
@@ -525,7 +524,13 @@ async function loadNewsWithArchival(
   try {
     const data = await kv.get<ArchivedNewsCollection>("news-archive");
     if (data) {
-      archived = data.archivedNews?.map(({ archivedAt, ...item }) => item) || [];
+      // Strip archivedAt so the returned objects match the NewsItem shape.
+      // `_stripped` is explicitly voided to satisfy no-unused-vars.
+      archived = data.archivedNews?.map((s) => {
+        const { archivedAt: _stripped, ...item } = s;
+        void _stripped;
+        return item;
+      }) ?? [];
     }
   } catch (error) {
     console.error("Error loading archived news from KV:", error);
