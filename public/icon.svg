@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="50" fill="#0A1628"/>
+  <!-- Mountain silhouette -->
+  <path d="M10 82 L33 38 L44 52 L58 18 L90 82 Z" fill="#FFFFFF"/>
+  <!-- Green summit triangle -->
+  <polygon points="58,8 67,22 49,22" fill="#22C55E"/>
+</svg>

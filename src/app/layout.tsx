@@ -19,10 +19,11 @@ const inter = Inter({
   display: "swap",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com"
-  ),
+  metadataBase: new URL(siteUrl),
   title: {
     template: "%s | Market Mountain",
     default: "Market Mountain | Independent Equity Research",
@@ -32,11 +33,38 @@ export const metadata: Metadata = {
   openGraph: {
     siteName: "Market Mountain",
     type: "website",
-    url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com",
+    url: siteUrl,
+    title: "Market Mountain | Independent Equity Research",
+    description:
+      "Data-driven equity research, macroeconomic analysis, and disciplined investment frameworks by Trevor Carnovsky.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Market Mountain — Independent Equity Research",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@MarketMountain",
+    title: "Market Mountain | Independent Equity Research",
+    description:
+      "Data-driven equity research, macroeconomic analysis, and disciplined investment frameworks.",
+    images: ["/opengraph-image"],
   },
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

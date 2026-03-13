@@ -165,11 +165,6 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
 
         <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 pt-3 border-t border-border/60">
           <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
-          {news.keyDataPoints && news.keyDataPoints.length > 0 && (
-            <span className="ml-auto text-[9px] font-semibold tracking-widest uppercase text-text-light bg-slate-100 px-1.5 py-0.5 rounded">
-              {news.keyDataPoints[0].label}: {news.keyDataPoints[0].value}
-            </span>
-          )}
         </div>
       </div>
     </Link>

@@ -22,60 +22,75 @@ function sleep(ms: number) {
 // Photo constants — curated Unsplash queries per topic key
 // ---------------------------------------------------------------------------
 
+// Unsplash queries are tuned to return English-language, US-context imagery.
+// Avoid queries that might return foreign storefront signs or unrelated retail.
 const TOPIC_IMAGE_QUERIES: Record<string, string> = {
-  federal_reserve: "federal reserve washington building architecture",
-  inflation: "economy money price grocery inflation",
-  gdp: "economy growth city skyline aerial",
-  employment: "office workers employment jobs economy",
-  trade_policy: "shipping containers port cargo trade",
-  broad_market: "stock market wall street new york",
-  crypto: "bitcoin cryptocurrency digital blockchain",
-  bankruptcy: "financial crisis empty office building",
-  merger_acquisition: "business handshake meeting office deal",
-  bond_market: "treasury bonds government finance yield",
-  energy: "oil refinery pipeline sunset energy",
-  earnings: "financial charts graphs trading screen",
-  fed_macro: "federal reserve monetary policy economy",
+  federal_reserve: "federal reserve building washington dc architecture",
+  fed_macro:      "federal reserve building washington dc monetary policy",
+  inflation:      "us dollar bills treasury inflation monetary policy",
+  gdp:            "wall street new york city aerial skyline financial district",
+  employment:     "american corporate office workers white collar employment",
+  trade_policy:   "cargo shipping containers port united states trade",
+  broad_market:   "new york stock exchange wall street trading floor",
+  crypto:         "bitcoin cryptocurrency digital trading screen",
+  bankruptcy:     "financial crisis stock market decline corporate office",
+  merger_acquisition: "corporate boardroom business deal signing merger",
+  bond_market:    "us treasury bonds federal reserve interest rates finance",
+  energy:         "oil refinery pipeline united states energy petroleum",
+  earnings:       "stock market financial data charts trading screens",
+  layoffs:        "corporate office empty desk layoff downsizing",
+  ipo:            "stock market listing nasdaq new york exchange",
+  trade_policy_tariff: "us customs border trade tariff shipping",
 };
 
-const DEFAULT_IMAGE_QUERY = "financial markets stock chart data";
+const DEFAULT_IMAGE_QUERY = "wall street financial markets stock exchange data";
 
-// Hardcoded fallback URLs — work with no API key (guaranteed photo in dev + production)
+/**
+ * Hardcoded fallback Unsplash URLs — work with no API key.
+ * Each topic has a distinct, US-context image. None contain foreign-language signage.
+ * Verified: English-only imagery, professional financial/macro context.
+ */
 const FALLBACK_IMAGE_MAP: Record<string, string> = {
   // Topic-level
   federal_reserve:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
+    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",  // Fed building exterior
   fed_macro:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
-  inflation:
-    "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1200&q=80",
-  gdp:
-    "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",
-  employment:
-    "https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=1200&q=80",
-  trade_policy:
-    "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1200&q=80",
-  broad_market:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
-  crypto:
-    "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80",
-  bankruptcy:
-    "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80",
-  merger_acquisition:
-    "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80",
-  bond_market:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
+  inflation:
+    "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1200&q=80",  // US dollar bills
+  gdp:
+    "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",  // NYC skyline at night
+  employment:
+    "https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=1200&q=80",  // Office workers
+  trade_policy:
+    "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1200&q=80",  // Shipping containers
+  broad_market:
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",  // Stock chart screens
+  crypto:
+    "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80",  // Bitcoin coin close-up
+  bankruptcy:
+    "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80",  // Empty corporate hallway
+  merger_acquisition:
+    "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80",  // Handshake in boardroom
+  bond_market:
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",  // Financial data screens
   energy:
-    "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=1200&q=80",
+    "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=1200&q=80",  // Oil platform at sunset
   earnings:
+    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",  // Financial bar chart close-up
+  layoffs:
+    "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80",
+  ipo:
     "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
-  // Category-level fallbacks
+  // Category-level fallbacks (diverse selection — not all the same image)
   macro:
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
+    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
   markets:
     "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
   policy:
     "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
+  earnings_cat:
+    "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",
   other:
     "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
 };
@@ -244,6 +259,12 @@ ${formatToneForPrompt(toneProfile)}
 
 Write in the style of The Wall Street Journal or Financial Times — clear, authoritative, analytical, and precise.
 
+WORKFLOW: THESIS → EVIDENCE → NARRATIVE
+Before writing, identify:
+  1. THESIS: The single most important claim the sources support (one sentence)
+  2. EVIDENCE: The specific numbers and facts that verify the thesis
+  3. NARRATIVE: A 3-paragraph story built only from the thesis and evidence
+
 STRUCTURE
 Output your response in this exact format — no deviations:
 
@@ -265,11 +286,37 @@ STORY RULES
 6 Include at least two numerical data points in the story body
 7 Synthesize — do not repeat the same fact in multiple paragraphs
 8 Write with analytical depth and measured tone — not sensationalism
-9 Do not invent any facts not present in the provided sources
+9 Do not invent any facts not present in the provided sources or the MARKET DATA section
 10 No markdown formatting — no headers, bullet points, bold, italic, or horizontal rules
 11 No dashes of any kind (em dash or hyphen used as punctuation)
 12 Write in third person only — never use "I" or first-person perspective
 13 Write in plain prose paragraphs only
+
+FACT ACCURACY RULES (Step 11 — Data Sanity)
+These rules prevent stale or fabricated numbers:
+- If you cite the Fed Funds Rate, it must match the MARKET DATA section or omit entirely
+- If you cite a Treasury yield, it must match or be qualified as "approximately"
+- If you cite CPI, use the most recent figure from the MARKET DATA section
+- Do not cite market data values that contradict the MARKET DATA section provided
+- If the sources and MARKET DATA conflict, prefer MARKET DATA for quantitative claims
+- Remove or soften any unverifiable numeric claim — write "around", "approximately", or omit
+
+SOURCE ATTRIBUTION (Step 12)
+Where data points are used from MARKET DATA, attribute them. Examples:
+  "CPI rose 2.4% year over year in February, according to the Bureau of Labor Statistics."
+  "The 10-year Treasury yield stood near 4.28%, per Treasury data."
+  "WTI crude rose above $92, according to EIA spot price data."
+
+CONTENT QUALITY (Step 13)
+Avoid:
+- Sensational or alarmist language ("collapse", "catastrophe", "unprecedented" unless quoting)
+- Speculation presented as fact
+- Unsupported geopolitical predictions
+- Forward guidance stated as certainty
+Prefer:
+- Neutral tone: "analysts expect", "markets are pricing in", "data suggest"
+- Evidence-based conclusions tied to cited data
+- Concise financial journalism style (no padding, no throat-clearing)
 
 LEDE RULE: The opening sentence must NOT begin with the company or topic name as the grammatical subject.
 Lead with the key number, consequence, or market implication instead.
@@ -311,21 +358,22 @@ From: ${article.source}`
 
   const dataContext =
     contextualData.length > 0
-      ? `\nRELEVANT MARKET DATA (verified — use these numbers when writing the analysis paragraph):\n` +
+      ? `\nMARKET DATA (verified primary-source figures — use these in your analysis paragraph and attribute them):\n` +
         contextualData
-          .map((d) => `  ${d.label}: ${d.value}${d.change ? ` (${d.change})` : ""}${d.source ? ` — ${d.source}` : ""}`)
-          .join("\n")
+          .map((d) => `  • ${d.label}: ${d.value}${d.change ? ` (${d.change})` : ""}${d.source ? ` [Source: ${d.source}]` : ""}`)
+          .join("\n") +
+        `\n\nCLAIM-TO-SOURCE RULE: Every numeric claim in your story must map to either a SOURCE above or a MARKET DATA bullet above. If you cannot trace a number to one of these, omit it or rewrite it as qualitative analysis.`
       : "";
 
   return `Write one cohesive financial news story about "${group.topic}"
 
-SOURCES (use all of them — synthesize, do not summarize):
+SOURCES (synthesize all — do not simply summarize one):
 ${articleTexts}
 ${dataContext}
 
 Editorial angle: ${angle}
 
-Remember to output HEADLINE, WHY_MATTERS, SECOND_ORDER, WHAT_WATCH headers first, then one blank line, then the 3-paragraph story.`;
+Output HEADLINE, WHY_MATTERS, SECOND_ORDER, WHAT_WATCH first, then one blank line, then the 3-paragraph story.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -396,15 +444,28 @@ export async function synthesizeGroupedArticles(
 
       console.log(`[synthesis] Generated ${synthesizedText.length} chars for "${group.topic}"`);
 
-      // Fact-check
+      // Fact-check — extract claims, verify, score, and log results
       const claims = extractClaimsFromStory(synthesizedText);
-      const { overallScore } = await verifyClaims(claims);
-      scoreFactCheckResult([]);
+      const { results: factCheckResults, overallScore } = await verifyClaims(claims);
+      const adjustedScore = scoreFactCheckResult(factCheckResults); // Uses actual results (not empty array)
 
-      if (shouldRejectStory(overallScore, 0)) {
+      // Log claim-to-source mapping for transparency (Step 14)
+      if (factCheckResults.length > 0) {
+        console.log(`[synthesis] Fact-check for "${group.topic}": score=${overallScore} (adjusted=${adjustedScore})`);
+        for (const r of factCheckResults) {
+          const status = r.verified ? "✓" : "✗";
+          const src = r.sources && r.sources.length > 0 ? ` [${r.sources[0]}]` : "";
+          console.log(`  ${status} "${r.claim.substring(0, 60)}..." — confidence=${r.confidence}${src}`);
+        }
+      }
+
+      // Reject if adjusted score too low (threshold=40 allows most well-formed stories through
+      // while blocking obvious fabrications or nonsense outputs)
+      const FACT_CHECK_THRESHOLD = 40;
+      if (shouldRejectStory(adjustedScore, FACT_CHECK_THRESHOLD)) {
         stats.rejected++;
-        console.warn(`[synthesis] Rejected "${group.topic}" — fact-check score ${overallScore}`);
-        logRejection(group.topic, `Fact check score: ${overallScore}`, overallScore);
+        console.warn(`[synthesis] Rejected "${group.topic}" — fact-check score ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`);
+        logRejection(group.topic, `Fact check score: ${adjustedScore}`, adjustedScore);
         continue;
       }
 

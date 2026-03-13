@@ -1,0 +1,57 @@
+name: Daily Markets Briefing (8 AM ET)
+
+on:
+  schedule:
+    # 8:00 AM Eastern Time
+    # EDT (UTC-4, applies Mar–Nov): 12:00 UTC
+    # EST (UTC-5, applies Nov–Mar): 13:00 UTC
+    # Running at 12:00 UTC covers EDT. GitHub cron has ~minutes variance.
+    - cron: '0 12 * * *'
+
+  # Manual trigger — allows regenerating the briefing at any time
+  workflow_dispatch:
+
+jobs:
+  generate-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Generate Daily Markets Briefing
+        run: |
+          SITE_URL="${{ secrets.SITE_URL }}"
+          if [ -z "$SITE_URL" ]; then
+            SITE_URL="https://marketmountainfinance.com"
+          fi
+
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "Generating briefing for $TODAY at $SITE_URL/api/briefing"
+
+          body=$(curl -s \
+            --max-time 60 \
+            -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.FETCH_NEWS_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "$SITE_URL/api/briefing")
+
+          http_code=$(echo "$body" | tail -n1)
+          response_body=$(echo "$body" | head -n -1)
+
+          echo "Response status: $http_code"
+          echo "Response body: $response_body"
+
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Briefing API returned HTTP $http_code"
+            exit 1
+          fi
+
+          if echo "$response_body" | grep -q '"error"'; then
+            error_msg=$(echo "$response_body" | grep -o '"error":"[^"]*"' | head -1)
+            echo "::warning::Briefing generated with warning — $error_msg"
+          fi
+
+          # Log summary
+          stories=$(echo "$response_body" | grep -o '"storiesPublished":[0-9]*' | head -1)
+          echo "Briefing published for $TODAY | $stories"
+          echo "Daily briefing completed successfully"

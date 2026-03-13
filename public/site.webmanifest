@@ -1,0 +1,17 @@
+{
+  "name": "Market Mountain",
+  "short_name": "Market Mountain",
+  "description": "Independent Equity Research by Trevor Carnovsky",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A1628",
+  "theme_color": "#0A1628",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
