@@ -124,12 +124,6 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         )}
-        {/* Category label in bottom-left */}
-        <div className="absolute inset-0 flex items-end p-3">
-          <span className="text-[10px] font-semibold tracking-widest uppercase text-white/70">
-            {categoryLabel}
-          </span>
-        </div>
       </div>
 
       {/* Body */}

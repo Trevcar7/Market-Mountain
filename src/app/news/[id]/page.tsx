@@ -5,10 +5,14 @@ import Image from "next/image";
 import { Redis } from "@upstash/redis";
 import { NewsCollection, NewsItem } from "@/lib/news-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
+import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
+
+// March 13, 2026 00:00:00 UTC — articles before this date are removed
+const MARCH_13_CUTOFF_MS = 1773360000000;
 
 async function getNewsItem(id: string): Promise<NewsItem | null> {
   // Return 404 immediately for suppressed articles
@@ -21,7 +25,10 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
   try {
     const kv = new Redis({ url, token });
     const data = await kv.get<NewsCollection>("news");
-    return data?.news.find((n) => n.id === id) ?? null;
+    const item = data?.news.find((n) => n.id === id) ?? null;
+    // Block direct URL access to March 12 articles
+    if (item && new Date(item.publishedAt).getTime() < MARCH_13_CUTOFF_MS) return null;
+    return item;
   } catch {
     return null;
   }
@@ -189,144 +196,104 @@ export default async function NewsStoryPage({ params }: Props) {
 
       {/* Story body */}
       <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
-        <div className="lg:grid lg:grid-cols-3 lg:gap-12">
-          {/* Main story column */}
-          <article className="lg:col-span-2">
-            <div className="prose prose-slate max-w-none">
-              {paragraphs.map((para, i) => (
-                <p key={i}>{para}</p>
+        <article>
+          <div className="prose prose-slate max-w-none">
+            {paragraphs.map((para, i) => (
+              <p key={i}>{para}</p>
+            ))}
+          </div>
+
+          {/* Inline chart — appears directly below the story body */}
+          {item.chartData && (
+            <NewsInlineChart chart={item.chartData} />
+          )}
+
+          {/* Inline key data — replaces the desktop-only sidebar */}
+          {item.keyDataPoints && item.keyDataPoints.length > 0 && (
+            <NewsKeyDataInline dataPoints={item.keyDataPoints} />
+          )}
+
+          {/* Tickers */}
+          {item.relatedTickers && item.relatedTickers.length > 0 && (
+            <div className="mt-8 flex flex-wrap gap-2">
+              {item.relatedTickers.map((ticker) => (
+                <span
+                  key={ticker}
+                  className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded text-xs font-mono font-semibold"
+                >
+                  {ticker}
+                </span>
               ))}
             </div>
+          )}
 
-            {/* Tickers */}
-            {item.relatedTickers && item.relatedTickers.length > 0 && (
-              <div className="mt-8 flex flex-wrap gap-2">
-                {item.relatedTickers.map((ticker) => (
-                  <span
-                    key={ticker}
-                    className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded text-xs font-mono font-semibold"
-                  >
-                    {ticker}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Second-order implication */}
-            {item.secondOrderImplication && (
-              <div className="mt-8 p-5 rounded-lg bg-navy-50 border border-border">
-                <p className="text-[10px] font-bold tracking-widest uppercase text-navy-600 mb-1.5">
-                  Second-Order Implication
-                </p>
-                <p className="text-navy-900 text-sm leading-relaxed">
-                  {item.secondOrderImplication}
-                </p>
-              </div>
-            )}
-
-            {/* What to watch next */}
-            {item.whatToWatchNext && (
-              <div className="mt-4 p-5 rounded-lg bg-accent-50 border border-accent-200">
-                <p className="text-[10px] font-bold tracking-widest uppercase text-accent-700 mb-1.5">
-                  What to Watch Next
-                </p>
-                <p className="text-navy-900 text-sm leading-relaxed">{item.whatToWatchNext}</p>
-              </div>
-            )}
-
-            {/* Source attribution */}
-            <div className="mt-8 pt-6 border-t border-border">
-              <p className="text-xs font-semibold tracking-widest uppercase text-text-light mb-3">
-                Data Sources
+          {/* Second-order implication */}
+          {item.secondOrderImplication && (
+            <div className="mt-8 p-5 rounded-lg bg-navy-50 border border-border">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-navy-600 mb-1.5">
+                Second-Order Implication
               </p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1">
-                {uniqueSources.map((src) =>
-                  src.url ? (
-                    <a
-                      key={src.source}
-                      href={src.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-accent-600 hover:text-accent-700 hover:underline transition-colors"
-                    >
-                      {src.source}
-                    </a>
-                  ) : (
-                    <span key={src.source} className="text-sm text-text-muted">
-                      {src.source}
-                    </span>
-                  )
-                )}
-              </div>
-              {item.keyDataPoints && item.keyDataPoints.length > 0 && (
-                <p className="text-xs text-text-light mt-2">
-                  Market data:{" "}
-                  {item.keyDataPoints
-                    .map((d) => d.source)
-                    .filter(Boolean)
-                    .filter((s, i, a) => a.indexOf(s) === i)
-                    .join(", ")}
-                </p>
+              <p className="text-navy-900 text-sm leading-relaxed">
+                {item.secondOrderImplication}
+              </p>
+            </div>
+          )}
+
+          {/* What to watch next */}
+          {item.whatToWatchNext && (
+            <div className="mt-4 p-5 rounded-lg bg-accent-50 border border-accent-200">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-accent-700 mb-1.5">
+                What to Watch Next
+              </p>
+              <p className="text-navy-900 text-sm leading-relaxed">{item.whatToWatchNext}</p>
+            </div>
+          )}
+
+          {/* Source attribution */}
+          <div className="mt-8 pt-6 border-t border-border">
+            <p className="text-xs font-semibold tracking-widest uppercase text-text-light mb-3">
+              Data Sources
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {uniqueSources.map((src) =>
+                src.url ? (
+                  <a
+                    key={src.source}
+                    href={src.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-accent-600 hover:text-accent-700 hover:underline transition-colors"
+                  >
+                    {src.source}
+                  </a>
+                ) : (
+                  <span key={src.source} className="text-sm text-text-muted">
+                    {src.source}
+                  </span>
+                )
               )}
             </div>
+          </div>
 
-            {/* Footer: back link */}
-            <div className="mt-8 pt-6 border-t border-border flex items-center justify-between">
-              <Link
-                href="/news"
-                className="inline-flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                  <path d="M12 7H2M6 3L2 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Back to Market News
-              </Link>
-              <Link
-                href="/briefing"
-                className="text-sm font-medium text-text-muted hover:text-navy-900 transition-colors"
-              >
-                Today&apos;s Briefing
-              </Link>
-            </div>
-          </article>
-
-          {/* Key Data sidebar (desktop only) */}
-          {item.keyDataPoints && item.keyDataPoints.length > 0 && (
-            <aside className="hidden lg:block">
-              <div className="sticky top-6">
-                <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-4">
-                  Key Data
-                </p>
-                <div className="bg-navy-900 rounded-xl overflow-hidden">
-                  <div className="divide-y divide-white/10">
-                    {item.keyDataPoints.map((dp, i) => (
-                      <div key={i} className="px-4 py-3.5">
-                        <p className="text-white/40 text-[9px] font-semibold tracking-wider uppercase mb-0.5">
-                          {dp.label}
-                        </p>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-white font-bold text-base">{dp.value}</span>
-                          {dp.change && (
-                            <span
-                              className={`text-xs font-semibold ${
-                                dp.change.startsWith("-") ? "text-red-400" : "text-accent-400"
-                              }`}
-                            >
-                              {dp.change}
-                            </span>
-                          )}
-                        </div>
-                        {dp.source && (
-                          <p className="text-white/25 text-[9px] mt-0.5">{dp.source}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </aside>
-          )}
-        </div>
+          {/* Footer: back link */}
+          <div className="mt-8 pt-6 border-t border-border flex items-center justify-between">
+            <Link
+              href="/news"
+              className="inline-flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M12 7H2M6 3L2 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to Market News
+            </Link>
+            <Link
+              href="/briefing"
+              className="text-sm font-medium text-text-muted hover:text-navy-900 transition-colors"
+            >
+              Today&apos;s Briefing
+            </Link>
+          </div>
+        </article>
       </div>
     </>
   );

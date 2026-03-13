@@ -25,9 +25,6 @@ function formatRelativeTime(iso: string): string {
   return `${hrs} hours ago`;
 }
 
-function isStale(iso: string): boolean {
-  return Date.now() - new Date(iso).getTime() > 10 * 60 * 1000; // >10 min
-}
 
 export default function NewsSection({
   initialNews = [],
@@ -149,11 +146,6 @@ export default function NewsSection({
       {lastUpdated && !loading && (
         <div className="flex items-center gap-2 text-xs text-slate-400 mb-4">
           <span>Last updated {formatRelativeTime(lastUpdated)}</span>
-          {isStale(lastUpdated) && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 font-medium">
-              Refresh delayed
-            </span>
-          )}
         </div>
       )}
 

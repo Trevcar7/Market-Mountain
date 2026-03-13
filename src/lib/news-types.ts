@@ -35,11 +35,10 @@ export interface NewsItem {
   sentiment?: "positive" | "negative" | "neutral";
   relatedTickers?: string[]; // e.g., ["SPY", "^GSPC", "BTC-USD"]
   sourcesUsed: NewsSource[]; // Original articles combined for synthesis
-  synthesizedBy: "Claude" | "Gemini"; // AI model used for synthesis
+  synthesizedBy?: string;  // Internal field — not rendered publicly
   factCheckScore: number; // 0-100, confidence in accuracy
   verifiedClaims: string[]; // List of specific facts verified
   topicKey?: string; // Canonical topic bucket (e.g. "federal_reserve") — used for cross-run dedup
-  toneMatch?: string; // e.g., "Trevor's voice - analytical, measured"
   failureReason?: string; // If story was rejected
   imageUrl?: string; // Unsplash photo URL
 

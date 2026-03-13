@@ -106,7 +106,7 @@ export default async function BriefingDatePage({ params }: Props) {
             {formatLongDate(briefing.date)}
           </h1>
           <p className="text-white/55 text-sm">
-            {`${briefing.storiesPublished} market stories · Published ${formatUpdateTime(briefing.generatedAt)}`}
+            {`Updated ${formatUpdateTime(briefing.generatedAt)}`}
           </p>
           {isToday && (
             <span className="inline-block mt-3 text-[10px] font-bold tracking-widest uppercase text-accent-400 bg-accent-400/10 px-2.5 py-1 rounded border border-accent-400/20">

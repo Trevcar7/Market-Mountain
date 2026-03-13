@@ -126,19 +126,21 @@ async function generateBriefing(
   if (!anthropicKey) return null;
 
   // Load today's published stories
+  // March 13, 2026 00:00:00 UTC — exclude all March 12 content
+  const MARCH_13_CUTOFF_MS = 1773360000000;
   let stories: NewsItem[] = [];
   try {
     const newsData = await kv.get<NewsCollection>("news");
     if (!newsData?.news?.length) return null;
 
-    // Filter to stories published today
+    // Filter to stories published today (and not before March 13 cutoff)
     const todayStart = new Date(date + "T00:00:00Z").getTime();
     const todayEnd = todayStart + 24 * 60 * 60 * 1000;
 
     stories = newsData.news
       .filter((s) => {
         const t = new Date(s.publishedAt).getTime();
-        return t >= todayStart && t < todayEnd;
+        return t >= todayStart && t < todayEnd && t >= MARCH_13_CUTOFF_MS;
       })
       .sort((a, b) => b.importance - a.importance);
   } catch (err) {
@@ -150,8 +152,11 @@ async function generateBriefing(
     // Use all available stories if today filter returns too few (e.g., timezone issues)
     try {
       const newsData = await kv.get<NewsCollection>("news");
-      if (newsData?.news?.length && newsData.news.length >= 2) {
-        stories = newsData.news.slice(0, 6).sort((a, b) => b.importance - a.importance);
+      const eligible = (newsData?.news ?? []).filter(
+        (s) => new Date(s.publishedAt).getTime() >= MARCH_13_CUTOFF_MS
+      );
+      if (eligible.length >= 2) {
+        stories = eligible.slice(0, 6).sort((a, b) => b.importance - a.importance);
       } else {
         return null;
       }

@@ -660,10 +660,8 @@ export async function synthesizeGroupedArticles(
           const fmt = formatNewsForStorage([article])[0];
           return { title: fmt.title, url: fmt.url, source: fmt.source };
         }),
-        synthesizedBy: "Claude",
         factCheckScore: overallScore,
         verifiedClaims: claims.slice(0, 3),
-        toneMatch: "Trevor's voice - analytical, data-driven, measured skepticism",
         // Editorial enrichment
         whyThisMatters: parsed.whyThisMatters || undefined,
         whatToWatchNext: parsed.whatToWatchNext || undefined,

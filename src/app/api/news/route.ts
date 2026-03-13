@@ -62,8 +62,21 @@ export async function GET() {
       );
     }
 
-    // Filter out administratively suppressed articles
-    const filteredNews = newsData.news.filter((item) => !SUPPRESSED_ARTICLE_IDS.has(item.id));
+    // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
+    // March 13, 2026 00:00:00 UTC = 1773360000000 ms
+    const MARCH_13_CUTOFF_MS = 1773360000000;
+    const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
+    const filteredNews = newsData.news
+      .filter(
+        (item) =>
+          !SUPPRESSED_ARTICLE_IDS.has(item.id) &&
+          new Date(item.publishedAt).getTime() >= MARCH_13_CUTOFF_MS
+      )
+      .map((item) =>
+        Object.fromEntries(
+          Object.entries(item).filter(([k]) => !STRIP_FIELDS.has(k))
+        ) as typeof item
+      );
     const filtered = { ...newsData, news: filteredNews, meta: { ...newsData.meta, totalCount: filteredNews.length } };
 
     return NextResponse.json(filtered, {
