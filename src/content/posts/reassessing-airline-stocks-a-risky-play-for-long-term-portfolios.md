@@ -7,6 +7,7 @@ excerpt: "Airlines are essential to global travel, but are they essential to you
 tags: ["Sector Analysis"]
 disclaimer: true
 coverImage: "/images/airlines.png"
+coverImagePosition: "50% 60%"
 ---
 
 ## An Intro to Airlines and Headwinds

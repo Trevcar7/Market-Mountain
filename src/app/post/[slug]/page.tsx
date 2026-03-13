@@ -58,6 +58,7 @@ export default async function ArticlePage({ params }: Props) {
               alt={article.title}
               fill
               className="object-cover opacity-40"
+              style={article.coverImagePosition ? { objectPosition: article.coverImagePosition } : undefined}
               priority
               sizes="100vw"
             />

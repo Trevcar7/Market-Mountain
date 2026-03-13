@@ -24,6 +24,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
             alt={article.title}
             fill
             className="object-cover opacity-40 group-hover:opacity-50 group-hover:scale-105 transition-all duration-500"
+            style={article.coverImagePosition ? { objectPosition: article.coverImagePosition } : undefined}
             sizes="(max-width: 768px) 100vw, 66vw"
             priority
           />
@@ -80,6 +81,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
             alt={article.title}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"
+            style={article.coverImagePosition ? { objectPosition: article.coverImagePosition } : undefined}
             sizes="(max-width: 640px) 112px, (max-width: 1024px) 50vw, 33vw"
           />
         </div>

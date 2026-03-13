@@ -12,6 +12,7 @@ export interface ArticleMeta {
   readTime: string;
   excerpt: string;
   coverImage?: string;
+  coverImagePosition?: string; // e.g. "top", "center", "bottom", "50% 20%"
   tags?: string[];
   updated?: string;
   disclaimer?: boolean;
@@ -50,6 +51,7 @@ export function getArticleMeta(slug: string): ArticleMeta | null {
     readTime: data.readTime ?? stats.text,
     excerpt: data.excerpt ?? content.slice(0, 160).replace(/[#*_]/g, "") + "…",
     coverImage: data.coverImage ?? undefined,
+    coverImagePosition: data.coverImagePosition ?? undefined,
     tags: data.tags ?? [],
     updated: data.updated ?? undefined,
     disclaimer: data.disclaimer ?? false,
@@ -69,6 +71,7 @@ export function getArticle(slug: string): Article | null {
     readTime: data.readTime ?? stats.text,
     excerpt: data.excerpt ?? content.slice(0, 160).replace(/[#*_]/g, "") + "…",
     coverImage: data.coverImage ?? undefined,
+    coverImagePosition: data.coverImagePosition ?? undefined,
     tags: data.tags ?? [],
     updated: data.updated ?? undefined,
     disclaimer: data.disclaimer ?? false,

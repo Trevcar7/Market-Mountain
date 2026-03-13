@@ -7,6 +7,7 @@ excerpt: "Brad Jacobs has built five billion-dollar companies through discipline
 tags: ["Stock Analysis", "Macro"]
 disclaimer: true
 coverImage: "/images/qxo.png"
+coverImagePosition: "50% 30%"
 ---
 
 ## Introducing the Man Behind It All

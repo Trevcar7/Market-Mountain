@@ -6,6 +6,7 @@ readTime: "4 min read"
 excerpt: "In today's market environment, one of the most important disciplines an investor must practice to be successful is patience — rooted in preparation, valuation, and the willingness to wait."
 tags: ["Market Commentary"]
 coverImage: "/images/patience.png"
+coverImagePosition: "50% 15%"
 disclaimer: true
 ---
 
