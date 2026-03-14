@@ -9,6 +9,7 @@ interface NewsSectionProps {
   limit?: number;
   showCategories?: boolean;
   showSort?: boolean;
+  noFeatured?: boolean;
 }
 
 type SortOption = "recent" | "importance" | "sentiment";
@@ -31,6 +32,7 @@ export default function NewsSection({
   limit = 50,
   showCategories = true,
   showSort = true,
+  noFeatured = false,
 }: NewsSectionProps) {
   const [news, setNews] = useState<NewsItem[]>(initialNews);
   const [loading, setLoading] = useState(!initialNews.length);
@@ -173,23 +175,31 @@ export default function NewsSection({
         </div>
       )}
 
-      {/* News: featured first, then grid */}
+      {/* News: grid-only (noFeatured) or featured + grid (default) */}
       {!loading && !error && filtered.length > 0 && (
-        <>
-          {/* Featured first story */}
-          <div className="mb-6 sm:mb-8">
-            <NewsCard news={filtered[0]} variant="featured" />
+        noFeatured ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {filtered.map((newsItem) => (
+              <NewsCard key={newsItem.id} news={newsItem} />
+            ))}
           </div>
-
-          {/* Remaining stories in grid */}
-          {filtered.length > 1 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-              {filtered.slice(1).map((newsItem) => (
-                <NewsCard key={newsItem.id} news={newsItem} />
-              ))}
+        ) : (
+          <>
+            {/* Featured first story */}
+            <div className="mb-6 sm:mb-8">
+              <NewsCard news={filtered[0]} variant="featured" />
             </div>
-          )}
-        </>
+
+            {/* Remaining stories in grid */}
+            {filtered.length > 1 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+                {filtered.slice(1).map((newsItem) => (
+                  <NewsCard key={newsItem.id} news={newsItem} />
+                ))}
+              </div>
+            )}
+          </>
+        )
       )}
 
       {/* Result count */}

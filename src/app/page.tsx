@@ -12,7 +12,7 @@ import { MarketDataProvider } from "@/contexts/MarketDataContext";
 export default function HomePage() {
   const articles = getAllArticles();
   const featured = articles[0];
-  const rest = articles.slice(1, 7);
+  const rest = articles.slice(1, 4);
 
   return (
     <>
@@ -113,7 +113,8 @@ export default function HomePage() {
         </div>
 
         <NewsSection
-          limit={6}
+          limit={3}
+          noFeatured
           showCategories={false}
           showSort={false}
         />

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Redis } from "@upstash/redis";
-import { NewsCollection, NewsItem } from "@/lib/news-types";
+import { NewsCollection, NewsItem, MarketImpactItem } from "@/lib/news-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { BLOCKED_SOURCES } from "@/lib/news";
 import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
@@ -77,6 +77,58 @@ function formatDate(iso: string) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+// ---------------------------------------------------------------------------
+// Market Impact Box component — displayed inline in article body
+// ---------------------------------------------------------------------------
+
+function MarketImpactBox({ items }: { items: MarketImpactItem[] }) {
+  return (
+    <div className="mt-8 p-5 rounded-lg bg-navy-50 border border-border">
+      <p className="text-[10px] font-bold tracking-widest uppercase text-navy-600 mb-3">
+        Market Impact
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {items.map((item, i) => (
+          <div
+            key={i}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-semibold ${
+              item.direction === "up"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                : item.direction === "down"
+                ? "bg-red-50 border-red-200 text-red-700"
+                : "bg-slate-50 border-slate-200 text-slate-600"
+            }`}
+          >
+            <span className="font-bold tabular-nums tracking-wide">{item.asset}</span>
+            <span
+              className={`flex items-center gap-0.5 text-xs tabular-nums ${
+                item.direction === "up"
+                  ? "text-emerald-600"
+                  : item.direction === "down"
+                  ? "text-red-600"
+                  : "text-slate-400"
+              }`}
+            >
+              {item.direction === "up" ? (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                  <path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : item.direction === "down" ? (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                  <path d="M5 2v6M2 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <span>—</span>
+              )}
+              {item.change}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default async function NewsStoryPage({ params }: Props) {
@@ -207,6 +259,11 @@ export default async function NewsStoryPage({ params }: Props) {
               <p key={i}>{para}</p>
             ))}
           </div>
+
+          {/* Market Impact Box — shows asset-level impact when present */}
+          {item.marketImpact && item.marketImpact.length > 0 && (
+            <MarketImpactBox items={item.marketImpact} />
+          )}
 
           {/* Inline chart — appears directly below the story body */}
           {item.chartData && (

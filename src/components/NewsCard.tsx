@@ -1,4 +1,4 @@
-import { NewsItem } from "@/lib/news-types";
+import { NewsItem, MarketImpactItem } from "@/lib/news-types";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -31,6 +31,35 @@ function formatDate(iso: string) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+/**
+ * Compact market-impact strip: "OIL +4.1% · S&P −1.2% · 10Y +8bps"
+ * Shown below article title on both card variants when marketImpact is present.
+ */
+function MarketImpactStrip({ items }: { items: MarketImpactItem[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2">
+      {items.slice(0, 3).map((item, i) => (
+        <span
+          key={i}
+          className={`text-[10px] font-bold tracking-wide tabular-nums ${
+            item.direction === "up"
+              ? "text-emerald-600"
+              : item.direction === "down"
+              ? "text-red-500"
+              : "text-slate-400"
+          }`}
+        >
+          {item.asset} {item.change}
+          {i < Math.min(items.length, 3) - 1 && (
+            <span className="text-border/80 font-normal ml-1.5">·</span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
@@ -72,11 +101,18 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
           </span>
 
           <h2
-            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-3 group-hover:text-accent-300 transition-colors duration-200"
+            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-2 group-hover:text-accent-300 transition-colors duration-200"
             style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
           >
             {news.title}
           </h2>
+
+          {/* Market impact strip — featured */}
+          {news.marketImpact && news.marketImpact.length > 0 && (
+            <div className="mb-2">
+              <MarketImpactStrip items={news.marketImpact} />
+            </div>
+          )}
 
           {/* Why this matters — featured variant */}
           {news.whyThisMatters ? (
@@ -133,11 +169,18 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
         </span>
 
         <h3
-          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-2 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3"
+          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-1.5 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3"
           style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
         >
           {news.title}
         </h3>
+
+        {/* Market impact strip — default card */}
+        {news.marketImpact && news.marketImpact.length > 0 && (
+          <div className="mb-1.5">
+            <MarketImpactStrip items={news.marketImpact} />
+          </div>
+        )}
 
         <p className="text-text-muted text-sm leading-relaxed line-clamp-2 flex-1 hidden sm:block">
           {excerpt}

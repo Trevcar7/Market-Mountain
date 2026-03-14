@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { GroupedNews, NewsItem, KeyDataPoint, ChartDataset } from "./news-types";
+import { GroupedNews, NewsItem, KeyDataPoint, ChartDataset, MarketImpactItem } from "./news-types";
 import { analyzeTone, formatToneForPrompt, ToneProfile } from "./tone-analyzer";
 import {
   extractClaimsFromStory,
@@ -235,10 +235,32 @@ interface ParsedArticle {
   whatToWatchNext: string;
   secondOrderImplication: string;
   keyTakeaways: string[];
+  marketImpact: MarketImpactItem[];
 }
 
-// Minimum confidence score required to publish (0–1). Articles below this are rejected.
-const CONFIDENCE_THRESHOLD = 0.70;
+/**
+ * Rebuild mode — mirrors editorial-qa.ts setting.
+ * Lowers confidence threshold from 0.70 to 0.58 so that Tier1 single-source
+ * articles that are 12-48h old (e.g. NewsAPI delay) can pass on merit.
+ */
+const REBUILD_MODE = process.env.REBUILD_MODE === "true";
+
+/**
+ * Minimum editorial confidence score required to publish (0–1).
+ * Production: 0.70 | Rebuild: 0.58
+ *
+ * Confidence breakdown:
+ *   0.30  Tier 1 source present (Reuters, Bloomberg, CNBC, etc.)
+ *   0.20  2+ unique sources corroborate the story (0.30 for 3+)
+ *   0.20  Story is < 12h old (0.10 for 12-24h)
+ *   0.20  Fact-check score ≥ 60
+ *
+ * Rebuild 0.58 allows: Tier1 + 1 source + 12-24h old + ok factcheck = 0.60 ≥ 0.58
+ */
+const CONFIDENCE_THRESHOLD = REBUILD_MODE ? 0.58 : 0.70;
+
+/** In rebuild mode, cap published articles per run at 2 to avoid bulk-publishing weak content. */
+const REBUILD_MAX_ARTICLES = 2;
 
 /**
  * Compute a 0–1 editorial confidence score for a story group.
@@ -308,15 +330,17 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
     whatToWatchNext: "",
     secondOrderImplication: "",
     keyTakeaways: [],
+    marketImpact: [],
   };
 
   const lines = raw.split("\n");
   const storyLines: string[] = [];
   let inStory = false;
   let inKeyTakeaways = false;
+  let inMarketImpact = false;
 
   const HEADER_PREFIXES = [
-    "HEADLINE:", "KEY_TAKEAWAYS:", "WHY_MATTERS:", "SECOND_ORDER:", "WHAT_WATCH:",
+    "HEADLINE:", "KEY_TAKEAWAYS:", "WHY_MATTERS:", "SECOND_ORDER:", "WHAT_WATCH:", "MARKET_IMPACT:",
   ];
 
   for (const line of lines) {
@@ -350,14 +374,24 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
     }
     if (trimmed.startsWith("WHAT_WATCH:")) {
       inKeyTakeaways = false;
+      inMarketImpact = false;
       result.whatToWatchNext = trimmed.replace("WHAT_WATCH:", "").trim();
+      continue;
+    }
+    if (trimmed.startsWith("MARKET_IMPACT:")) {
+      inKeyTakeaways = false;
+      inMarketImpact = true;
+      // Handle inline: "MARKET_IMPACT: OIL +4.1% up, S&P -1.2% down"
+      const remainder = trimmed.replace("MARKET_IMPACT:", "").trim();
+      if (remainder) {
+        parseMarketImpactLine(remainder, result.marketImpact);
+      }
       continue;
     }
 
     // Inside KEY_TAKEAWAYS block: collect bullet lines
     if (inKeyTakeaways) {
       if (trimmed === "") {
-        // Blank line ends the takeaways block
         inKeyTakeaways = false;
         continue;
       }
@@ -365,8 +399,20 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
         const bullet = trimmed.replace(/^[•\-\*]\s*/, "").trim();
         if (bullet) result.keyTakeaways.push(bullet);
       } else {
-        // Non-bullet text inside KEY_TAKEAWAYS block — treat as unlabeled takeaway
         result.keyTakeaways.push(trimmed);
+      }
+      continue;
+    }
+
+    // Inside MARKET_IMPACT block: parse asset lines like "• OIL +4.1% up"
+    if (inMarketImpact) {
+      if (trimmed === "") {
+        inMarketImpact = false;
+        continue;
+      }
+      const bulletText = trimmed.replace(/^[•\-\*]\s*/, "").trim();
+      if (bulletText) {
+        parseMarketImpactLine(bulletText, result.marketImpact);
       }
       continue;
     }
@@ -406,12 +452,36 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
         !l.startsWith("WHY_MATTERS:") &&
         !l.startsWith("SECOND_ORDER:") &&
         !l.startsWith("WHAT_WATCH:") &&
+        !l.startsWith("MARKET_IMPACT:") &&
         !l.trim().startsWith("•")
     );
     result.story = bodyLines.join("\n").trim();
   }
 
   return result;
+}
+
+/**
+ * Parse a MARKET_IMPACT line into a MarketImpactItem.
+ * Accepts formats like:
+ *   "OIL +4.1% up"
+ *   "S&P 500: -1.2% down"
+ *   "10Y YIELD +8bps up"
+ */
+function parseMarketImpactLine(text: string, out: MarketImpactItem[]): void {
+  // Pattern: ASSET CHANGE direction  (e.g. "OIL +4.1% up" or "S&P 500: -1.2% down")
+  const m = text.match(/^([A-Za-z0-9&. /]+?)[:]\s*([+\-]\d+[.,]?\d*\s*(?:%|bps|bp))\s*(up|down|flat)?$/i)
+    ?? text.match(/^([A-Za-z0-9&. /]+?)\s+([+\-]\d+[.,]?\d*\s*(?:%|bps|bp))\s*(up|down|flat)?$/i);
+  if (!m) return;
+
+  const asset = m[1].trim().toUpperCase();
+  const change = m[2].trim();
+  const dirText = (m[3] ?? "").toLowerCase();
+  let direction: "up" | "down" | "flat" = "flat";
+  if (dirText === "up" || change.startsWith("+")) direction = "up";
+  else if (dirText === "down" || change.startsWith("-")) direction = "down";
+
+  out.push({ asset, change, direction });
 }
 
 // ---------------------------------------------------------------------------
@@ -442,25 +512,32 @@ KEY_TAKEAWAYS:
 WHY_MATTERS: [one sentence explaining why this story matters to investors]
 SECOND_ORDER: [one sentence identifying the second-order market implication beyond the headline]
 WHAT_WATCH: [one sentence on the most important forward-looking signal to monitor]
+MARKET_IMPACT:
+• [ASSET] [+/-change%] [up/down/flat] — e.g. "OIL +4.1% up" or "S&P 500 -1.2% down" or "10Y YIELD +8bps up"
+• [ASSET] [+/-change%] [up/down/flat]
 
 [blank line]
-[story body — 3 paragraphs]
+[story body — 5 sections, 500–800 words total]
 
 STORY RULES
 
-1 Open with the single most important fact — inverted pyramid, most newsworthy detail first
-2 Paragraph 1 (Lede): Key event with the most impactful number or consequence
-3 Paragraph 2 (Context): Background that explains why this happened and what preceded it
-4 Paragraph 3 (Analysis + Market Impact): What this means for markets, sectors, or investors
-5 Use specific numbers, company names, dates, and percentage figures from the sources
-6 Include at least two numerical data points in the story body
-7 Synthesize — do not repeat the same fact in multiple paragraphs
-8 Write with analytical depth and measured tone — not sensationalism
-9 Do not invent any facts not present in the provided sources or the MARKET DATA section
-10 No markdown formatting — no headers, bullet points, bold, italic, or horizontal rules
-11 No dashes of any kind (em dash or hyphen used as punctuation)
-12 Write in third person only — never use "I" or first-person perspective
-13 Write in plain prose paragraphs only
+1 Target 500–800 words across five sections — no single section may be less than 60 words
+2 Section 1 (Event Summary): Open with the single most important fact. Inverted pyramid. Most impactful number first.
+3 Section 2 (Market Reaction): How markets responded in price terms. Specific index, sector, or asset moves with percentages or basis points.
+4 Section 3 (Macro Analysis): Why this happened. Economic context, precedent, and the broader macro narrative.
+5 Section 4 (Investor Implications): Which sectors, tickers, or strategies benefit or suffer. Name specific assets.
+6 Section 5 (What to Watch Next): The most important catalyst or data point to monitor over the next 1–4 weeks.
+7 Separate each section with a blank line. Do NOT label sections with headers.
+8 Use specific numbers, company names, dates, and percentage figures from the sources
+9 Include at least three numerical data points distributed across the story body
+10 Synthesize — do not repeat the same fact in multiple sections
+11 Write with analytical depth and measured tone — not sensationalism
+12 Do not invent any facts not present in the provided sources or the MARKET DATA section
+13 No markdown formatting — no headers, bullet points, bold, italic, or horizontal rules
+14 No dashes of any kind (em dash or hyphen used as punctuation)
+15 Write in third person only — never use "I" or first-person perspective
+16 Write in plain prose paragraphs only
+17 MARKET_IMPACT bullets: only list assets that appear in your story or MARKET DATA. Omit assets you cannot support.
 
 FACT ACCURACY RULES (Step 11 — Data Sanity)
 These rules prevent stale or fabricated numbers:
@@ -598,7 +675,7 @@ ${dataContext}
 
 Editorial angle: ${angle}
 
-Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH first, then one blank line, then the 3-paragraph story.`;
+Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, MARKET_IMPACT (1–3 asset bullets) first, then one blank line, then the 5-section story (500–800 words). Do NOT label the sections with headers.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -760,7 +837,20 @@ export async function synthesizeGroupedArticles(
     return true;
   });
 
+  if (REBUILD_MODE) {
+    console.log(
+      `[synthesis] REBUILD MODE: confidence threshold=${CONFIDENCE_THRESHOLD}, ` +
+      `article cap=${REBUILD_MAX_ARTICLES}, processing ${groupsToProcess.length} groups`
+    );
+  }
+
   for (const group of groupsToProcess) {
+    // Rebuild mode: stop once article cap is reached
+    if (REBUILD_MODE && stats.posted >= REBUILD_MAX_ARTICLES) {
+      console.log(`[synthesis] REBUILD MODE: article cap (${REBUILD_MAX_ARTICLES}) reached — stopping synthesis early`);
+      break;
+    }
+
     try {
       // ── Pre-synthesis story worthiness gate (hard stop) ───────────────────
       // Reject unworthy groups BEFORE calling Claude to save API credits.
@@ -793,7 +883,7 @@ export async function synthesizeGroupedArticles(
       const systemPrompt = createSystemPrompt(toneProfile);
       const userPrompt = createUserPrompt(group, formattedArticles, contextualData);
 
-      const synthesizedText = await callClaude(client, systemPrompt, userPrompt, 1600);
+      const synthesizedText = await callClaude(client, systemPrompt, userPrompt, 2400);
 
       if (!synthesizedText || synthesizedText.length < 200) {
         stats.errors++;
@@ -940,6 +1030,9 @@ export async function synthesizeGroupedArticles(
         chartData,
         keyTakeaways: parsed.keyTakeaways.length > 0 ? parsed.keyTakeaways : undefined,
         confidenceScore,
+        // Event-first architecture
+        marketImpact: parsed.marketImpact.length > 0 ? parsed.marketImpact : undefined,
+        wordCount: parsed.story.trim().split(/\s+/).length,
       };
 
       // ── Editorial Quality Gate ────────────────────────────────────────────
@@ -965,7 +1058,10 @@ export async function synthesizeGroupedArticles(
       stats.posted++;
 
       console.log(
-        `[synthesis] ✓ "${parsed.title}" — qa=${qaResult.score}/100, takeaways=${parsed.keyTakeaways.length}, whyMatters=${!!parsed.whyThisMatters}, keyData=${contextualData.length}, chart=${!!chartData}, confidence=${confidenceScore}`
+        `[synthesis] ✓ "${parsed.title}" — qa=${qaResult.score}/100, words=${newsItem.wordCount}, ` +
+        `takeaways=${parsed.keyTakeaways.length}, whyMatters=${!!parsed.whyThisMatters}, ` +
+        `keyData=${contextualData.length}, chart=${!!chartData}, marketImpact=${parsed.marketImpact.length}, ` +
+        `confidence=${confidenceScore}`
       );
 
       await sleep(2000);
@@ -978,9 +1074,23 @@ export async function synthesizeGroupedArticles(
     }
   }
 
+  const mode = REBUILD_MODE ? "REBUILD" : "PRODUCTION";
   console.log(
-    `[synthesis] Done: processed=${groupsToProcess.length}, preRejected=${stats.preRejected}, posted=${stats.posted}, rejected=${stats.rejected}, errors=${stats.errors}`
+    `[synthesis] Done [${mode}]: processed=${groupsToProcess.length}, ` +
+    `preRejected=${stats.preRejected}, posted=${stats.posted}, rejected=${stats.rejected}, errors=${stats.errors} | ` +
+    `confidence_threshold=${CONFIDENCE_THRESHOLD}${REBUILD_MODE ? `, cap=${REBUILD_MAX_ARTICLES}` : ""}`
   );
+
+  if (stats.posted === 0) {
+    console.warn(
+      `[synthesis] ZERO stories published. Possible causes:\n` +
+      `  1. Chart hard-fail: FRED_API_KEY/BLS_API_KEY/EIA_API_KEY missing → topics requiring charts score 0/10\n` +
+      `  2. Confidence < ${CONFIDENCE_THRESHOLD}: Check Tier1 source presence + multi-source corroboration\n` +
+      `  3. QA score < ${REBUILD_MODE ? 78 : 85}/100: Review [editorial-qa] logs above for per-test scores\n` +
+      `  4. Source tier mismatch: MarketWatch/Barron's/Economist now fixed in editorial-qa.ts\n` +
+      `  Set REBUILD_MODE=true in Vercel env to temporarily lower thresholds for feed bootstrapping.`
+    );
+  }
 
   return { stories, stats };
 }

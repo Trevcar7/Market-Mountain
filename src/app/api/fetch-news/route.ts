@@ -50,8 +50,15 @@ const MIN_IMPORTANCE = 8;               // Multi-source groups must meet this fl
 const MIN_IMPORTANCE_SINGLE_SOURCE = 6; // Single-source fallback has a lower floor
 const MAX_GROUPS_PER_RUN = 3;           // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
 const MAX_GROUPS_FALLBACK = 2;          // Fewer groups when running in single-source fallback mode
-const MIN_STORIES_TO_PUBLISH = 3;       // Publish Decision Layer: require ≥3 quality stories
-const MAX_ARTICLES_PER_DAY = 5;        // Editorial daily publishing cap — keeps feed curated
+/**
+ * Rebuild mode — set REBUILD_MODE=true in Vercel env vars to bootstrap an empty feed.
+ * Requirements: ≥2 quality stories (not 3), publish cap = 2, detailed rejection logging.
+ * Remove REBUILD_MODE once the feed has ≥3 published articles.
+ */
+const REBUILD_MODE = process.env.REBUILD_MODE === "true";
+
+const MIN_STORIES_TO_PUBLISH = REBUILD_MODE ? 2 : 3; // Publish Decision Layer threshold
+const MAX_ARTICLES_PER_DAY = 5;                       // Editorial daily publishing cap
 
 // ---------------------------------------------------------------------------
 // Redis client
@@ -180,21 +187,35 @@ async function handleNewsFetch() {
     );
   }
 
+  if (REBUILD_MODE) {
+    console.log(
+      "[fetch-news] REBUILD MODE ACTIVE — min_publish=2, article_cap=2, qa_threshold=78, " +
+      "confidence_threshold=0.58, chart soft-fail=6/10. " +
+      "Remove REBUILD_MODE env var once feed has ≥3 articles."
+    );
+  }
+
   const stats = {
     fetchedFinnhub: 0,
     fetchedNewsAPI: 0,
     filtered: 0,
     deduplicated: 0,
+    grouped: 0,
+    crossRunSuppressed: 0,
+    tierCheckDropped: 0,
+    categoryCapDropped: 0,
+    importanceDropped: 0,
+    synthesisGroups: 0,
     posted: 0,
     rejected: 0,
     preRejected: 0,       // Groups rejected before Claude synthesis (story worthiness gate)
     archived: 0,
     errors: 0,
-    crossRunSuppressed: 0,
     executionMs: 0,
     publishDecision: "pending" as "pending" | "published" | "skipped" | "insufficient",
     storiesWithWhyMatters: 0,
     storiesWithKeyData: 0,
+    rebuildMode: REBUILD_MODE,
   };
 
   try {
@@ -242,6 +263,7 @@ async function handleNewsFetch() {
 
     // 4. Group related articles
     const grouped = groupRelatedArticles(unique);
+    stats.grouped = grouped.length;
     console.log(`[fetch-news] Grouped into ${grouped.length} topic groups`);
 
     // 4a. Prefer multi-source groups (2+ articles); fall back to single-source
@@ -314,6 +336,7 @@ async function handleNewsFetch() {
     stats.crossRunSuppressed = qualifiedGroups.length - afterCrossRunDedup.length;
 
     // 4c.5. Tier-1 source filter — require at least one Tier 1 or Tier 2 source per group
+    const tierCheckBefore = afterCrossRunDedup.length;
     const afterTierCheck = afterCrossRunDedup.filter((g) => {
       if (!hasQualitySource(g.articles)) {
         console.log(`[fetch-news] Tier check: dropping "${g.topic}" (no Tier 1/2 source among ${g.articles.length} articles)`);
@@ -321,6 +344,8 @@ async function handleNewsFetch() {
       }
       return true;
     });
+
+    stats.tierCheckDropped = tierCheckBefore - afterTierCheck.length;
 
     if (afterTierCheck.length === 0 && afterCrossRunDedup.length > 0) {
       // All groups dropped by tier check — log clearly so we know why
@@ -337,6 +362,7 @@ async function handleNewsFetch() {
 
     // 4d. Per-category cap
     const categoryCount: Record<string, number> = {};
+    const catCapBefore = afterTierCheck.length;
     const afterCategoryCap = afterTierCheck.filter((g) => {
       const cat = g.category;
       categoryCount[cat] = (categoryCount[cat] ?? 0) + 1;
@@ -347,8 +373,10 @@ async function handleNewsFetch() {
       }
       return true;
     });
+    stats.categoryCapDropped = catCapBefore - afterCategoryCap.length;
 
     // 4e. Minimum importance floor (lower in single-source fallback mode)
+    const impBefore = afterCategoryCap.length;
     const importanceFloor = usingFallback ? MIN_IMPORTANCE_SINGLE_SOURCE : MIN_IMPORTANCE;
     const afterImportanceFloor = afterCategoryCap.filter((g) => {
       if (g.importance < importanceFloor) {
@@ -361,12 +389,21 @@ async function handleNewsFetch() {
     // 4f. Cap total groups per run — respects both mode cap and daily budget
     const modeCap = usingFallback ? MAX_GROUPS_FALLBACK : MAX_GROUPS_PER_RUN;
     const groupCap = Math.min(modeCap, remainingDailyBudget);
+    stats.importanceDropped = impBefore - afterImportanceFloor.length;
     const groupsToSynthesize = afterImportanceFloor.slice(0, groupCap);
+    stats.synthesisGroups = groupsToSynthesize.length;
 
+    console.log(
+      `[fetch-news] Pipeline stage counts — ` +
+      `grouped=${stats.grouped}, crossRunSuppressed=${stats.crossRunSuppressed}, ` +
+      `tierDropped=${stats.tierCheckDropped}, catCapDropped=${stats.categoryCapDropped}, ` +
+      `importanceDropped=${stats.importanceDropped}, toSynthesize=${stats.synthesisGroups}`
+    );
     console.log(
       `[fetch-news] Final groups to synthesize: ${groupsToSynthesize.length} ` +
       `(mode=${usingFallback ? "single-source-fallback" : "multi-source"}, ` +
-      `cap=${groupCap}, cross-run suppressed=${stats.crossRunSuppressed})`
+      `cap=${groupCap}, cross-run suppressed=${stats.crossRunSuppressed}, ` +
+      `rebuild=${REBUILD_MODE})`
     );
 
     if (groupsToSynthesize.length === 0) {
@@ -385,31 +422,61 @@ async function handleNewsFetch() {
     stats.preRejected = synthStats.preRejected ?? 0;
     stats.errors = synthStats.errors;
 
-    console.log(`[fetch-news] Synthesis complete: posted=${synthStats.posted}, rejected=${synthStats.rejected}, errors=${synthStats.errors}`);
+    console.log(
+      `[fetch-news] Synthesis complete [${REBUILD_MODE ? "REBUILD" : "PRODUCTION"}]: ` +
+      `synthesisGroups=${stats.synthesisGroups}, preRejected=${stats.preRejected}, ` +
+      `posted=${synthStats.posted}, rejected=${synthStats.rejected}, errors=${synthStats.errors}`
+    );
 
-    // 5b. Publish Decision Layer — require ≥3 quality stories with whyThisMatters
+    // 5b. Publish Decision Layer
+    // Rebuild: require ≥2 quality stories. Production: require ≥3.
+    // Gate only applies when existingActive is empty (feed bootstrap scenario).
     const qualityStories = stories.filter(
       (s) => s.whyThisMatters && s.whyThisMatters.length > 10
     );
     stats.storiesWithWhyMatters = qualityStories.length;
     stats.storiesWithKeyData = stories.filter((s) => (s.keyDataPoints?.length ?? 0) > 0).length;
 
-    if (stories.length < MIN_STORIES_TO_PUBLISH && existingActive.length === 0) {
+    // Section 13 Publish Decision Layer:
+    // Normal run: publish if stories.length >= MIN_STORIES_TO_PUBLISH.
+    // Bootstrap exception: if feed is completely empty, allow ≥1 quality story to prevent
+    //   permanent deadlock. This removes the need for REBUILD_MODE in a fresh deployment.
+    const feedIsEmpty = existingActive.length === 0;
+    const bootstrapAllowed = feedIsEmpty && stories.length >= 1;
+    const meetsThreshold = stories.length >= MIN_STORIES_TO_PUBLISH;
+
+    if (!meetsThreshold && !bootstrapAllowed) {
       stats.publishDecision = "insufficient";
       stats.executionMs = Date.now() - startTime;
       console.warn(
-        `[fetch-news] Publish decision: SKIP — only ${stories.length} new stories (need ${MIN_STORIES_TO_PUBLISH})`
+        `[fetch-news] Publish decision: INSUFFICIENT — ${stories.length} new stories ` +
+        `(need ${MIN_STORIES_TO_PUBLISH} in ${REBUILD_MODE ? "rebuild" : "production"} mode, ` +
+        `feed has ${existingActive.length} articles). ` +
+        (REBUILD_MODE
+          ? "Rebuild mode is ON but still couldn't reach threshold. Check [synthesis] logs above."
+          : "Set REBUILD_MODE=true in Vercel env to lower thresholds.")
       );
       return NextResponse.json({
         success: true,
-        message: `Only ${stories.length} new stories synthesized — publish threshold not met, existing feed preserved`,
+        message:
+          `Only ${stories.length} new stories synthesized — publish threshold not met (need ${MIN_STORIES_TO_PUBLISH}). ` +
+          `Existing feed preserved. ` +
+          (!REBUILD_MODE ? "Hint: set REBUILD_MODE=true to lower thresholds." : ""),
         stats,
         health: health.warnings,
       });
     }
     stats.publishDecision = "published";
+    if (bootstrapAllowed && !meetsThreshold) {
+      console.log(
+        `[fetch-news] Publish decision: BOOTSTRAP PUBLISH — ${stories.length} story(ies) ` +
+        `(feed was empty; bootstrap exception allows ≥1 quality story in production)`
+      );
+    }
     console.log(
-      `[fetch-news] Publish decision: PUBLISH — ${stories.length} new stories (${stats.storiesWithWhyMatters} with why-matters, ${stats.storiesWithKeyData} with key data)`
+      `[fetch-news] Publish decision: PUBLISH — ${stories.length} new stories ` +
+      `(${stats.storiesWithWhyMatters} with why-matters, ${stats.storiesWithKeyData} with key data, ` +
+      `rebuild=${REBUILD_MODE})`
     );
 
     // 5a. Write newly covered topics to Redis for cross-run memory
