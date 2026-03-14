@@ -21,10 +21,10 @@ const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", 
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);
 
 // Snapshot items to include in Market Prices section (10Y Yield excluded — lives in Rates)
-const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "Gold", "BTC", "Broad U.S. Dollar Index"]);
+const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar Index"]);
 
 // Preferred display order for Market Prices
-const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Gold", "Broad U.S. Dollar Index", "BTC"];
+const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar Index"];
 
 // Labels where UP = bullish (green)
 const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin", "BTC", "Gold"]);
@@ -476,7 +476,7 @@ export default function MacroBoard() {
 
   // ── Section visibility: show all skeletons while loading; hide empty after ─
   const ALL_SECTIONS = [
-    { key: "market", title: "Market Prices", type: "market" as const, items: marketPrices, skeletonCount: 6 },
+    { key: "market", title: "Market Prices", type: "market" as const, items: marketPrices, skeletonCount: 4 },
     { key: "rates",  title: "Rates",         type: "rates"  as const, items: rates,        skeletonCount: 4 },
     { key: "econ",   title: "Economic Data", type: "econ"   as const, items: econData,     skeletonCount: 4 },
   ];
