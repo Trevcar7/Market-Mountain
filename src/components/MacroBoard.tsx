@@ -30,10 +30,13 @@ const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar Index"];
 const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin", "BTC", "Gold"]);
 
 // Labels where UP = bearish (red)
+// Rising oil = inflation pressure; rising dollar = earnings/EM headwind
 const NEGATIVE_UP = new Set([
   "Fed Funds Rate", "10Y Treasury", "10-Year Yield",
   "2Y Treasury", "2-Year Yield",
   "VIX", "CPI (YoY)", "Core CPI (YoY)",
+  "WTI Oil",
+  "Broad U.S. Dollar Index", "USD Index",
 ]);
 
 // Static border class maps — written out in full so Tailwind includes them
@@ -186,7 +189,7 @@ function buildSignalTags(
     const v = parseFloat(vixSnap.value);
     if (!isNaN(v)) {
       if (v >= 35)
-        candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 88 });
+        candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 88 });
       else if (v >= 25)
         candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 60 });
       else if (v <= 12)
