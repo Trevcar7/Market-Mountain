@@ -262,14 +262,19 @@ async function fetchTwelveDataSingle(
     const price = parseFloat(raw.close);
     if (isNaN(price)) return null;
 
-    // Prefer API's percent_change; fall back to change/previous_close if null/NaN
-    // (TwelveData returns percent_change: null for some commodity/forex quotes)
+    // Prefer API's percent_change; fall back to change/previous_close when:
+    //   (a) percent_change is null/NaN, OR
+    //   (b) percent_change is effectively zero but change/previous_close is non-trivial
+    //       (happens on weekends/closed sessions where TwelveData returns "0.00"
+    //        even though the last daily close was meaningfully up/down)
     let pct = raw.percent_change != null ? parseFloat(raw.percent_change) : NaN;
-    if (isNaN(pct)) {
+    if (isNaN(pct) || Math.abs(pct) < 0.005) {
       const chg  = raw.change         != null ? parseFloat(raw.change)         : NaN;
       const prev = raw.previous_close != null ? parseFloat(raw.previous_close) : NaN;
-      pct = (!isNaN(chg) && !isNaN(prev) && prev > 0) ? (chg / prev) * 100 : 0;
+      const computed = (!isNaN(chg) && !isNaN(prev) && prev > 0) ? (chg / prev) * 100 : NaN;
+      if (!isNaN(computed) && Math.abs(computed) >= 0.005) pct = computed;
     }
+    if (isNaN(pct)) pct = 0;
 
     return {
       label,
