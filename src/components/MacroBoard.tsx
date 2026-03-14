@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MacroBoardData, MarketSnapshotData, RegimeDimensions } from "@/lib/news-types";
+import { MacroBoardData, MarketSnapshotData, MacroIndicator } from "@/lib/news-types";
 
 // ─── Display config ───────────────────────────────────────────────────────────
 
@@ -73,23 +73,38 @@ function getChangeColor(label: string, displayLabel: string, direction: "up" | "
   return direction === "up" ? "text-emerald-400" : "text-red-400";
 }
 
-function parseDimensionsFromTags(tags: string[]): RegimeDimensions {
-  const d: RegimeDimensions = { inflation: "—", policy: "—", growth: "—", liquidity: "—" };
-  for (const tag of tags) {
-    if (tag.includes("Policy Restrictive"))  d.policy = "Restrictive";
-    if (tag.includes("Policy Accommod"))    d.policy = "Accommodative";
-    if (tag.includes("Policy Easing"))      d.policy = "Easing";
-    if (tag.includes("Policy Tightening"))  d.policy = "Tightening";
-    if (tag.includes("Inflation Persistent")) d.inflation = "Persistent";
-    if (tag.includes("Above-Target"))       d.inflation = "Above Target";
-    if (tag.includes("Disinflation"))       d.inflation = "Disinflating";
-    if (tag.includes("Near Target"))        d.inflation = "Near Target";
-    if (tag.includes("Labor Market Tight")) d.growth = "Solid";
-    if (tag.includes("Labor Market Cool"))  d.growth = "Slowing";
-    if (tag.includes("Yield Curve Inverted")) d.liquidity = "Tightening";
-    if (tag.includes("Curve Flattening"))   d.liquidity = "Tight";
+// ─── Simple signal tags — derived from raw indicator values ──────────────────
+
+interface SignalTag { label: string; colorClass: string; }
+
+function buildSignalTags(indicators: MacroIndicator[]): SignalTag[] {
+  const tags: SignalTag[] = [];
+
+  const fedRate    = indicators.find((i) => i.label === "Fed Funds Rate");
+  const coreCpi    = indicators.find((i) => i.label === "Core CPI (YoY)");
+  const cpi        = indicators.find((i) => i.label === "CPI (YoY)");
+
+  // Rates tag — only show when clearly elevated
+  if (fedRate) {
+    const rate = parseFloat(fedRate.value);
+    if (rate > 4.0) {
+      tags.push({ label: `Rates Elevated · ${fedRate.value}`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25" });
+    } else if (rate < 1.5) {
+      tags.push({ label: `Rates Near Zero · ${fedRate.value}`, colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" });
+    }
   }
-  return d;
+
+  // Inflation tag — use Core CPI (Fed's preferred); fall back to headline
+  const inflationInd = coreCpi ?? cpi;
+  if (inflationInd) {
+    const val = parseFloat(inflationInd.value);
+    if (val > 2.5) {
+      const label = coreCpi ? "Core CPI" : "CPI";
+      tags.push({ label: `Inflation Above Target · ${label} ${inflationInd.value}`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25" });
+    }
+  }
+
+  return tags;
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -273,78 +288,20 @@ function Section({ title, type, items, loading, skeletonCount = 4, borderClass }
   );
 }
 
-// ─── Regime panel — always shows all 4 dimensions ────────────────────────────
+// ─── Signal tag row ───────────────────────────────────────────────────────────
 
-function dimensionColor(dim: string, value: string): string {
-  const v = value.toLowerCase();
-  if (dim === "inflation") {
-    if (v.includes("persistent"))                        return "bg-red-500/20 text-red-300 border-red-500/20";
-    if (v.includes("above"))                             return "bg-amber-500/20 text-amber-300 border-amber-500/20";
-    if (v.includes("disinflat") || v.includes("near"))  return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
-  }
-  if (dim === "policy") {
-    if (v.includes("restrict") || v.includes("tighten")) return "bg-red-500/20 text-red-300 border-red-500/20";
-    if (v.includes("easing") || v.includes("accommod")) return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
-    if (v.includes("neutral"))                           return "bg-white/10 text-white/45 border-white/10";
-  }
-  if (dim === "growth") {
-    if (v.includes("solid"))                             return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
-    if (v.includes("moderat"))                           return "bg-amber-500/20 text-amber-300 border-amber-500/20";
-    if (v.includes("slow"))                              return "bg-red-500/20 text-red-300 border-red-500/20";
-  }
-  if (dim === "liquidity") {
-    if (v.includes("tighten") || v === "tight")          return "bg-red-500/20 text-red-300 border-red-500/20";
-    if (v.includes("neutral"))                           return "bg-amber-500/20 text-amber-300 border-amber-500/20";
-    if (v.includes("easing") || v.includes("accommod")) return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
-  }
-  return "bg-white/10 text-white/40 border-white/10";
-}
-
-const REGIME_ENTRIES = [
-  { key: "inflation" as const, label: "Inflation" },
-  { key: "policy"    as const, label: "Policy" },
-  { key: "growth"    as const, label: "Growth" },
-  { key: "liquidity" as const, label: "Liquidity" },
-];
-
-function RegimePanel({ dimensions }: { dimensions: RegimeDimensions }) {
+function SignalTagRow({ tags }: { tags: SignalTag[] }) {
+  if (tags.length === 0) return null;
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 pb-4">
-      <p className="text-[9px] font-bold tracking-[0.16em] uppercase text-white/30 mb-3">
-        Current Macro Regime
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {REGIME_ENTRIES.map(({ key, label }) => {
-          const value = dimensions[key];
-          const hasData = Boolean(value) && value !== "—";
-          // Always render all 4 slots; missing ones are very subtle
-          const colorClass = hasData
-            ? dimensionColor(key, value)
-            : "bg-white/[0.04] text-white/20 border-white/[0.06]";
-          return (
-            <div
-              key={key}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium ${colorClass}`}
-            >
-              <span className="opacity-60 font-normal">{label}:</span>
-              <span className="font-semibold">{hasData ? value : "—"}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function RegimeSkeleton() {
-  return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-5 pb-4 animate-pulse">
-      <div className="h-2 bg-white/10 rounded w-32 mb-3" />
-      <div className="flex gap-2">
-        {[96, 88, 72, 88].map((w, i) => (
-          <div key={i} className="h-7 bg-white/[0.06] rounded-lg border border-white/[0.08]" style={{ width: w }} />
-        ))}
-      </div>
+    <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-3 flex flex-wrap gap-2">
+      {tags.map((tag) => (
+        <span
+          key={tag.label}
+          className={`inline-flex items-center px-2.5 py-1 rounded-md border text-[11px] font-semibold tracking-wide ${tag.colorClass}`}
+        >
+          {tag.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -451,17 +408,15 @@ export default function MacroBoard() {
   const gridClass = GRID_CLASS[colCount] ?? GRID_CLASS[3];
   const borderClass = SECTION_BORDER[colCount] ?? SECTION_BORDER[3];
 
-  // Resolve regime dimensions
-  const dims: RegimeDimensions | null =
-    macroData?.regimeDimensions
-    ?? (macroData?.regimeTags?.length ? parseDimensionsFromTags(macroData.regimeTags) : null);
+  // Build simple signal tags from live indicator data
+  const signalTags = macroData ? buildSignalTags(macroData.indicators) : [];
 
   return (
     <div className="bg-navy-950 text-white border-t-2 border-white/[0.06]">
       <div className="mx-auto max-w-7xl">
 
-        {/* Regime panel — always rendered (skeleton while loading, all 4 dims after) */}
-        {loading ? <RegimeSkeleton /> : dims ? <RegimePanel dimensions={dims} /> : null}
+        {/* Signal tags — 1-2 clear, data-backed tags when thresholds are crossed */}
+        {!loading && <SignalTagRow tags={signalTags} />}
 
         {/* Indicator grid — only populated sections */}
         <div className={`grid ${gridClass} border-t border-white/[0.07]`}>

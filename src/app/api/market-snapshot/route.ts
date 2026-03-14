@@ -105,9 +105,14 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  // ── FMP-backed items: S&P 500, VIX, DXY, BTC ──────────────────────────────
+  // ── Market prices: S&P 500, VIX, DXY, BTC ────────────────────────────────
+  // Prefer TwelveData; fall back to FMP if only that key is set.
+  const twKey  = process.env.TWELVEDATA_API_KEY;
   const fmpKey = process.env.FMP_API_KEY;
-  if (fmpKey) {
+  if (twKey) {
+    const twItems = await fetchTwelveDataSnapshot(twKey);
+    items.push(...twItems);
+  } else if (fmpKey) {
     const fmpItems = await fetchFmpSnapshot(fmpKey);
     items.push(...fmpItems);
   }
@@ -145,7 +150,79 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
 }
 
 // ---------------------------------------------------------------------------
-// FMP (Financial Modeling Prep) — equity/volatility/crypto data
+// TwelveData — equity/volatility/FX/crypto data (preferred source)
+// ---------------------------------------------------------------------------
+
+interface TwelveDataQuote {
+  symbol?: string;
+  close?: string;
+  percent_change?: string;
+  // Present on per-symbol errors
+  code?: number;
+  message?: string;
+}
+
+async function fetchTwelveDataSnapshot(apiKey: string): Promise<MarketSnapshotItem[]> {
+  // S&P 500 (SPX), VIX, Dollar Index (DXY), Bitcoin (BTC/USD)
+  const labelMap: Record<string, string> = {
+    "SPX":     "S&P 500",
+    "VIX":     "VIX",
+    "DXY":     "DXY",
+    "BTC/USD": "BTC",
+  };
+
+  try {
+    const url = `https://api.twelvedata.com/quote?symbol=SPX,VIX,DXY,BTC/USD&apikey=${apiKey}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) {
+      console.warn(`[market-snapshot/TwelveData] HTTP ${res.status}`);
+      return [];
+    }
+
+    const raw = (await res.json()) as Record<string, TwelveDataQuote>;
+    const result: MarketSnapshotItem[] = [];
+
+    for (const [sym, quote] of Object.entries(raw)) {
+      // Per-symbol errors return { code, message } instead of quote data
+      if (!quote || quote.code || !quote.close) {
+        if (quote?.code) console.warn(`[market-snapshot/TwelveData] ${sym}: ${quote.message}`);
+        continue;
+      }
+
+      const price = parseFloat(quote.close);
+      if (isNaN(price)) continue;
+
+      const pct = parseFloat(quote.percent_change ?? "0");
+      const label = labelMap[sym];
+      if (!label) continue;
+
+      let value: string;
+      if (sym === "VIX")     value = price.toFixed(2);
+      else if (sym === "BTC/USD") value = `$${Math.round(price).toLocaleString()}`;
+      else if (sym === "SPX") value = Math.round(price).toLocaleString();
+      else                    value = price.toFixed(2); // DXY
+
+      result.push({
+        label,
+        value,
+        change: `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+        direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
+        source: "Twelve Data",
+      });
+    }
+
+    return result;
+  } catch (err) {
+    console.error("[market-snapshot/TwelveData] fetch error:", err);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FMP (Financial Modeling Prep) — equity/volatility/crypto data (fallback)
 // ---------------------------------------------------------------------------
 
 interface FmpQuote {
