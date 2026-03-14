@@ -5,8 +5,9 @@ import { useMarketData } from "@/contexts/MarketDataContext";
 
 // Display label overrides for the strip
 const STRIP_LABEL: Record<string, string> = {
-  BTC:        "Bitcoin",
-  "10Y Yield": "10Y Treasury",
+  BTC:                      "Bitcoin",
+  "10Y Yield":              "10Y Treasury",
+  "Broad U.S. Dollar Index": "Dollar Index",
 };
 
 // ---------------------------------------------------------------------------
@@ -45,7 +46,7 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
   const displayLabel = STRIP_LABEL[item.label] ?? item.label;
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 border-r border-border/60 last:border-r-0 shrink-0">
+    <div className="flex items-center gap-1 px-2 py-2 border-r border-border/60 last:border-r-0 shrink-0">
       <span className="text-[11px] font-semibold tracking-wide text-text-muted uppercase whitespace-nowrap">
         {displayLabel}
       </span>
@@ -78,7 +79,7 @@ export default function MarketStrip() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center overflow-x-auto scrollbar-none -mx-4 sm:mx-0 px-4 sm:px-0">
           {/* Label */}
-          <div className="flex items-center gap-1.5 px-4 py-2 border-r border-border/60 shrink-0">
+          <div className="flex items-center gap-1.5 px-2 py-2 border-r border-border/60 shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
             <span className="text-[10px] font-bold tracking-widest uppercase text-text-light whitespace-nowrap">
               Markets
@@ -91,7 +92,7 @@ export default function MarketStrip() {
           ))}
 
           {/* Timestamp */}
-          <div className="px-4 py-2 shrink-0 ml-auto hidden sm:block">
+          <div className="px-2 py-2 shrink-0 ml-auto hidden xl:block">
             <span className="text-[10px] text-text-light tabular-nums">
               {new Date(snapshot.generatedAt).toLocaleTimeString("en-US", {
                 hour: "2-digit",

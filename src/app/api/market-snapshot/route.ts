@@ -11,7 +11,7 @@ const CACHE_SECONDS = 60;
 /**
  * GET /api/market-snapshot
  * Returns seven core market indicators for the homepage strip:
- *   S&P 500, VIX, 10Y Yield, WTI Oil, Gold, DXY, Bitcoin
+ *   S&P 500, VIX, 10Y Yield, WTI Oil, Gold, Broad U.S. Dollar Index, Bitcoin
  *
  * Source priority (per-indicator, graceful-degrade):
  *   S&P 500    → FRED SP500
@@ -19,7 +19,7 @@ const CACHE_SECONDS = 60;
  *   10Y Yield  → FRED DGS10 — change in basis points
  *   WTI Oil    → EIA live → FRED DCOILWTICO fallback
  *   Gold       → TwelveData XAU/USD → FMP XAUUSD → FRED GOLDAMGBD228NLBM
- *   USD Index  → FRED DTWEXBGS (Trade Weighted Broad Dollar Index)
+ *   Broad U.S. Dollar Index → FRED DTWEXBGS (Trade Weighted Broad Dollar Index)
  *   Bitcoin    → TwelveData BTC/USD → FMP BTCUSD
  *   FMP also overrides S&P 500 + VIX with intraday data when key is set
  *
@@ -203,8 +203,8 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     const prev   = dxObs.length >= 2 ? parseFloat(dxObs[1].value) : NaN;
     if (!isNaN(latest)) {
       const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
-      itemMap.set("USD Index", {
-        label:     "USD Index",
+      itemMap.set("Broad U.S. Dollar Index", {
+        label:     "Broad U.S. Dollar Index",
         value:     latest.toFixed(2),
         change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
         direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
@@ -213,7 +213,7 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  const STRIP_ORDER = ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "USD Index", "BTC"];
+  const STRIP_ORDER = ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "Broad U.S. Dollar Index", "BTC"];
   const items = STRIP_ORDER.map((k) => itemMap.get(k)).filter(Boolean) as MarketSnapshotItem[];
 
   return {

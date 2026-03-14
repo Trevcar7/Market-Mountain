@@ -105,7 +105,7 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
 
   // USD Index: FRED DTWEXBGS (Trade Weighted Broad Dollar Index)
   const dxPoints = fredToChronological(dxFredRes.status === "fulfilled" ? dxFredRes.value : []);
-  if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "USD Index", points: dxPoints });
+  if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "Broad U.S. Dollar Index", points: dxPoints });
 
   // Bitcoin: TwelveData BTC/USD — no FRED fallback (omit rather than show stale)
   if (twKey) {
