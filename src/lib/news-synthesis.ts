@@ -673,7 +673,19 @@ GOOD LEDES:
 "Record services revenue of $23.1 billion masked a steeper-than-expected decline in iPhone unit sales."
 "Institutional inflows of $1.2 billion in a single session lifted Bitcoin past $70,000 for the first time since 2021."
 
-Write for a financially literate reader who values accuracy, analysis, and forward-looking insight over hype.`;
+Write for a financially literate reader who values accuracy, analysis, and forward-looking insight over hype.
+
+TAG STANDARD (Step 18)
+Article tags must come exclusively from this controlled taxonomy:
+ENERGY · MACRO · RATES · EQUITIES · USD · GEOPOLITICS · COMMODITIES · TECH · FINANCIALS · AI · CRYPTO
+
+Additionally, specific well-known asset identifiers are allowed: WTI · CRUDE · GOLD · SPX · DXY · BTC · ETH · VIX
+
+Rules:
+- Include 2–3 tags maximum
+- Tags must be complete words — never truncated or partially matched
+- ENERGY is preferred over COMMODITIES for oil/gas stories
+- Do not invent new tags outside this list`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1039,12 +1051,36 @@ export async function synthesizeGroupedArticles(
       }
 
       // Optional chart data — only for macro/FRED-backed topics, capped at MAX_CHARTS_PER_RUN
+      // Energy + rates stories get a secondary chart (WTI → 10Y yield companion, etc.)
       let chartData: ChartDataset[] | undefined;
       if (chartCount < MAX_CHARTS_PER_RUN) {
         const primary = await buildChartData(group.topic);
         if (primary) {
           chartCount++;
           chartData = [primary];
+
+          // For energy stories add a secondary 10Y yield chart (macro transmission mechanism)
+          // For bond_market/fed stories add a secondary S&P 500 chart (equity rate sensitivity)
+          const topicNorm = group.topic.toLowerCase().replace(/\s+/g, "_");
+          const secondaryTopic =
+            topicNorm === "energy" || topicNorm === "trade_policy" ? "bond_market" :
+            topicNorm === "bond_market" || topicNorm === "federal_reserve" || topicNorm === "fed_macro" ? "broad_market" :
+            null;
+
+          if (secondaryTopic && chartCount < MAX_CHARTS_PER_RUN) {
+            const secondary = await buildChartData(secondaryTopic);
+            if (secondary) {
+              // Secondary chart's insertAfterParagraph should be later than primary's
+              const primaryPos = primary.insertAfterParagraph ?? 0;
+              secondary.insertAfterParagraph = Math.max(primaryPos + 2, 2);
+              // Give secondary chart a contextual label
+              if (!secondary.chartLabel) {
+                secondary.chartLabel = "Market Context";
+              }
+              chartCount++;
+              chartData.push(secondary);
+            }
+          }
         }
       }
 
@@ -1058,7 +1094,7 @@ export async function synthesizeGroupedArticles(
         publishedAt: new Date().toISOString(),
         importance: group.importance,
         sentiment: inferSentiment(synthesizedText),
-        relatedTickers: extractTickers(synthesizedText),
+        relatedTickers: generateTags(group.topic, synthesizedText, group.category),
         sourcesUsed: group.articles.map((article) => {
           const fmt = formatNewsForStorage([article])[0];
           return { title: fmt.title, url: fmt.url, source: fmt.source };
@@ -1210,14 +1246,81 @@ function inferSentiment(text: string): "positive" | "negative" | "neutral" {
   return "neutral";
 }
 
-function extractTickers(text: string): string[] {
-  const tickers = new Set<string>();
-  const regex = /\$?([A-Z]{2,5})(?:\s|$|[,.])/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    tickers.add(match[1]);
+// ---------------------------------------------------------------------------
+// Controlled tag taxonomy — prevents malformed/truncated tags forever
+// ---------------------------------------------------------------------------
+
+/** Complete list of allowed taxonomy tags */
+const ALLOWED_TAGS = new Set([
+  "ENERGY", "MACRO", "RATES", "EQUITIES", "USD",
+  "GEOPOLITICS", "COMMODITIES", "TECH", "FINANCIALS", "AI", "CRYPTO",
+  // Asset-level identifiers (well-known, unambiguous)
+  "WTI", "CRUDE", "GOLD", "SPX", "DXY", "BTC", "ETH", "VIX",
+]);
+
+/** Topic → canonical tags mapping */
+const TOPIC_TAGS: Record<string, string[]> = {
+  energy:              ["WTI", "CRUDE", "ENERGY"],
+  trade_policy:        ["ENERGY", "MACRO", "USD"],
+  trade_policy_tariff: ["MACRO", "USD", "EQUITIES"],
+  federal_reserve:     ["RATES", "MACRO", "EQUITIES"],
+  fed_macro:           ["RATES", "MACRO"],
+  inflation:           ["MACRO", "RATES", "USD"],
+  gdp:                 ["MACRO", "EQUITIES"],
+  employment:          ["MACRO", "USD"],
+  bond_market:         ["RATES", "MACRO"],
+  broad_market:        ["EQUITIES", "MACRO"],
+  markets:             ["EQUITIES", "MACRO"],
+  crypto:              ["CRYPTO", "MACRO"],
+  commodities:         ["COMMODITIES", "MACRO"],
+  currency:            ["USD", "MACRO"],
+  earnings:            ["EQUITIES"],
+  merger_acquisition:  ["EQUITIES", "FINANCIALS"],
+  bankruptcy:          ["EQUITIES", "FINANCIALS"],
+  ipo:                 ["EQUITIES"],
+  layoffs:             ["EQUITIES", "MACRO"],
+};
+
+/** Category fallback tags */
+const CATEGORY_TAGS: Record<string, string[]> = {
+  macro:    ["MACRO"],
+  earnings: ["EQUITIES"],
+  markets:  ["EQUITIES", "MACRO"],
+  policy:   ["MACRO", "RATES"],
+  crypto:   ["CRYPTO"],
+  other:    ["MACRO"],
+};
+
+/**
+ * Generate 2–3 validated tags from controlled taxonomy.
+ * Uses topic-based mapping first, then scans text for known asset identifiers.
+ * Never produces truncated or malformed tags.
+ */
+function generateTags(
+  topicKey: string,
+  synthesizedText: string,
+  category: string
+): string[] {
+  const topicNorm = topicKey.toLowerCase().replace(/\s+/g, "_");
+  const topicTags = TOPIC_TAGS[topicNorm] ?? [];
+  const catTags = CATEGORY_TAGS[category] ?? ["MACRO"];
+
+  // Scan synthesized text for known asset identifiers using word boundaries
+  const knownAssets = ["WTI", "CRUDE", "GOLD", "SPX", "DXY", "BTC", "ETH", "VIX"];
+  const assetRegex = new RegExp(`\\b(${knownAssets.join("|")})\\b`, "g");
+  const textAssets: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = assetRegex.exec(synthesizedText)) !== null) {
+    textAssets.push(m[1]);
   }
-  return Array.from(tickers).slice(0, 5);
+
+  // Combine: topic tags first (most relevant), then text-found assets, then category fallback
+  const combined = [...new Set([...topicTags, ...textAssets, ...catTags])];
+
+  // Validate: only keep tags in the allowed taxonomy
+  const valid = combined.filter((t) => ALLOWED_TAGS.has(t));
+
+  return valid.slice(0, 3);
 }
 
 function generateId(topic: string): string {

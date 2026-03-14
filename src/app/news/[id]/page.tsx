@@ -159,6 +159,28 @@ export default async function NewsStoryPage({ params }: Props) {
   const charts: ChartDataset[] = !item.chartData ? [] :
     Array.isArray(item.chartData) ? item.chartData : [item.chartData as unknown as ChartDataset];
 
+  // Build per-paragraph chart map using insertAfterParagraph when set.
+  // Fallback positions: chart[0] → after P1, chart[1] → after P3, rest → after story body.
+  const FALLBACK_POSITIONS = [1, 3];
+  const chartsByParagraph = new Map<number, ChartDataset[]>();
+  const overflowCharts: ChartDataset[] = [];
+  charts.forEach((chart, i) => {
+    if (chart.insertAfterParagraph !== undefined) {
+      const arr = chartsByParagraph.get(chart.insertAfterParagraph) ?? [];
+      arr.push(chart);
+      chartsByParagraph.set(chart.insertAfterParagraph, arr);
+    } else {
+      const pos = FALLBACK_POSITIONS[i];
+      if (pos !== undefined) {
+        const arr = chartsByParagraph.get(pos) ?? [];
+        arr.push(chart);
+        chartsByParagraph.set(pos, arr);
+      } else {
+        overflowCharts.push(chart);
+      }
+    }
+  });
+
   return (
     <>
       {/* Hero */}
@@ -263,16 +285,12 @@ export default async function NewsStoryPage({ params }: Props) {
             {paragraphs.map((para, i) => (
               <React.Fragment key={i}>
                 <p>{para}</p>
-                {/* First chart injected after 2nd paragraph (index 1) */}
-                {i === 1 && charts.length > 0 && (
+                {/* Inject charts assigned to this paragraph index */}
+                {chartsByParagraph.has(i) && (
                   <div className="not-prose">
-                    <NewsInlineChart chart={charts[0]} />
-                  </div>
-                )}
-                {/* Second chart injected after 4th paragraph (index 3) */}
-                {i === 3 && charts.length > 1 && (
-                  <div className="not-prose">
-                    <NewsInlineChart chart={charts[1]} />
+                    {chartsByParagraph.get(i)!.map((chart, ci) => (
+                      <NewsInlineChart key={ci} chart={chart} />
+                    ))}
                   </div>
                 )}
               </React.Fragment>
@@ -284,8 +302,8 @@ export default async function NewsStoryPage({ params }: Props) {
             <MarketImpactBox items={item.marketImpact} />
           )}
 
-          {/* Any additional charts (3rd+) rendered below story body */}
-          {charts.slice(2).map((chart, i) => (
+          {/* Overflow charts (no paragraph assignment, beyond fallback range) */}
+          {overflowCharts.map((chart, i) => (
             <NewsInlineChart key={i} chart={chart} />
           ))}
 

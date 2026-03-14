@@ -1227,10 +1227,28 @@ export async function fetchChartSeriesForTopic(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Chart label + placement metadata per topic — institutional research style
+// ---------------------------------------------------------------------------
+
+const CHART_METADATA: Record<string, { chartLabel: string; insertAfterParagraph: number }> = {
+  energy:          { chartLabel: "Energy Markets",  insertAfterParagraph: 0 },
+  trade_policy:    { chartLabel: "Energy Markets",  insertAfterParagraph: 0 },
+  federal_reserve: { chartLabel: "Monetary Policy", insertAfterParagraph: 1 },
+  fed_macro:       { chartLabel: "Monetary Policy", insertAfterParagraph: 1 },
+  bond_market:     { chartLabel: "Rates",            insertAfterParagraph: 1 },
+  inflation:       { chartLabel: "Inflation",        insertAfterParagraph: 1 },
+  employment:      { chartLabel: "Labor Market",     insertAfterParagraph: 1 },
+  gdp:             { chartLabel: "Growth",           insertAfterParagraph: 1 },
+  broad_market:    { chartLabel: "Market Context",   insertAfterParagraph: 1 },
+  markets:         { chartLabel: "Market Context",   insertAfterParagraph: 1 },
+};
+
 /**
  * Build a complete ChartDataset for use in NewsItem.chartData.
- * Attaches editorial reference lines where appropriate (e.g., Fed 2% target).
- * Returns undefined if no chart data is available.
+ * Attaches: editorial reference lines, chartLabel, insertAfterParagraph, and
+ * appends the timeframe to the chart title for institutional clarity.
+ * Returns undefined if no API key is set or the topic has no chart mapping.
  */
 export async function buildNewsChartData(
   topicKey: string
@@ -1239,14 +1257,28 @@ export async function buildNewsChartData(
     const result = await fetchChartSeriesForTopic(topicKey);
     if (!result || result.values.length < 3) return undefined;
 
+    const meta = CHART_METADATA[topicKey];
+
+    // Append timeframe to title if not already present (e.g., "(12-Month)")
+    let title = result.title;
+    if (result.timeRange && !title.includes("(")) {
+      // Derive short label: "Last 12 months" → "(12-Month)", "Last 8 quarters" → "(8-Quarter)"
+      const m12 = result.timeRange.match(/last\s+(\d+)\s+month/i);
+      const m8q = result.timeRange.match(/last\s+(\d+)\s+quarter/i);
+      if (m12) title = `${title} (${m12[1]}-Month)`;
+      else if (m8q) title = `${title} (${m8q[1]}-Quarter)`;
+    }
+
     const dataset: ChartDataset = {
-      title: result.title,
+      title,
       type: result.type,
       labels: result.labels,
       values: result.values,
       unit: result.unit,
       source: result.source,
       timeRange: result.timeRange,
+      chartLabel: meta?.chartLabel,
+      insertAfterParagraph: meta?.insertAfterParagraph,
     };
 
     // Attach well-known benchmark reference lines for editorial context

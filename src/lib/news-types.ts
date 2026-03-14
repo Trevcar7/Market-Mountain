@@ -18,14 +18,16 @@ export interface KeyDataPoint {
 export interface ChartDataset {
   title: string;
   type: "bar" | "line";
-  labels: string[];        // x-axis labels (dates, tickers, etc.)
-  values: number[];        // y-axis values
-  unit?: string;           // e.g., "%" or "$B" or "bps"
-  source: string;          // Data source attribution
-  timeRange?: string;      // e.g., "Jan 2024 – Mar 2026"
-  caption?: string;        // Editorial caption explaining macro relevance (shown below chart)
-  referenceValue?: number; // Optional benchmark line (e.g., 2.0 for Fed 2% target)
-  referenceLabel?: string; // Label for reference line (e.g., "Fed 2% Target")
+  labels: string[];              // x-axis labels (dates, tickers, etc.)
+  values: number[];              // y-axis values
+  unit?: string;                 // e.g., "%" or "$B" or "bps"
+  source: string;                // Data source attribution
+  timeRange?: string;            // e.g., "Jan 2024 – Mar 2026"
+  caption?: string;              // Editorial caption explaining macro relevance (shown below chart)
+  chartLabel?: string;           // Header label above chart title (e.g., "Energy Markets", "Rates")
+  insertAfterParagraph?: number; // 0-indexed paragraph after which this chart is injected
+  referenceValue?: number;       // Optional benchmark line (e.g., 2.0 for Fed 2% target)
+  referenceLabel?: string;       // Label for reference line (e.g., "Fed 2% Target")
 }
 
 // ---------------------------------------------------------------------------

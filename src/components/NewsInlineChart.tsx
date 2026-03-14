@@ -5,13 +5,16 @@ import { ChartDataset, KeyDataPoint } from "@/lib/news-types";
 // Renders a ChartDataset inline within an article body.
 // Pure SVG — no external charting library required.
 //
-// Design improvements (visual editorial QA, March 2026):
-//   • Line charts use a tight y-axis anchored to the data range (not 0)
-//     so movements are clearly visible at macro scale.
-//   • Bar charts keep a zero baseline (handles negative values like GDP growth).
-//   • Optional reference line (chart.referenceValue) — e.g., Fed 2% inflation target.
-//   • Last data point is labelled in accent color for quick reading.
-//   • YYYY-MM-DD date labels are formatted as "Mar '25" for readability.
+// Design standard (institutional, March 2026):
+//   • chartLabel rendered as a small category header above the chart title
+//     (e.g., "ENERGY MARKETS", "RATES", "MARKET CONTEXT")
+//   • Tight y-axis anchored to data range for line charts (macro scale)
+//   • Zero-based y-axis for bar charts
+//   • 2px stroke — clean and lightweight
+//   • Subtle gradient area fill beneath the line
+//   • Final data point: larger dot with white ring + bold value callout
+//   • Optional reference line (e.g., Fed 2% target, $100 threshold)
+//   • YYYY-MM-DD date labels formatted as "Mar '25"
 // ---------------------------------------------------------------------------
 
 interface NewsInlineChartProps {
@@ -20,13 +23,11 @@ interface NewsInlineChartProps {
 
 /** Format YYYY-MM-DD or "Mon YYYY" labels into short "Mar '25" form */
 function formatXLabel(label: string): string {
-  // YYYY-MM-DD (FRED daily/monthly)
   if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
     const [year, month] = label.split("-");
     const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return `${MONTHS[parseInt(month, 10) - 1]} '${year.slice(2)}`;
   }
-  // "March 2025" → "Mar '25"
   const longMonthMatch = label.match(/^([A-Za-z]+)\s+(\d{4})$/);
   if (longMonthMatch) {
     return `${longMonthMatch[1].slice(0, 3)} '${longMonthMatch[2].slice(2)}`;
@@ -46,8 +47,6 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const dataRange = dataMax - dataMin || 1;
 
   // ── Y-axis bounds ──────────────────────────────────────────────────────────
-  // Line charts: tight range around the data (macro rates rarely start at 0).
-  // Bar charts: zero-based so bar heights are proportionally honest.
   let axisMin: number;
   let axisMax: number;
 
@@ -59,7 +58,6 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     axisMin = Math.max(0, dataMin - pad);
     axisMax = dataMax + pad;
 
-    // Ensure referenceValue is within view with a small margin
     if (chart.referenceValue !== undefined) {
       const refPad = dataRange * 0.10;
       axisMin = Math.min(axisMin, chart.referenceValue - refPad);
@@ -74,7 +72,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
 
   const formatValue = (v: number) => {
     const unit = chart.unit ?? "";
-    if (unit === "%") return `${v.toFixed(1)}%`;
+    if (unit === "%") return `${v.toFixed(2)}%`;
     if (unit === "Points") return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0);
     if (unit === "$/bbl") return `$${v.toFixed(0)}`;
     if (unit === "$B") return `$${v.toFixed(1)}B`;
@@ -88,10 +86,12 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const TEXT = "#64748b";
   const REF_COLOR = "#94a3b8";
 
-  // Show first, last, and evenly-spaced labels — at most 6 x-axis ticks
   const labelStep = chart.labels.length > 8 ? Math.ceil(chart.labels.length / 6) : 1;
   const showLabel = (i: number) =>
     i === 0 || i === chart.labels.length - 1 || i % labelStep === 0;
+
+  // Gradient fill ID — unique per chart to avoid SVG conflicts when multiple charts on page
+  const gradientId = `fill-${chart.title.replace(/\W/g, "")}`;
 
   // ── LINE CHART ─────────────────────────────────────────────────────────────
   if (chart.type === "line") {
@@ -103,10 +103,16 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
       .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
       .join(" ");
 
+    // Area fill path: line + close down to baseline
+    const baselineY = PADDING.top + plotH;
+    const areaD =
+      pathD +
+      ` L ${points[points.length - 1].x.toFixed(1)} ${baselineY}` +
+      ` L ${points[0].x.toFixed(1)} ${baselineY} Z`;
+
     const lastPt = points[points.length - 1];
     const lastVal = chart.values[chart.values.length - 1];
 
-    // Reference line y-position (if set and within plot bounds)
     const refY =
       chart.referenceValue !== undefined
         ? PADDING.top + toY(chart.referenceValue)
@@ -114,9 +120,19 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     const refInBounds =
       refY !== null && refY >= PADDING.top && refY <= PADDING.top + plotH;
 
+    // Label anchor: shift left if near right edge
+    const labelAnchor = lastPt.x > W * 0.75 ? "end" : "middle";
+    const labelX = labelAnchor === "end" ? lastPt.x - 2 : lastPt.x;
+
     return (
       <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        {/* Chart header */}
         <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+          {chart.chartLabel && (
+            <p className="text-[9px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
+              {chart.chartLabel}
+            </p>
+          )}
           <p className="text-sm font-semibold text-slate-800">{chart.title}</p>
           {chart.timeRange && (
             <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
@@ -129,6 +145,13 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             style={{ maxHeight: 240 }}
             aria-label={chart.title}
           >
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={ACCENT} stopOpacity="0.12" />
+                <stop offset="100%" stopColor={ACCENT} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+
             {/* Grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((f) => {
               const y = PADDING.top + f * plotH;
@@ -156,10 +179,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
                   stroke={REF_COLOR} strokeWidth="1.5" strokeDasharray="5 4"
                 />
                 {chart.referenceLabel && (
-                  <text
-                    x={PADDING.left + 6} y={refY - 5}
-                    fontSize="9" fill={REF_COLOR}
-                  >
+                  <text x={PADDING.left + 6} y={refY - 5} fontSize="9" fill={REF_COLOR}>
                     {chart.referenceLabel}
                   </text>
                 )}
@@ -177,31 +197,38 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
               );
             })}
 
-            {/* Line */}
+            {/* Gradient area fill */}
+            <path d={areaD} fill={`url(#${gradientId})`} />
+
+            {/* Line — 2px stroke */}
             <path
               d={pathD} fill="none"
-              stroke={ACCENT} strokeWidth="2.5"
+              stroke={ACCENT} strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round"
             />
 
-            {/* Data points — smaller dots, last point highlighted */}
-            {points.map((p, i) => (
+            {/* Intermediate data points — small dots */}
+            {points.slice(0, -1).map((p, i) => (
               <circle
                 key={i} cx={p.x} cy={p.y}
-                r={i === points.length - 1 ? 4.5 : 2.5}
-                fill={ACCENT}
-                stroke={i === points.length - 1 ? "white" : "none"}
-                strokeWidth="1.5"
+                r={2} fill={ACCENT} opacity="0.5"
               />
             ))}
 
-            {/* Latest value callout */}
+            {/* Final data point — emphasized with white ring */}
+            <circle
+              cx={lastPt.x} cy={lastPt.y}
+              r={5.5} fill="white" stroke={ACCENT} strokeWidth="2"
+            />
+            <circle cx={lastPt.x} cy={lastPt.y} r={2.5} fill={ACCENT} />
+
+            {/* Latest value callout — anchored to final point */}
             <text
-              x={lastPt.x} y={lastPt.y - 12}
-              textAnchor={lastPt.x > W * 0.8 ? "end" : "middle"}
+              x={labelX} y={lastPt.y - 13}
+              textAnchor={labelAnchor}
               fontSize="11" fontWeight="700" fill={ACCENT}
             >
-              {formatValue(lastVal)}
+              ● {formatValue(lastVal)}
             </text>
           </svg>
         </div>
@@ -227,6 +254,11 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   return (
     <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+        {chart.chartLabel && (
+          <p className="text-[9px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
+            {chart.chartLabel}
+          </p>
+        )}
         <p className="text-sm font-semibold text-slate-800">{chart.title}</p>
         {chart.timeRange && (
           <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
@@ -248,7 +280,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             );
           })}
 
-          {/* Zero baseline (visible for charts with negative values) */}
+          {/* Zero baseline */}
           {axisMin < 0 && (
             <line x1={PADDING.left} y1={zeroY} x2={W - PADDING.right} y2={zeroY}
               stroke={AXIS} strokeWidth="1.5" />
