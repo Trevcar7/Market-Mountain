@@ -33,18 +33,16 @@ function DirectionArrow({ direction }: { direction: "up" | "down" | "flat" }) {
   return <span aria-hidden="true">—</span>;
 }
 
-// Items where rising = bearish (rates, vol, oil, dollar) — same rule as MacroBoard
-const STRIP_NEGATIVE_UP = new Set(["10Y Yield", "VIX", "WTI Oil", "Broad U.S. Dollar Index"]);
-
 function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
   const isUp   = item.direction === "up";
   const isDown = item.direction === "down";
 
-  const negativeUp = STRIP_NEGATIVE_UP.has(item.label);
+  // Ticker colors reflect price movement direction only (up=green, down=red).
+  // Macro interpretation is handled by the signal badges in the dashboard below.
   const changeColor = isUp
-    ? (negativeUp ? "text-red-500"     : "text-emerald-600")
+    ? "text-emerald-600"
     : isDown
-    ? (negativeUp ? "text-emerald-600" : "text-red-500")
+    ? "text-red-500"
     : "text-slate-400";
 
   const displayLabel = STRIP_LABEL[item.label] ?? item.label;
