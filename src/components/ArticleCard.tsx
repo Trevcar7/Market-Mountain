@@ -23,8 +23,8 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
             src={article.coverImage}
             alt={article.title}
             fill
-            className="object-cover opacity-40 group-hover:opacity-50 group-hover:scale-105 transition-all duration-500"
-            style={article.coverImagePosition ? { objectPosition: article.coverImagePosition } : undefined}
+            className="object-cover opacity-40 group-hover:opacity-50 group-hover:scale-[1.03] transition-all duration-500"
+            style={{ objectPosition: article.coverImagePosition ?? "center 20%" }}
             sizes="(max-width: 768px) 100vw, 66vw"
             priority
           />

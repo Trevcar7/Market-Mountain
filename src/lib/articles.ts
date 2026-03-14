@@ -58,24 +58,27 @@ export function getArticleMeta(slug: string): ArticleMeta | null {
   };
 }
 
+const STRIP_PHRASES = /\*?References available upon request\.?\*?/gi;
+
 export function getArticle(slug: string): Article | null {
   const filePath = path.join(postsDirectory, `${slug}.md`);
   if (!fs.existsSync(filePath)) return null;
   const raw = fs.readFileSync(filePath, "utf8");
   const { data, content } = matter(raw);
-  const stats = readingTime(content);
+  const cleaned = content.replace(STRIP_PHRASES, "").replace(/\n{3,}/g, "\n\n").trim();
+  const stats = readingTime(cleaned);
   return {
     slug,
     title: data.title ?? slug,
     date: data.date ?? "",
     readTime: data.readTime ?? stats.text,
-    excerpt: data.excerpt ?? content.slice(0, 160).replace(/[#*_]/g, "") + "…",
+    excerpt: data.excerpt ?? cleaned.slice(0, 160).replace(/[#*_]/g, "") + "…",
     coverImage: data.coverImage ?? undefined,
     coverImagePosition: data.coverImagePosition ?? undefined,
     tags: data.tags ?? [],
     updated: data.updated ?? undefined,
     disclaimer: data.disclaimer ?? false,
-    content,
+    content: cleaned,
   };
 }
 
