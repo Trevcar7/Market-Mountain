@@ -19,7 +19,7 @@ const CACHE_SECONDS = 60;
  *   10Y Yield  → FRED DGS10 — change in basis points
  *   WTI Oil    → EIA live → FRED DCOILWTICO fallback
  *   Gold       → TwelveData XAU/USD → FMP XAUUSD → FRED GOLDAMGBD228NLBM
- *   DXY        → TwelveData DXY → FMP DX-Y.NYB → FRED DTWEXBGS
+ *   DXY        → Polygon C:DXY → FMP DX-Y.NYB → FRED DTWEXBGS
  *   Bitcoin    → TwelveData BTC/USD → FMP BTCUSD
  *   FMP also overrides S&P 500 + VIX with intraday data when key is set
  *
@@ -158,23 +158,21 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  // ── TwelveData: Gold + DXY + BTC/USD — fetched per-symbol for resilience ──
-  const twKey  = process.env.TWELVEDATA_API_KEY;
-  const fmpKey = process.env.FMP_API_KEY;
+  // ── TwelveData (Gold, BTC) + Polygon (DXY) — fetched in parallel, each fails independently ──
+  // NOTE: TwelveData "DXY" symbol does NOT exist in their catalog (confirmed by symbol search).
+  //       DXY is sourced from Polygon.io instead, with FMP DX-Y.NYB and FRED DTWEXBGS as fallbacks.
+  const twKey   = process.env.TWELVEDATA_API_KEY;
+  const polyKey = process.env.POLYGON_API_KEY;
+  const fmpKey  = process.env.FMP_API_KEY;
 
-  if (twKey) {
-    const [goldItem, dxyItem, btcItem] = await Promise.allSettled([
-      fetchTwelveDataSingle(twKey, "XAU/USD", "Gold", (p) => `$${Math.round(p).toLocaleString()}`),
-      fetchTwelveDataSingle(twKey, "DXY",     "DXY",  (p) => p.toFixed(2)),
-      fetchTwelveDataSingle(twKey, "BTC/USD",  "BTC",  (p) => `$${Math.round(p).toLocaleString()}`),
-    ]);
-    if (goldItem.status === "fulfilled" && goldItem.value)
-      itemMap.set("Gold", goldItem.value);
-    if (dxyItem.status === "fulfilled" && dxyItem.value)
-      itemMap.set("DXY", dxyItem.value);
-    if (btcItem.status === "fulfilled" && btcItem.value)
-      itemMap.set("BTC", btcItem.value);
-  }
+  const [goldTwRes, btcTwRes, dxyPolyRes] = await Promise.allSettled([
+    twKey   ? fetchTwelveDataSingle(twKey,   "XAU/USD", "Gold", (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
+    twKey   ? fetchTwelveDataSingle(twKey,   "BTC/USD",  "BTC",  (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
+    polyKey ? fetchPolygonDXY(polyKey) : Promise.resolve(null),
+  ]);
+  if (goldTwRes.status  === "fulfilled" && goldTwRes.value)  itemMap.set("Gold", goldTwRes.value);
+  if (btcTwRes.status   === "fulfilled" && btcTwRes.value)   itemMap.set("BTC",  btcTwRes.value);
+  if (dxyPolyRes.status === "fulfilled" && dxyPolyRes.value) itemMap.set("DXY",  dxyPolyRes.value);
 
   // FMP fallback for missing live symbols — also overrides FRED S&P 500 + VIX with intraday
   if (fmpKey) {
@@ -280,6 +278,51 @@ async function fetchTwelveDataSingle(
     };
   } catch (err) {
     console.error(`[market-snapshot/TwelveData] ${symbol} error:`, err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Polygon — primary DXY source (TwelveData does not carry this symbol)
+// ---------------------------------------------------------------------------
+
+interface PolygonForexSnapshotResponse {
+  status?: string;
+  ticker?: {
+    day?:              { o: number; h: number; l: number; c: number };
+    todaysChange?:     number;
+    todaysChangePerc?: number;
+  };
+}
+
+async function fetchPolygonDXY(apiKey: string): Promise<MarketSnapshotItem | null> {
+  try {
+    const res = await fetch(
+      `https://api.polygon.io/v2/snapshot/locale/global/markets/forex/tickers/C:DXY?apiKey=${apiKey}`,
+      { signal: AbortSignal.timeout(8000), next: { revalidate: 60 } }
+    );
+    if (!res.ok) {
+      console.warn(`[market-snapshot/Polygon] DXY: HTTP ${res.status}`);
+      return null;
+    }
+
+    const raw = (await res.json()) as PolygonForexSnapshotResponse;
+    if (raw.status !== "OK" || !raw.ticker?.day?.c) {
+      console.warn(`[market-snapshot/Polygon] DXY: status=${raw.status}, no day close`);
+      return null;
+    }
+
+    const price = raw.ticker.day.c;
+    const pct   = raw.ticker.todaysChangePerc ?? 0;
+    return {
+      label:     "DXY",
+      value:     price.toFixed(2),
+      change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+      direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
+      source:    "Polygon",
+    };
+  } catch (err) {
+    console.error("[market-snapshot/Polygon] DXY error:", err);
     return null;
   }
 }

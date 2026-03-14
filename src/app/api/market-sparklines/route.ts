@@ -19,7 +19,7 @@ const MIN_POINTS    = 5;       // Minimum useful data points for a sparkline
  *   VIX          → FRED VIXCLS (30 daily closes)
  *   WTI Oil      → FRED DCOILWTICO (30 daily closes)
  *   Gold         → TwelveData XAU/USD (30 daily) → FRED GOLDAMGBD228NLBM fallback
- *   DXY          → TwelveData DXY (30 daily) → FRED DTWEXBGS fallback
+ *   DXY          → Polygon C:DXY (30 daily) → FRED DTWEXBGS fallback
  *   Bitcoin      → TwelveData BTC/USD (30 daily)
  *
  * TTL: 15-minute server-side Redis cache
@@ -87,41 +87,41 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
   const wtiPoints = fredToChronological(wtiRes.status === "fulfilled" ? wtiRes.value : []);
   if (wtiPoints.length >= MIN_POINTS) sparklines.push({ label: "WTI Oil", points: wtiPoints });
 
-  // Gold + Dollar Index + Bitcoin via TwelveData
-  const twKey = process.env.TWELVEDATA_API_KEY;
-  if (twKey) {
-    const [goldSpark, dxySpark, btcSpark] = await Promise.allSettled([
-      fetchTwelveDataSeries(twKey, "XAU/USD", "Gold"),
-      fetchTwelveDataSeries(twKey, "DXY",     "DXY"),
-      fetchTwelveDataSeries(twKey, "BTC/USD",  "Bitcoin"),
-    ]);
+  const twKey   = process.env.TWELVEDATA_API_KEY;
+  const polyKey = process.env.POLYGON_API_KEY;
 
-    if (goldSpark.status === "fulfilled" && goldSpark.value) {
-      sparklines.push(goldSpark.value);
+  // Gold: TwelveData XAU/USD primary, FRED GOLDAMGBD228NLBM fallback
+  if (twKey) {
+    const goldSpark = await fetchTwelveDataSeries(twKey, "XAU/USD", "Gold").catch(() => null);
+    if (goldSpark) {
+      sparklines.push(goldSpark);
     } else {
-      // FRED GOLDAMGBD228NLBM fallback
       const goldPoints = fredToChronological(goldFredRes.status === "fulfilled" ? goldFredRes.value : []);
       if (goldPoints.length >= MIN_POINTS) sparklines.push({ label: "Gold", points: goldPoints });
     }
+  } else {
+    const goldPoints = fredToChronological(goldFredRes.status === "fulfilled" ? goldFredRes.value : []);
+    if (goldPoints.length >= MIN_POINTS) sparklines.push({ label: "Gold", points: goldPoints });
+  }
 
-    if (dxySpark.status === "fulfilled" && dxySpark.value) {
-      sparklines.push(dxySpark.value);
+  // DXY: Polygon C:DXY primary (TwelveData does not carry this symbol), FRED DTWEXBGS fallback
+  if (polyKey) {
+    const dxySpark = await fetchPolygonDXYSeries(polyKey).catch(() => null);
+    if (dxySpark) {
+      sparklines.push(dxySpark);
     } else {
-      // FRED DTWEXBGS fallback
       const dxPoints = fredToChronological(dxFredRes.status === "fulfilled" ? dxFredRes.value : []);
       if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "DXY", points: dxPoints });
     }
-
-    if (btcSpark.status === "fulfilled" && btcSpark.value) {
-      sparklines.push(btcSpark.value);
-    }
-    // No FRED fallback for BTC — omit sparkline rather than show stale data
   } else {
-    // No TwelveData key — use FRED fallbacks for Gold + DXY; skip BTC
-    const goldPoints = fredToChronological(goldFredRes.status === "fulfilled" ? goldFredRes.value : []);
-    if (goldPoints.length >= MIN_POINTS) sparklines.push({ label: "Gold", points: goldPoints });
     const dxPoints = fredToChronological(dxFredRes.status === "fulfilled" ? dxFredRes.value : []);
     if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "DXY", points: dxPoints });
+  }
+
+  // Bitcoin: TwelveData BTC/USD — no FRED fallback (omit rather than show stale)
+  if (twKey) {
+    const btcSpark = await fetchTwelveDataSeries(twKey, "BTC/USD", "Bitcoin").catch(() => null);
+    if (btcSpark) sparklines.push(btcSpark);
   }
 
   return {
@@ -184,6 +184,52 @@ async function fetchTwelveDataSeries(
     return points.length >= MIN_POINTS ? { label, points } : null;
   } catch (err) {
     console.error(`[market-sparklines/TwelveData] ${symbol} error:`, err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Polygon — 30-day DXY sparkline (TwelveData does not carry this symbol)
+// ---------------------------------------------------------------------------
+
+interface PolygonAggResult { c: number; }
+interface PolygonAggResponse {
+  status?:   string;
+  results?:  PolygonAggResult[];
+}
+
+async function fetchPolygonDXYSeries(apiKey: string): Promise<SparklineSet | null> {
+  try {
+    // Fetch ~45 calendar days to ensure we get 30 trading days
+    const end   = new Date();
+    const start = new Date(end.getTime() - 45 * 24 * 60 * 60 * 1000);
+    const from  = start.toISOString().split("T")[0];
+    const to    = end.toISOString().split("T")[0];
+
+    const res = await fetch(
+      `https://api.polygon.io/v2/aggs/ticker/C:DXY/range/1/day/${from}/${to}` +
+      `?adjusted=true&sort=asc&limit=30&apiKey=${apiKey}`,
+      { signal: AbortSignal.timeout(8000), next: { revalidate: 900 } }
+    );
+    if (!res.ok) {
+      console.warn(`[market-sparklines/Polygon] DXY: HTTP ${res.status}`);
+      return null;
+    }
+
+    const raw = (await res.json()) as PolygonAggResponse;
+    if (raw.status !== "OK" || !raw.results?.length) {
+      console.warn(`[market-sparklines/Polygon] DXY: status=${raw.status}, no results`);
+      return null;
+    }
+
+    // Results are already chronological (sort=asc)
+    const points = raw.results
+      .map((r) => r.c)
+      .filter((v) => !isNaN(v));
+
+    return points.length >= MIN_POINTS ? { label: "DXY", points } : null;
+  } catch (err) {
+    console.error("[market-sparklines/Polygon] DXY error:", err);
     return null;
   }
 }
