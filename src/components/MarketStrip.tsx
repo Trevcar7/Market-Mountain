@@ -46,7 +46,7 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
   const displayLabel = STRIP_LABEL[item.label] ?? item.label;
 
   return (
-    <div className="flex items-center gap-1 px-2 py-2 border-r border-border/60 last:border-r-0 shrink-0">
+    <div className="flex items-center justify-center gap-1 px-2 py-2 border-r border-border/60 last:border-r-0 flex-1">
       <span className="text-[11px] font-semibold tracking-wide text-text-muted uppercase whitespace-nowrap">
         {displayLabel}
       </span>
