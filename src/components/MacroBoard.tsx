@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MacroBoardData, MacroIndicator } from "@/lib/news-types";
+import { MacroBoardData, MacroIndicator, MarketSnapshotItem } from "@/lib/news-types";
 import { useMarketData } from "@/contexts/MarketDataContext";
 
 // ─── Display config ───────────────────────────────────────────────────────────
@@ -129,38 +129,134 @@ function getChangeColor(label: string, displayLabel: string, direction: "up" | "
   return direction === "up" ? "text-emerald-400" : "text-red-400";
 }
 
-// ─── Simple signal tags — derived from raw indicator values ──────────────────
+// ─── Signal tags — derived from live macro + market data ─────────────────────
 
 interface SignalTag { label: string; colorClass: string; }
 
-function buildSignalTags(indicators: MacroIndicator[]): SignalTag[] {
-  const tags: SignalTag[] = [];
+function buildSignalTags(
+  indicators: MacroIndicator[],
+  snapshotItems: MarketSnapshotItem[],
+): SignalTag[] {
+  type Candidate = SignalTag & { priority: number };
+  const candidates: Candidate[] = [];
 
-  const fedRate    = indicators.find((i) => i.label === "Fed Funds Rate");
-  const coreCpi    = indicators.find((i) => i.label === "Core CPI (YoY)");
-  const cpi        = indicators.find((i) => i.label === "CPI (YoY)");
+  const ind  = (label: string) => indicators.find((i) => i.label === label);
+  const snap = (label: string) => snapshotItems.find((i) => i.label === label);
 
-  // Rates tag — only show when clearly elevated
+  // ── Inflation ────────────────────────────────────────────────────────────
+  const coreCpi    = ind("Core CPI (YoY)");
+  const cpi        = ind("CPI (YoY)");
+  const inflInd    = coreCpi ?? cpi;
+  const inflLabel  = coreCpi ? "Core CPI" : "CPI";
+  if (inflInd) {
+    const v = parseFloat(inflInd.value);
+    if (v >= 4.0)
+      candidates.push({ label: `Inflation Elevated (${inflLabel} ${inflInd.value})`,    colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 90 });
+    else if (v >= 2.5)
+      candidates.push({ label: `Inflation Above Target (${inflLabel} ${inflInd.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 70 });
+    else if (v >= 1.8 && v <= 2.2)
+      candidates.push({ label: `Inflation Near Target (${inflLabel} ${inflInd.value})`,  colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25", priority: 20 });
+  }
+
+  // ── Nonfarm Payrolls ─────────────────────────────────────────────────────
+  const payrolls = ind("Nonfarm Payrolls");
+  if (payrolls) {
+    const v = parseFloat(payrolls.value.replace(/[K,]/g, ""));
+    if (!isNaN(v)) {
+      if (v < 0)
+        candidates.push({ label: `Labor Market Weakening (${payrolls.value} Payrolls)`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 85 });
+      else if (v < 75)
+        candidates.push({ label: `Hiring Slowing (${payrolls.value} Payrolls)`,          colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 65 });
+      else if (v > 250)
+        candidates.push({ label: `Labor Market Strong (${payrolls.value} Payrolls)`,     colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25", priority: 35 });
+    }
+  }
+
+  // ── Unemployment ─────────────────────────────────────────────────────────
+  const unemp = ind("Unemployment");
+  if (unemp) {
+    const v = parseFloat(unemp.value);
+    if (!isNaN(v) && (v >= 5.0 || (v >= 4.5 && unemp.direction === "up")))
+      candidates.push({ label: `Unemployment Rising (${unemp.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 60 });
+  }
+
+  // ── VIX ──────────────────────────────────────────────────────────────────
+  const vixSnap = snap("VIX");
+  if (vixSnap) {
+    const v = parseFloat(vixSnap.value);
+    if (!isNaN(v)) {
+      if (v >= 35)
+        candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 88 });
+      else if (v >= 25)
+        candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 60 });
+      else if (v <= 12)
+        candidates.push({ label: `Market Volatility Low (VIX ${vixSnap.value})`,       colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25", priority: 25 });
+    }
+  }
+
+  // ── Fed Funds Rate ────────────────────────────────────────────────────────
+  const fedRate = ind("Fed Funds Rate");
   if (fedRate) {
-    const rate = parseFloat(fedRate.value);
-    if (rate > 4.0) {
-      tags.push({ label: `Rates Elevated (${fedRate.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25" });
-    } else if (rate < 1.5) {
-      tags.push({ label: `Rates Near Zero (${fedRate.value})`, colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" });
+    const v = parseFloat(fedRate.value);
+    if (!isNaN(v)) {
+      if (v > 5.0)
+        candidates.push({ label: `Rates Restrictive (Fed Funds ${fedRate.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 72 });
+      else if (v > 4.0)
+        candidates.push({ label: `Rates Elevated (Fed Funds ${fedRate.value})`,    colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 50 });
+      else if (v < 1.0)
+        candidates.push({ label: `Rates Near Zero (Fed Funds ${fedRate.value})`,   colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25", priority: 45 });
     }
   }
 
-  // Inflation tag — use Core CPI (Fed's preferred); fall back to headline
-  const inflationInd = coreCpi ?? cpi;
-  if (inflationInd) {
-    const val = parseFloat(inflationInd.value);
-    if (val > 2.5) {
-      const label = coreCpi ? "Core CPI" : "CPI";
-      tags.push({ label: `Inflation Above Target (${label} ${inflationInd.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25" });
+  // ── 10-Year Treasury Yield ────────────────────────────────────────────────
+  const tenYear = ind("10-Year Yield");
+  if (tenYear) {
+    const v = parseFloat(tenYear.value);
+    if (!isNaN(v)) {
+      if (v >= 5.0)
+        candidates.push({ label: `Rates Pressure Building (10Y ${tenYear.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",       priority: 80 });
+      else if (v >= 4.5)
+        candidates.push({ label: `Rates Pressure Building (10Y ${tenYear.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 55 });
     }
   }
 
-  return tags;
+  // ── Yield Curve ───────────────────────────────────────────────────────────
+  const yc = ind("Yield Curve");
+  if (yc) {
+    const v = parseFloat(yc.value);
+    if (!isNaN(v)) {
+      if (v < -0.5)
+        candidates.push({ label: `Yield Curve Inverted (${yc.value})`,   colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 82 });
+      else if (v < 0)
+        candidates.push({ label: `Yield Curve Inverted (${yc.value})`,   colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 58 });
+      else if (v > 1.0)
+        candidates.push({ label: `Yield Curve Steepening (${yc.value})`, colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25", priority: 30 });
+    }
+  }
+
+  // ── WTI Oil ───────────────────────────────────────────────────────────────
+  const wtiSnap = snap("WTI Oil");
+  if (wtiSnap) {
+    const v = parseFloat(wtiSnap.value.replace(/[$,]/g, ""));
+    if (!isNaN(v)) {
+      if (v >= 100)
+        candidates.push({ label: `Energy Prices Elevated (Oil $${Math.round(v)})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",       priority: 78 });
+      else if (v >= 85)
+        candidates.push({ label: `Energy Prices Elevated (Oil $${Math.round(v)})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 45 });
+    }
+  }
+
+  // ── Broad USD Index ───────────────────────────────────────────────────────
+  const dxySnap = snap("Broad U.S. Dollar Index");
+  if (dxySnap) {
+    const v = parseFloat(dxySnap.value);
+    if (!isNaN(v) && v >= 120)
+      candidates.push({ label: `Dollar Strength Rising (DXY ${v.toFixed(1)})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 40 });
+  }
+
+  // Return top 5 by priority
+  candidates.sort((a, b) => b.priority - a.priority);
+  return candidates.slice(0, 5).map(({ priority: _p, ...tag }) => tag);
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -493,7 +589,7 @@ export default function MacroBoard() {
   const borderClass = SECTION_BORDER[colCount] ?? SECTION_BORDER[3];
 
   // Build simple signal tags from live indicator data
-  const signalTags = macroData ? buildSignalTags(macroData.indicators) : [];
+  const signalTags = macroData ? buildSignalTags(macroData.indicators, snapshot?.items ?? []) : [];
 
   return (
     <div className="bg-navy-950 text-white border-t-2 border-white/[0.06]">
