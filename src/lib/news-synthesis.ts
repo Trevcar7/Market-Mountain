@@ -654,6 +654,27 @@ Headlines must be 8–12 words, analytically specific, and publication-quality.
 Strong: "Iran Conflict Pushes Oil Above $100, Pressuring Equities and Rate Expectations"
 Weak: "Iran conflict pushes oil past $100, testing equity valuations and rate expectations"
 
+GEOPOLITICAL LANGUAGE STANDARD (Step 16f)
+Market Mountain is macro commentary, not a newswire. When writing about geopolitical events:
+
+DO NOT make definitive claims about specific military actions, attacks, or confirmed incidents unless they are directly quoted from a named, credible source in the article.
+- BAD: "Iran launched tanker attacks in the Persian Gulf"
+- BAD: "China fired missiles across the Taiwan Strait"
+- GOOD: "escalating tensions involving Iran and shipping risks in the Persian Gulf"
+- GOOD: "rising geopolitical uncertainty in the region"
+- GOOD: "regional supply risk following reports of increased military activity"
+
+Frame geopolitical developments as market risks, not confirmed facts:
+- Use: "tensions", "uncertainty", "risk", "conflict", "disruption", "pressure"
+- Avoid: "attacks", "strikes", "invasions", "launched", "seized" — unless directly sourced with a named outlet
+
+The article should explain the MARKET IMPLICATION of geopolitical risk, not report the geopolitical event as a journalist would. Focus on:
+- How the risk is priced into assets (oil, gold, yields, dollar, equities)
+- The transmission mechanism (supply disruption → inflation → rate expectations → equity multiples)
+- What investors are monitoring, not what governments are doing
+
+When uncertain whether an event is confirmed, use: "amid reports of", "following elevated tensions", "as regional risk indicators rose".
+
 CHART ANCHOR RULE (Step 17)
 For inflation, energy, labor, rates, GDP, and earnings topics:
 Write one sentence in the analysis paragraph that explicitly references the trend data and sets up the visual context.
