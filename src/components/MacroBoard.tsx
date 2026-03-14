@@ -12,7 +12,8 @@ const DISPLAY_LABEL: Record<string, string> = {
   "Yield Curve":   "Yield Curve (10Y–2Y)",
   Unemployment:    "Unemployment Rate",
   // Snapshot label → human-readable Market Prices name
-  BTC: "Bitcoin",
+  BTC:                      "Bitcoin",
+  "Broad U.S. Dollar Index": "USD Index",
 };
 
 // Macro-board labels per section

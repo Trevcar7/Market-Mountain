@@ -77,7 +77,7 @@ export default function MarketStrip() {
       aria-label="Live market prices"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center overflow-x-auto scrollbar-none -mx-4 sm:mx-0 px-4 sm:px-0">
+        <div className="flex items-center -mx-4 sm:mx-0 px-4 sm:px-0">
           {/* Label */}
           <div className="flex items-center gap-1.5 px-2 py-2 border-r border-border/60 shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
