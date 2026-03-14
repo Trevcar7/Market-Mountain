@@ -26,18 +26,6 @@ const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar In
 // Preferred display order for Market Prices
 const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar Index"];
 
-// Labels where UP = bullish (green)
-const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin", "BTC", "Gold"]);
-
-// Labels where UP = bearish (red)
-// Rising oil = inflation pressure; rising dollar = earnings/EM headwind
-const NEGATIVE_UP = new Set([
-  "Fed Funds Rate", "10Y Treasury", "10-Year Yield",
-  "2Y Treasury", "2-Year Yield",
-  "VIX", "CPI (YoY)", "Core CPI (YoY)",
-  "WTI Oil",
-  "Broad U.S. Dollar Index", "USD Index",
-]);
 
 // Static border class maps — written out in full so Tailwind includes them
 const SECTION_BORDER: Record<1 | 2 | 3, string> = {
@@ -121,15 +109,12 @@ function Sparkline({ points, direction }: { points: number[]; direction: "up" | 
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
-function getChangeColor(label: string, displayLabel: string, direction: "up" | "down" | "flat"): string {
-  if (direction === "flat") return "text-white/35";
-  if (label === "Yield Curve")
-    return direction === "up" ? "text-emerald-400" : "text-red-400";
-  if (POSITIVE_UP.has(label) || POSITIVE_UP.has(displayLabel))
-    return direction === "up" ? "text-emerald-400" : "text-red-400";
-  if (NEGATIVE_UP.has(label) || NEGATIVE_UP.has(displayLabel))
-    return direction === "up" ? "text-red-400" : "text-emerald-400";
-  return direction === "up" ? "text-emerald-400" : "text-red-400";
+// Change colors reflect price movement direction only — up=green, down=red.
+// Macro interpretation is expressed by the signal badges, not indicator arrows.
+function getChangeColor(_label: string, _displayLabel: string, direction: "up" | "down" | "flat"): string {
+  if (direction === "up")   return "text-emerald-400";
+  if (direction === "down") return "text-red-400";
+  return "text-white/35";
 }
 
 // ─── Signal tags — derived from live macro + market data ─────────────────────
