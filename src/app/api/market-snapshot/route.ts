@@ -68,14 +68,13 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
   const validUntil = new Date(now.getTime() + CACHE_SECONDS * 1000);
 
   // All FRED/EIA fetches in parallel — each degrades independently
-  const [sp500Res, vixRes, tenYearRes, wtiEiaRes, wtiCoRes, dxFredRes, goldFredRes] = await Promise.allSettled([
-    fetchFredSeries("SP500",            3),   // S&P 500 daily close
-    fetchFredSeries("VIXCLS",           3),   // CBOE VIX daily close
-    fetchFredSeries("DGS10",            3),   // 10-Year Treasury yield
-    fetchWtiCrudePrice(),                     // EIA WTI spot (primary)
-    fetchFredSeries("DCOILWTICO",       3),   // FRED WTI fallback
-    fetchFredSeries("DTWEXBGS",         2),   // FRED Broad USD Index fallback for DXY
-    fetchFredSeries("GOLDAMGBD228NLBM", 3),   // FRED Gold (London AM fix) fallback
+  const [sp500Res, vixRes, tenYearRes, wtiEiaRes, wtiCoRes, dxFredRes] = await Promise.allSettled([
+    fetchFredSeries("SP500",      3),   // S&P 500 daily close
+    fetchFredSeries("VIXCLS",     3),   // CBOE VIX daily close
+    fetchFredSeries("DGS10",      3),   // 10-Year Treasury yield
+    fetchWtiCrudePrice(),               // EIA WTI spot (primary)
+    fetchFredSeries("DCOILWTICO", 3),   // FRED WTI fallback
+    fetchFredSeries("DTWEXBGS",   2),   // FRED Broad USD Index fallback for DXY
   ]);
 
   const itemMap = new Map<string, MarketSnapshotItem>();
@@ -162,38 +161,16 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
   const twKey  = process.env.TWELVEDATA_API_KEY;
   const fmpKey = process.env.FMP_API_KEY;
 
-  const [goldTwRes, btcTwRes] = await Promise.allSettled([
-    twKey ? fetchTwelveDataSingle(twKey, "XAU/USD", "Gold", (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
-    twKey ? fetchTwelveDataSingle(twKey, "BTC/USD",  "BTC",  (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
+  const [btcTwRes] = await Promise.allSettled([
+    twKey ? fetchTwelveDataSingle(twKey, "BTC/USD", "BTC", (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
   ]);
-  if (goldTwRes.status === "fulfilled" && goldTwRes.value) itemMap.set("Gold", goldTwRes.value);
-  if (btcTwRes.status  === "fulfilled" && btcTwRes.value)  itemMap.set("BTC",  btcTwRes.value);
+  if (btcTwRes.status === "fulfilled" && btcTwRes.value) itemMap.set("BTC", btcTwRes.value);
 
   // FMP fallback for missing live symbols — also overrides FRED S&P 500 + VIX with intraday
   if (fmpKey) {
-    const needGold = !itemMap.has("Gold");
-    const needBtc  = !itemMap.has("BTC");
-    const fmpItems = await fetchFmpSnapshot(fmpKey, needGold, needBtc);
+    const needBtc = !itemMap.has("BTC");
+    const fmpItems = await fetchFmpSnapshot(fmpKey, needBtc);
     for (const item of fmpItems) itemMap.set(item.label, item);
-  }
-
-  // FRED GOLDAMGBD228NLBM last-resort fallback for Gold
-  if (!itemMap.has("Gold")) {
-    const goldObs = goldFredRes.status === "fulfilled" ? goldFredRes.value : [];
-    if (goldObs.length >= 1) {
-      const latest = parseFloat(goldObs[0].value);
-      const prev   = goldObs.length >= 2 ? parseFloat(goldObs[1].value) : NaN;
-      if (!isNaN(latest)) {
-        const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
-        itemMap.set("Gold", {
-          label:     "Gold",
-          value:     `$${Math.round(latest).toLocaleString()}`,
-          change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-          source:    "FRED",
-        });
-      }
-    }
   }
 
   // FRED DTWEXBGS — Trade Weighted Broad Dollar Index (USD Index)
@@ -213,7 +190,7 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  const STRIP_ORDER = ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "Broad U.S. Dollar Index", "BTC"];
+  const STRIP_ORDER = ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Broad U.S. Dollar Index", "BTC"];
   const items = STRIP_ORDER.map((k) => itemMap.get(k)).filter(Boolean) as MarketSnapshotItem[];
 
   return {
@@ -302,13 +279,11 @@ interface FmpQuote {
 
 async function fetchFmpSnapshot(
   apiKey: string,
-  needGold: boolean,
-  needBtc:  boolean,
+  needBtc: boolean,
 ): Promise<MarketSnapshotItem[]> {
-  // Always fetch S&P 500 + VIX for intraday override; add Gold/BTC as needed
+  // Always fetch S&P 500 + VIX for intraday override; add BTC as needed
   const symbols = ["^GSPC", "^VIX"];
-  if (needGold) symbols.push("XAUUSD");
-  if (needBtc)  symbols.push("BTCUSD");
+  if (needBtc) symbols.push("BTCUSD");
 
   try {
     const res = await fetch(
@@ -340,14 +315,6 @@ async function fetchFmpSnapshot(
           value:     q.price.toFixed(2),
           change:    Math.abs(pts) < 0.005 ? "—" : `${pts >= 0 ? "+" : ""}${pts.toFixed(2)}`,
           direction: (pts > 0.005 ? "up" : pts < -0.005 ? "down" : "flat") as "up" | "down" | "flat",
-          source:    "FMP",
-        });
-      } else if (q.symbol === "XAUUSD") {
-        result.push({
-          label:     "Gold",
-          value:     `$${Math.round(q.price).toLocaleString()}`,
-          change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: dir,
           source:    "FMP",
         });
       } else if (q.symbol === "BTCUSD") {
