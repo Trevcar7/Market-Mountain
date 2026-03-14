@@ -46,7 +46,7 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
   const displayLabel = STRIP_LABEL[item.label] ?? item.label;
 
   return (
-    <div className="flex items-center justify-center gap-1 px-2 py-2 border-r border-border/60 last:border-r-0 flex-1">
+    <div className="flex items-center justify-center gap-1 px-2 py-2 border-r border-border/60 last:border-r-0">
       <span className="text-[11px] font-semibold tracking-wide text-text-muted uppercase whitespace-nowrap">
         {displayLabel}
       </span>
@@ -78,22 +78,29 @@ export default function MarketStrip() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center">
-          {/* Label — fixed width so right side can mirror it */}
-          <div className="w-[88px] flex items-center gap-1.5 px-2 py-2 border-r border-border/60 shrink-0">
+          {/* Left: Markets label — natural width */}
+          <div className="shrink-0 flex items-center gap-1.5 px-2 py-2 border-r border-border/60">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
             <span className="text-[10px] font-bold tracking-widest uppercase text-text-light whitespace-nowrap">
               Markets
             </span>
           </div>
 
-          {/* Items */}
-          {snapshot.items.map((item) => (
-            <SnapshotChip key={item.label} item={item} />
-          ))}
+          {/* Center: chips at natural widths, centered in the remaining flex space */}
+          <div className="flex-1 flex items-center justify-center">
+            {snapshot.items.map((item) => (
+              <SnapshotChip key={item.label} item={item} />
+            ))}
+          </div>
 
-          {/* Timestamp — same fixed width as label; acts as silent spacer below xl */}
-          <div className="w-[88px] px-2 py-2 shrink-0 flex items-center justify-end">
-            <span className="text-[10px] text-text-light tabular-nums hidden xl:inline">
+          {/* Right: invisible mirror of the Markets label so both sides are equal width.
+              At xl+ the timestamp replaces the mirror content. */}
+          <div className="shrink-0 flex items-center gap-1.5 px-2 py-2">
+            <span className="xl:hidden w-1.5 h-1.5 rounded-full opacity-0" aria-hidden="true" />
+            <span className="xl:hidden text-[10px] font-bold tracking-widest uppercase opacity-0 whitespace-nowrap" aria-hidden="true">
+              Markets
+            </span>
+            <span className="hidden xl:inline text-[10px] text-text-light tabular-nums whitespace-nowrap">
               {new Date(snapshot.generatedAt).toLocaleTimeString("en-US", {
                 hour: "2-digit",
                 minute: "2-digit",
