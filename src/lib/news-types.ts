@@ -23,6 +23,7 @@ export interface ChartDataset {
   unit?: string;           // e.g., "%" or "$B" or "bps"
   source: string;          // Data source attribution
   timeRange?: string;      // e.g., "Jan 2024 – Mar 2026"
+  caption?: string;        // Editorial caption explaining macro relevance (shown below chart)
   referenceValue?: number; // Optional benchmark line (e.g., 2.0 for Fed 2% target)
   referenceLabel?: string; // Label for reference line (e.g., "Fed 2% Target")
 }
@@ -75,7 +76,7 @@ export interface NewsItem {
   whatToWatchNext?: string;        // Forward-looking signal for investors
   secondOrderImplication?: string; // Beyond-the-headline market impact
   keyDataPoints?: KeyDataPoint[];  // Important numbers with sources
-  chartData?: ChartDataset;        // Optional chart for data-driven stories
+  chartData?: ChartDataset[];      // Optional charts for data-driven stories (up to 3)
   keyTakeaways?: string[];         // 3-bullet editorial summary (displayed below headline)
   confidenceScore?: number;        // 0–1 editorial confidence gate (≥ 0.70 required to publish)
 

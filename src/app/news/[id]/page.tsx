@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Redis } from "@upstash/redis";
-import { NewsCollection, NewsItem, MarketImpactItem } from "@/lib/news-types";
+import { NewsCollection, NewsItem, MarketImpactItem, ChartDataset } from "@/lib/news-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { BLOCKED_SOURCES } from "@/lib/news";
 import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
@@ -154,6 +155,10 @@ export default async function NewsStoryPage({ params }: Props) {
     .map((p) => p.trim())
     .filter(Boolean);
 
+  // Normalize chartData to array (backward-compatible: handles both legacy single-object and new array)
+  const charts: ChartDataset[] = !item.chartData ? [] :
+    Array.isArray(item.chartData) ? item.chartData : [item.chartData as unknown as ChartDataset];
+
   return (
     <>
       {/* Hero */}
@@ -256,7 +261,21 @@ export default async function NewsStoryPage({ params }: Props) {
         <article>
           <div className="prose prose-slate max-w-none">
             {paragraphs.map((para, i) => (
-              <p key={i}>{para}</p>
+              <React.Fragment key={i}>
+                <p>{para}</p>
+                {/* First chart injected after 2nd paragraph (index 1) */}
+                {i === 1 && charts.length > 0 && (
+                  <div className="not-prose">
+                    <NewsInlineChart chart={charts[0]} />
+                  </div>
+                )}
+                {/* Second chart injected after 4th paragraph (index 3) */}
+                {i === 3 && charts.length > 1 && (
+                  <div className="not-prose">
+                    <NewsInlineChart chart={charts[1]} />
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
 
@@ -265,10 +284,10 @@ export default async function NewsStoryPage({ params }: Props) {
             <MarketImpactBox items={item.marketImpact} />
           )}
 
-          {/* Inline chart — appears directly below the story body */}
-          {item.chartData && (
-            <NewsInlineChart chart={item.chartData} />
-          )}
+          {/* Any additional charts (3rd+) rendered below story body */}
+          {charts.slice(2).map((chart, i) => (
+            <NewsInlineChart key={i} chart={chart} />
+          ))}
 
           {/* Inline key data — replaces the desktop-only sidebar */}
           {item.keyDataPoints && item.keyDataPoints.length > 0 && (

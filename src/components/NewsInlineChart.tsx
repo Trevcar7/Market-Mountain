@@ -205,9 +205,14 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             </text>
           </svg>
         </div>
-        {chart.source && (
-          <div className="bg-slate-50 border-t border-slate-200 px-5 py-2 text-[10px] text-slate-400">
-            Source: {chart.source}
+        {(chart.source || chart.caption) && (
+          <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 space-y-0.5">
+            {chart.caption && (
+              <p className="text-xs text-slate-600 italic leading-relaxed">{chart.caption}</p>
+            )}
+            {chart.source && (
+              <p className="text-[10px] text-slate-400">Source: {chart.source}</p>
+            )}
           </div>
         )}
       </figure>
@@ -278,9 +283,14 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
           })}
         </svg>
       </div>
-      {chart.source && (
-        <div className="bg-slate-50 border-t border-slate-200 px-5 py-2 text-[10px] text-slate-400">
-          Source: {chart.source}
+      {(chart.source || chart.caption) && (
+        <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 space-y-0.5">
+          {chart.caption && (
+            <p className="text-xs text-slate-600 italic leading-relaxed">{chart.caption}</p>
+          )}
+          {chart.source && (
+            <p className="text-[10px] text-slate-400">Source: {chart.source}</p>
+          )}
         </div>
       )}
     </figure>

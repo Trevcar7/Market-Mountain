@@ -612,9 +612,49 @@ Review checklist:
 
 Strengthen any weak section before delivering. If sources are too thin to support the thesis, scale back claims — do not pad with qualifiers instead of facts.
 
+SENTENCE CLARITY (Step 16a)
+Write in short, direct sentences. Each sentence should carry one primary idea.
+- Break sentences that stack multiple subordinate clauses using "as", "while", or "and" into two separate sentences
+- Target 20–30 words per sentence for financial news writing
+- Long explanations should be distributed across 2–3 sentences, not compressed into one
+
+ANALYTICAL CALIBRATION (Step 16b)
+Use precise but measured language. Avoid overstating the magnitude or uniqueness of events.
+- Prefer "one of the more significant" over "the largest" or "the most severe" unless the source explicitly makes that claim
+- Prefer "may compress multiples" and "could weigh on valuations" over "will compress" or "will force"
+- Prefer "markets appear to be pricing in" over definitive statements about future market behavior
+- For assets with mixed behavior during geopolitical events (e.g., gold, currencies): note that responses can vary depending on whether markets are pricing currency risk or real rate risk — do not assert a single predictable direction unless the source data clearly supports it
+
+MACRO MECHANISM CLARITY (Step 16c)
+For stories about oil shocks, inflation, or rate expectations, make the causal chain explicit and concise:
+1. Higher energy or commodity prices → consumer costs and producer input costs rise
+2. Higher costs → upward pressure on CPI and PCE measures the Fed monitors
+3. Higher inflation expectations → markets price in a longer restrictive policy period
+4. Longer rate expectations → higher discount rates compress equity valuations
+5. Compression is most acute in longer-duration assets: growth stocks, REITs, utilities
+
+Name the specific sectors affected. Do not write "equity markets fell" without identifying which sectors and why.
+
+For yield/rates stories: state whether the rate move reflects stronger growth expectations, higher inflation pricing, or direct Fed guidance changes — the cause matters for sector implications.
+
+TOPIC-SPECIFIC PRECISION (Step 16d)
+California refining: When relevant to an energy story, note that California operates an isolated refining system with limited pipeline connections to other U.S. regions. This makes the state especially sensitive to supply shocks in Pacific Basin or Gulf crude, causing price disruptions to transmit to pump prices faster than in most other regions.
+
+Gold in geopolitical events: Gold's response to geopolitical shocks is mixed and depends on the nature of the shock. It may rise on safe-haven demand or fall if the event raises real interest rate expectations. Do not assert a single predictable direction for gold during geopolitical events unless clearly supported by the source data.
+
+HEADLINE STANDARD (Step 16e)
+Headlines must be 8–12 words, analytically specific, and publication-quality.
+- Use a strong active verb that reflects the causal relationship
+- Name the key metric or event (specific price level, policy action, data print)
+- Avoid weak verbs: "tests", "weighs on", "highlights", "pushes" — prefer "presses", "forces", "drives", "lifts", "cuts"
+- Target Financial Times or Bloomberg Markets front-page quality
+
+Strong: "Iran Conflict Pushes Oil Above $100, Pressuring Equities and Rate Expectations"
+Weak: "Iran conflict pushes oil past $100, testing equity valuations and rate expectations"
+
 CHART ANCHOR RULE (Step 17)
 For inflation, energy, labor, rates, GDP, and earnings topics:
-Write one sentence in the analysis paragraph that explicitly references the trend data.
+Write one sentence in the analysis paragraph that explicitly references the trend data and sets up the visual context.
 Anchor it with a specific figure from the MARKET DATA section above.
 Example:
 "WTI crude averaged above $85 per barrel over the past year, sustaining cost pressure on transportation-dependent sectors."
@@ -999,10 +1039,13 @@ export async function synthesizeGroupedArticles(
       }
 
       // Optional chart data — only for macro/FRED-backed topics, capped at MAX_CHARTS_PER_RUN
-      let chartData: ChartDataset | undefined;
+      let chartData: ChartDataset[] | undefined;
       if (chartCount < MAX_CHARTS_PER_RUN) {
-        chartData = await buildChartData(group.topic);
-        if (chartData) chartCount++;
+        const primary = await buildChartData(group.topic);
+        if (primary) {
+          chartCount++;
+          chartData = [primary];
+        }
       }
 
       const newsItem: NewsItem = {

@@ -48,14 +48,14 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
   const displayLabel = STRIP_LABEL[item.label] ?? item.label;
 
   return (
-    <div className="flex items-center justify-center gap-0.5 px-4 sm:px-6 py-2 border-r border-border/60 last:border-r-0">
-      <span className="text-[11px] font-semibold tracking-wide text-text-muted uppercase whitespace-nowrap">
+    <div className="flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2 border-r border-border/60 last:border-r-0">
+      <span className="text-[10px] font-medium tracking-wide text-text-muted uppercase whitespace-nowrap">
         {displayLabel}
       </span>
-      <span className="text-[13px] font-bold text-navy-900 whitespace-nowrap tabular-nums">
+      <span className="text-[15px] font-bold text-navy-900 whitespace-nowrap tabular-nums leading-none">
         {item.value}
       </span>
-      <span className={`text-[11px] font-semibold flex items-center gap-0.5 whitespace-nowrap tabular-nums ${changeColor}`}>
+      <span className={`text-[11px] font-semibold flex items-center gap-0.5 whitespace-nowrap tabular-nums leading-none ${changeColor}`}>
         <DirectionArrow direction={item.direction} />
         {item.change}
       </span>

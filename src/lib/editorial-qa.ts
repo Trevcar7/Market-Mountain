@@ -198,7 +198,9 @@ function scoreStoryWorthiness(article: NewsItem): QATestResult {
 
 function scoreChartQuality(article: NewsItem): QATestResult {
   const requiresChart = article.topicKey ? CHART_REQUIRED_TOPICS.has(article.topicKey) : false;
-  const chart = article.chartData;
+  // chartData is now ChartDataset[] — use first chart for quality scoring
+  const chartArr = article.chartData;
+  const chart = Array.isArray(chartArr) ? chartArr[0] : (chartArr as import("./news-types").ChartDataset | undefined);
   const hasChart = !!chart && (chart.values?.length ?? 0) > 0;
 
   // Chart required but missing
