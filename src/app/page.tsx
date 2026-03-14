@@ -23,7 +23,7 @@ export default function HomePage() {
             <Logo variant="light" size="xl" />
           </div>
           <p className="text-white/55 text-base sm:text-lg max-w-lg leading-relaxed">
-            Market news, equity research, and macro commentary — independent and disciplined.
+            Independent market news, equity research, and macro commentary.
           </p>
           <div className="mt-7 flex flex-col sm:flex-row gap-3">
             <Link
@@ -41,7 +41,7 @@ export default function HomePage() {
           </div>
           <Link
             href="/briefing"
-            className="mt-4 inline-flex items-center gap-1 text-[11px] font-medium text-white/35 hover:text-white/60 tracking-wide transition-colors"
+            className="mt-4 inline-flex items-center gap-1 text-[11px] font-medium text-white/50 hover:text-white/70 tracking-wide transition-colors"
           >
             Morning Brief
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
