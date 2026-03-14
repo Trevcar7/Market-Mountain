@@ -84,7 +84,7 @@ const SPARK_COLORS: Record<"up" | "down" | "flat", string> = {
 function Sparkline({ points, direction }: { points: number[]; direction: "up" | "down" | "flat" }) {
   if (points.length < 2) return null;
 
-  const W = 56, H = 18, PAD = 1;
+  const W = 56, H = 14, PAD = 1;
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = max - min || 1;
@@ -282,12 +282,12 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
   const valueColor  = isInverted ? "text-red-400" : "text-white";
 
   return (
-    <div className="flex items-start gap-2.5 py-3 sm:py-3.5 border-b border-white/[0.06] last:border-0">
+    <div className="flex items-start gap-2.5 py-2 sm:py-2.5 border-b border-white/[0.06] last:border-0">
       <div className="mt-[4px]">
         <IndicatorIcon label={item.displayLabel} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[9px] font-semibold tracking-[0.12em] uppercase text-white/35 mb-1 truncate">
+        <p className="text-[9px] font-semibold tracking-[0.12em] uppercase text-white/35 mb-0.5 truncate">
           {item.displayLabel}
         </p>
         <div className="flex items-baseline gap-2 flex-wrap">
@@ -313,10 +313,10 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
 
 function IndicatorSkeleton() {
   return (
-    <div className="flex items-start gap-2.5 py-3 border-b border-white/[0.06] last:border-0 animate-pulse">
+    <div className="flex items-start gap-2.5 py-2 border-b border-white/[0.06] last:border-0 animate-pulse">
       <div className="w-[11px] h-[11px] rounded bg-white/10 mt-1 shrink-0" />
       <div className="flex-1">
-        <div className="h-2 bg-white/10 rounded w-16 mb-2.5" />
+        <div className="h-2 bg-white/10 rounded w-16 mb-1.5" />
         <div className="h-4 bg-white/15 rounded w-20" />
       </div>
     </div>
@@ -337,13 +337,13 @@ interface SectionProps {
 function Section({ title, type, items, loading, skeletonCount = 4, borderClass }: SectionProps) {
   return (
     <div className={borderClass}>
-      <div className="flex items-center gap-2 px-5 sm:px-6 lg:px-5 xl:px-6 pt-4 pb-1">
+      <div className="flex items-center gap-2 px-5 sm:px-6 lg:px-5 xl:px-6 pt-3 pb-0.5">
         <SectionIcon type={type} />
         <p className="text-[9px] font-bold tracking-[0.16em] uppercase text-white/40">
           {title}
         </p>
       </div>
-      <div className="px-5 sm:px-6 lg:px-5 xl:px-6 pb-5">
+      <div className="px-5 sm:px-6 lg:px-5 xl:px-6 pb-3">
         {loading
           ? Array.from({ length: skeletonCount }).map((_, i) => <IndicatorSkeleton key={i} />)
           : items.map((item) => <IndicatorCard key={item.label} item={item} />)
@@ -358,7 +358,7 @@ function Section({ title, type, items, loading, skeletonCount = 4, borderClass }
 function SignalTagRow({ tags }: { tags: SignalTag[] }) {
   if (tags.length === 0) return null;
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-3 flex flex-wrap gap-2">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-2 flex flex-wrap gap-2">
       {tags.map((tag) => (
         <span
           key={tag.label}
