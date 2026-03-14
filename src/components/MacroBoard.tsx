@@ -20,10 +20,10 @@ const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", 
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);
 
 // Snapshot items to include in Market Prices section (10Y Yield excluded — lives in Rates)
-const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "Gold", "BTC", "DXY"]);
+const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "Gold", "BTC", "USD Index"]);
 
 // Preferred display order for Market Prices
-const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Gold", "DXY", "BTC"];
+const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Gold", "USD Index", "BTC"];
 
 // Labels where UP = bullish (green)
 const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin", "BTC", "Gold"]);
@@ -199,7 +199,7 @@ function IndicatorIcon({ label }: { label: string }) {
       <path d="M6 1.5C6 1.5 9.5 6 9.5 7.8C9.5 9.6 7.9 11 6 11C4.1 11 2.5 9.6 2.5 7.8C2.5 6 6 1.5 6 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
     </svg>
   );
-  if (label.includes("Dollar") || label === "DXY") return (
+  if (label.includes("Dollar") || label === "DXY" || label === "USD Index") return (
     <svg viewBox="0 0 12 12" fill="none" className={cls} aria-hidden="true">
       <path d="M6 1.5V10.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
       <path d="M3.5 4C3.5 3.2 4.7 2.5 6 2.5C7.3 2.5 8.5 3.2 8.5 4C8.5 5 7 5.5 6 5.5C4.8 5.5 3.5 6 3.5 7C3.5 7.8 4.7 8.5 6 8.5C7.3 8.5 8.5 7.8 8.5 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -411,7 +411,7 @@ export default function MacroBoard() {
   }, []);
 
   // ── Build MARKET PRICES — from shared context snapshot ────────────────────
-  // Snapshot order: ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "DXY", "BTC"]
+  // Snapshot order: ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "USD Index", "BTC"]
   // We filter to SNAPSHOT_MKT items (excludes 10Y Yield — lives in Rates section)
   // and sort into MARKET_ORDER display order.
 

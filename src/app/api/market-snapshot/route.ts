@@ -19,7 +19,7 @@ const CACHE_SECONDS = 60;
  *   10Y Yield  → FRED DGS10 — change in basis points
  *   WTI Oil    → EIA live → FRED DCOILWTICO fallback
  *   Gold       → TwelveData XAU/USD → FMP XAUUSD → FRED GOLDAMGBD228NLBM
- *   DXY        → Polygon C:DXY → FMP DX-Y.NYB → FRED DTWEXBGS
+ *   USD Index  → FRED DTWEXBGS (Trade Weighted Broad Dollar Index)
  *   Bitcoin    → TwelveData BTC/USD → FMP BTCUSD
  *   FMP also overrides S&P 500 + VIX with intraday data when key is set
  *
@@ -158,28 +158,22 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  // ── TwelveData (Gold, BTC) + Polygon (DXY) — fetched in parallel, each fails independently ──
-  // NOTE: TwelveData "DXY" symbol does NOT exist in their catalog (confirmed by symbol search).
-  //       DXY is sourced from Polygon.io instead, with FMP DX-Y.NYB and FRED DTWEXBGS as fallbacks.
-  const twKey   = process.env.TWELVEDATA_API_KEY;
-  const polyKey = process.env.POLYGON_API_KEY;
-  const fmpKey  = process.env.FMP_API_KEY;
+  // ── TwelveData (Gold, BTC) — fetched in parallel, each fails independently ──
+  const twKey  = process.env.TWELVEDATA_API_KEY;
+  const fmpKey = process.env.FMP_API_KEY;
 
-  const [goldTwRes, btcTwRes, dxyPolyRes] = await Promise.allSettled([
-    twKey   ? fetchTwelveDataSingle(twKey,   "XAU/USD", "Gold", (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
-    twKey   ? fetchTwelveDataSingle(twKey,   "BTC/USD",  "BTC",  (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
-    polyKey ? fetchPolygonDXY(polyKey) : Promise.resolve(null),
+  const [goldTwRes, btcTwRes] = await Promise.allSettled([
+    twKey ? fetchTwelveDataSingle(twKey, "XAU/USD", "Gold", (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
+    twKey ? fetchTwelveDataSingle(twKey, "BTC/USD",  "BTC",  (p) => `$${Math.round(p).toLocaleString()}`) : Promise.resolve(null),
   ]);
-  if (goldTwRes.status  === "fulfilled" && goldTwRes.value)  itemMap.set("Gold", goldTwRes.value);
-  if (btcTwRes.status   === "fulfilled" && btcTwRes.value)   itemMap.set("BTC",  btcTwRes.value);
-  if (dxyPolyRes.status === "fulfilled" && dxyPolyRes.value) itemMap.set("DXY",  dxyPolyRes.value);
+  if (goldTwRes.status === "fulfilled" && goldTwRes.value) itemMap.set("Gold", goldTwRes.value);
+  if (btcTwRes.status  === "fulfilled" && btcTwRes.value)  itemMap.set("BTC",  btcTwRes.value);
 
   // FMP fallback for missing live symbols — also overrides FRED S&P 500 + VIX with intraday
   if (fmpKey) {
     const needGold = !itemMap.has("Gold");
-    const needDxy  = !itemMap.has("DXY");
     const needBtc  = !itemMap.has("BTC");
-    const fmpItems = await fetchFmpSnapshot(fmpKey, needGold, needDxy, needBtc);
+    const fmpItems = await fetchFmpSnapshot(fmpKey, needGold, needBtc);
     for (const item of fmpItems) itemMap.set(item.label, item);
   }
 
@@ -202,26 +196,24 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  // FRED DTWEXBGS last-resort fallback for Dollar Index
-  if (!itemMap.has("DXY")) {
-    const dxObs = dxFredRes.status === "fulfilled" ? dxFredRes.value : [];
-    if (dxObs.length >= 1) {
-      const latest = parseFloat(dxObs[0].value);
-      const prev   = dxObs.length >= 2 ? parseFloat(dxObs[1].value) : NaN;
-      if (!isNaN(latest)) {
-        const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
-        itemMap.set("DXY", {
-          label:     "DXY",
-          value:     latest.toFixed(2),
-          change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-          source:    "FRED",
-        });
-      }
+  // FRED DTWEXBGS — Trade Weighted Broad Dollar Index (USD Index)
+  const dxObs = dxFredRes.status === "fulfilled" ? dxFredRes.value : [];
+  if (dxObs.length >= 1) {
+    const latest = parseFloat(dxObs[0].value);
+    const prev   = dxObs.length >= 2 ? parseFloat(dxObs[1].value) : NaN;
+    if (!isNaN(latest)) {
+      const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
+      itemMap.set("USD Index", {
+        label:     "USD Index",
+        value:     latest.toFixed(2),
+        change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+        direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
+        source:    "FRED",
+      });
     }
   }
 
-  const STRIP_ORDER = ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "DXY", "BTC"];
+  const STRIP_ORDER = ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "USD Index", "BTC"];
   const items = STRIP_ORDER.map((k) => itemMap.get(k)).filter(Boolean) as MarketSnapshotItem[];
 
   return {
@@ -283,52 +275,7 @@ async function fetchTwelveDataSingle(
 }
 
 // ---------------------------------------------------------------------------
-// Polygon — primary DXY source (TwelveData does not carry this symbol)
-// ---------------------------------------------------------------------------
-
-interface PolygonForexSnapshotResponse {
-  status?: string;
-  ticker?: {
-    day?:              { o: number; h: number; l: number; c: number };
-    todaysChange?:     number;
-    todaysChangePerc?: number;
-  };
-}
-
-async function fetchPolygonDXY(apiKey: string): Promise<MarketSnapshotItem | null> {
-  try {
-    const res = await fetch(
-      `https://api.polygon.io/v2/snapshot/locale/global/markets/forex/tickers/C:DXY?apiKey=${apiKey}`,
-      { signal: AbortSignal.timeout(8000), next: { revalidate: 60 } }
-    );
-    if (!res.ok) {
-      console.warn(`[market-snapshot/Polygon] DXY: HTTP ${res.status}`);
-      return null;
-    }
-
-    const raw = (await res.json()) as PolygonForexSnapshotResponse;
-    if (raw.status !== "OK" || !raw.ticker?.day?.c) {
-      console.warn(`[market-snapshot/Polygon] DXY: status=${raw.status}, no day close`);
-      return null;
-    }
-
-    const price = raw.ticker.day.c;
-    const pct   = raw.ticker.todaysChangePerc ?? 0;
-    return {
-      label:     "DXY",
-      value:     price.toFixed(2),
-      change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-      direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-      source:    "Polygon",
-    };
-  } catch (err) {
-    console.error("[market-snapshot/Polygon] DXY error:", err);
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// FMP — fallback for DXY + BTC; also overrides S&P 500 + VIX with intraday
+// FMP — fallback for Gold + BTC; also overrides S&P 500 + VIX with intraday
 // ---------------------------------------------------------------------------
 
 interface FmpQuote {
@@ -341,13 +288,11 @@ interface FmpQuote {
 async function fetchFmpSnapshot(
   apiKey: string,
   needGold: boolean,
-  needDxy:  boolean,
   needBtc:  boolean,
 ): Promise<MarketSnapshotItem[]> {
-  // Always fetch S&P 500 + VIX for intraday override; add Gold/DXY/BTC as needed
+  // Always fetch S&P 500 + VIX for intraday override; add Gold/BTC as needed
   const symbols = ["^GSPC", "^VIX"];
   if (needGold) symbols.push("XAUUSD");
-  if (needDxy)  symbols.push("DX-Y.NYB");
   if (needBtc)  symbols.push("BTCUSD");
 
   try {
@@ -386,14 +331,6 @@ async function fetchFmpSnapshot(
         result.push({
           label:     "Gold",
           value:     `$${Math.round(q.price).toLocaleString()}`,
-          change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: dir,
-          source:    "FMP",
-        });
-      } else if (q.symbol === "DX-Y.NYB") {
-        result.push({
-          label:     "DXY",
-          value:     q.price.toFixed(2),
           change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
           direction: dir,
           source:    "FMP",
