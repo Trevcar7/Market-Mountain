@@ -303,3 +303,18 @@ export interface MarketPricesData {
   generatedAt: string;        // ISO 8601
   validUntil: string;         // ISO 8601 — 60s TTL
 }
+
+// ---------------------------------------------------------------------------
+// Market Sparklines — 30-day daily trendlines for key market indicators
+// ---------------------------------------------------------------------------
+
+export interface SparklineSet {
+  label: string;    // "S&P 500", "VIX", "WTI Oil", "Dollar Index", "Bitcoin"
+  points: number[]; // Chronological price values (oldest → newest)
+}
+
+export interface MarketSparklinesData {
+  sparklines: SparklineSet[];
+  generatedAt: string;  // ISO 8601
+  validUntil: string;   // ISO 8601 — 15-min TTL
+}

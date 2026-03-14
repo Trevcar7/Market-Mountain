@@ -7,6 +7,7 @@ import MacroBoard from "@/components/MacroBoard";
 import SignalBar from "@/components/SignalBar";
 import MarketStrip from "@/components/MarketStrip";
 import WhatsMoving from "@/components/WhatsMoving";
+import { MarketDataProvider } from "@/contexts/MarketDataContext";
 
 export default function HomePage() {
   const articles = getAllArticles();
@@ -42,11 +43,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Market Snapshot Strip — live price ticker (S&P, 10Y, Oil, BTC, VIX, DXY) */}
-      <MarketStrip />
+      {/* Shared market data — single fetch/poll for strip + dashboard (prevents value drift) */}
+      <MarketDataProvider>
+        {/* Market Snapshot Strip — live price ticker (S&P, 10Y, Oil, BTC, VIX, DXY) */}
+        <MarketStrip />
 
-      {/* Macro Board — live indicators + regime classification */}
-      <MacroBoard />
+        {/* Macro Board — live indicators + regime classification */}
+        <MacroBoard />
+      </MarketDataProvider>
 
       {/* What's Moving Markets — top 3 AI-derived signal drivers (connects to MacroBoard) */}
       <WhatsMoving />

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MacroBoardData, MarketPricesData, MacroIndicator } from "@/lib/news-types";
+import { MacroBoardData, MacroIndicator } from "@/lib/news-types";
+import { useMarketData } from "@/contexts/MarketDataContext";
 
 // ─── Display config ───────────────────────────────────────────────────────────
 
@@ -10,14 +11,23 @@ const DISPLAY_LABEL: Record<string, string> = {
   "2-Year Yield":  "2Y Treasury",
   "Yield Curve":   "Yield Curve (10Y–2Y)",
   Unemployment:    "Unemployment Rate",
+  // Snapshot labels → human-readable Market Prices names
+  BTC:             "Bitcoin",
+  DXY:             "Dollar Index",
 };
 
 // Macro-board labels per section
 const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", "Yield Curve"]);
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);
 
+// Snapshot items to include in Market Prices section (10Y Yield excluded — lives in Rates)
+const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "BTC", "DXY"]);
+
+// Preferred display order for Market Prices
+const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "BTC", "DXY"];
+
 // Labels where UP = bullish (green)
-const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin"]);
+const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin", "BTC"]);
 
 // Labels where UP = bearish (red)
 const NEGATIVE_UP = new Set([
@@ -47,11 +57,10 @@ interface DisplayItem {
   change?:      string;
   direction:    "up" | "down" | "flat";
   source:       string;
+  sparkPoints?: number[];
 }
 
 // ─── Client-side refresh interval (ET-aware) ─────────────────────────────────
-// Returns the appropriate poll interval in ms based on the current market session.
-// BTC trades 24/7 so we never stop completely — minimum is 5 min outside hours.
 
 function getClientRefreshMs(): number {
   const etNow = new Date(
@@ -61,6 +70,50 @@ function getClientRefreshMs(): number {
   const tm  = etNow.getHours() * 60 + etNow.getMinutes();
   if (day >= 1 && day <= 5 && tm >= 9 * 60 + 30 && tm < 16 * 60) return 60_000;
   return 5 * 60_000;
+}
+
+// ─── Sparkline ────────────────────────────────────────────────────────────────
+// Minimal inline SVG trendline — no external library, no fill.
+
+const SPARK_COLORS: Record<"up" | "down" | "flat", string> = {
+  up:   "#10b981", // emerald-500
+  down: "#ef4444", // red-500
+  flat: "#475569", // slate-600
+};
+
+function Sparkline({ points, direction }: { points: number[]; direction: "up" | "down" | "flat" }) {
+  if (points.length < 2) return null;
+
+  const W = 56, H = 18, PAD = 1;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+
+  const coords = points.map((v, i) => {
+    const x = PAD + (i / (points.length - 1)) * (W - PAD * 2);
+    const y = PAD + (1 - (v - min) / range) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  return (
+    <svg
+      width={W}
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <polyline
+        points={coords.join(" ")}
+        fill="none"
+        stroke={SPARK_COLORS[direction]}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.75"
+      />
+    </svg>
+  );
 }
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
@@ -221,7 +274,6 @@ function SectionIcon({ type }: { type: "market" | "rates" | "econ" }) {
 
 function IndicatorCard({ item }: { item: DisplayItem }) {
   const changeColor = getChangeColor(item.label, item.displayLabel, item.direction);
-  // Yield Curve bps format: "-22 bps" starts with "-" so isInverted still works
   const isInverted  = item.label === "Yield Curve" && item.value.startsWith("-");
   const valueColor  = isInverted ? "text-red-400" : "text-white";
 
@@ -247,6 +299,11 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
         </div>
         <p className="text-[9px] text-white/15 mt-1.5">{item.source}</p>
       </div>
+      {item.sparkPoints && item.sparkPoints.length >= 2 && (
+        <div className="mt-1 self-center">
+          <Sparkline points={item.sparkPoints} direction={item.direction} />
+        </div>
+      )}
     </div>
   );
 }
@@ -314,42 +371,36 @@ function SignalTagRow({ tags }: { tags: SignalTag[] }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function MacroBoard() {
-  const [macroData,   setMacroData]   = useState<MacroBoardData | null>(null);
-  const [pricesData,  setPricesData]  = useState<MarketPricesData | null>(null);
-  const [loading,     setLoading]     = useState(true);
+  const { snapshot, sparklines, loading: mktLoading } = useMarketData();
+  const [macroData, setMacroData] = useState<MacroBoardData | null>(null);
+  const [macroLoading, setMacroLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Initial parallel load — macro indicators (15-min Redis TTL) + market prices (60s TTL)
-    Promise.all([
-      fetch("/api/macro-board").then((r) => r.json()).catch(() => null),
-      fetch("/api/market-prices").then((r) => r.json()).catch(() => null),
-    ]).then(([macro, prices]) => {
+    // Fetch macro indicators (15-min Redis TTL — rates + economic data)
+    fetch("/api/macro-board").then((r) => r.json()).catch(() => null).then((macro) => {
       if (cancelled) return;
       setMacroData(macro as MacroBoardData | null);
-      setPricesData(prices as MarketPricesData | null);
-      setLoading(false);
+      setMacroLoading(false);
     });
 
-    // Trading-hours-aware refresh for market prices
-    // Market open (9:30–4 ET M–F): 60s  |  All other times: 5min (BTC trades 24/7)
-    function scheduleRefresh() {
+    // Macro data refreshes on the same trading-hours cadence as market prices
+    function scheduleMacroRefresh() {
       if (intervalRef.current) clearInterval(intervalRef.current);
       const intervalMs = getClientRefreshMs();
       intervalRef.current = setInterval(async () => {
-        const res = await fetch("/api/market-prices").then((r) => r.json()).catch(() => null);
+        const res = await fetch("/api/macro-board").then((r) => r.json()).catch(() => null);
         if (res && !cancelled) {
-          setPricesData(res as MarketPricesData);
-          // Re-schedule if the session changed (e.g., market just opened/closed)
+          setMacroData(res as MacroBoardData);
           const newMs = getClientRefreshMs();
-          if (newMs !== intervalMs) scheduleRefresh();
+          if (newMs !== intervalMs) scheduleMacroRefresh();
         }
       }, intervalMs);
     }
 
-    scheduleRefresh();
+    scheduleMacroRefresh();
 
     return () => {
       cancelled = true;
@@ -357,16 +408,37 @@ export default function MacroBoard() {
     };
   }, []);
 
-  // ── Build MARKET PRICES — directly from /api/market-prices ───────────────
-  // Items already have display-ready labels: "S&P 500", "VIX", "WTI Oil", "Dollar Index", "Bitcoin"
-  const marketPrices: DisplayItem[] = (pricesData?.items ?? []).map((item) => ({
-    label:        item.label,
-    displayLabel: item.label,
-    value:        item.value,
-    change:       item.change === "—" ? undefined : item.change,
-    direction:    item.direction,
-    source:       item.source,
-  }));
+  // ── Build MARKET PRICES — from shared context snapshot ────────────────────
+  // Snapshot order: ["S&P 500", "10Y Yield", "WTI Oil", "BTC", "VIX", "DXY"]
+  // We filter to SNAPSHOT_MKT items (excludes 10Y Yield — lives in Rates section)
+  // and sort into MARKET_ORDER display order.
+
+  // Build sparkline lookup map keyed by label (both raw and display label)
+  const sparkMap: Record<string, number[]> = {};
+  if (sparklines) {
+    for (const s of sparklines.sparklines) sparkMap[s.label] = s.points;
+  }
+
+  const snapshotMktMap = new Map<string, DisplayItem>();
+  for (const item of snapshot?.items ?? []) {
+    if (!SNAPSHOT_MKT.has(item.label)) continue;
+    const displayLabel = DISPLAY_LABEL[item.label] ?? item.label;
+    // Sparklines keyed by display label (e.g. "Bitcoin", "Dollar Index") or raw label
+    const points = sparkMap[displayLabel] ?? sparkMap[item.label];
+    snapshotMktMap.set(item.label, {
+      label:        item.label,
+      displayLabel,
+      value:        item.value,
+      change:       item.change === "—" ? undefined : item.change,
+      direction:    item.direction,
+      source:       item.source,
+      sparkPoints:  points,
+    });
+  }
+
+  const marketPrices: DisplayItem[] = MARKET_ORDER
+    .map((k) => snapshotMktMap.get(k))
+    .filter(Boolean) as DisplayItem[];
 
   // ── Build RATES ──────────────────────────────────────────────────────────
   const rates: DisplayItem[] = macroData
@@ -395,6 +467,9 @@ export default function MacroBoard() {
           source:       i.source,
         }))
     : [];
+
+  // ── Combined loading state — show skeletons until BOTH sources have responded
+  const loading = mktLoading || macroLoading;
 
   // ── Section visibility: show all skeletons while loading; hide empty after ─
   const ALL_SECTIONS = [

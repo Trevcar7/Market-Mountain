@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MarketSnapshotData, MarketSnapshotItem } from "@/lib/news-types";
+import { MarketSnapshotItem } from "@/lib/news-types";
+import { useMarketData } from "@/contexts/MarketDataContext";
 
 // Display label overrides for the strip
 const STRIP_LABEL: Record<string, string> = {
@@ -10,7 +10,7 @@ const STRIP_LABEL: Record<string, string> = {
 
 // ---------------------------------------------------------------------------
 // MarketStrip — live market price ticker
-// Auto-refreshes every 60 seconds. Graceful fallback on API failure.
+// Consumes shared MarketDataContext — no independent fetch or polling.
 // ---------------------------------------------------------------------------
 
 function DirectionArrow({ direction }: { direction: "up" | "down" | "flat" }) {
@@ -60,37 +60,14 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
 }
 
 export default function MarketStrip() {
-  const [data, setData] = useState<MarketSnapshotData | null>(null);
-  const [error, setError] = useState(false);
+  const { snapshot, loading } = useMarketData();
 
-  async function loadData() {
-    try {
-      const res = await fetch("/api/market-snapshot", { cache: "no-store" });
-      if (!res.ok) throw new Error("fetch failed");
-      const json = (await res.json()) as MarketSnapshotData;
-      if (json.items && json.items.length > 0) {
-        setData(json);
-        setError(false);
-      } else {
-        setError(true);
-      }
-    } catch {
-      setError(true);
-    }
-  }
-
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 60_000); // refresh every 60s
-    return () => clearInterval(interval);
-  }, []);
-
-  // Don't render at all if no data and no error (avoids layout shift on initial SSR)
-  if (!data && !error) return null;
+  // Don't render at all until initial data arrives (avoids layout shift on SSR)
+  if (loading) return null;
 
   // Silent failure — strip disappears rather than showing an error state
   // Require at least 3 items to avoid a sparse single-item ticker
-  if (error || !data || data.items.length < 3) return null;
+  if (!snapshot || snapshot.items.length < 3) return null;
 
   return (
     <div
@@ -108,14 +85,14 @@ export default function MarketStrip() {
           </div>
 
           {/* Items */}
-          {data.items.map((item) => (
+          {snapshot.items.map((item) => (
             <SnapshotChip key={item.label} item={item} />
           ))}
 
           {/* Timestamp */}
           <div className="px-4 py-2 shrink-0 ml-auto hidden sm:block">
             <span className="text-[10px] text-text-light tabular-nums">
-              {new Date(data.generatedAt).toLocaleTimeString("en-US", {
+              {new Date(snapshot.generatedAt).toLocaleTimeString("en-US", {
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: true,
