@@ -20,13 +20,13 @@ const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", 
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);
 
 // Snapshot items to include in Market Prices section (10Y Yield excluded — lives in Rates)
-const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "BTC", "DXY"]);
+const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "Gold", "BTC", "DXY"]);
 
 // Preferred display order for Market Prices
-const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "BTC", "DXY"];
+const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Gold", "DXY", "BTC"];
 
 // Labels where UP = bullish (green)
-const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin", "BTC"]);
+const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin", "BTC", "Gold"]);
 
 // Labels where UP = bearish (red)
 const NEGATIVE_UP = new Set([
@@ -205,6 +205,12 @@ function IndicatorIcon({ label }: { label: string }) {
       <path d="M3.5 4C3.5 3.2 4.7 2.5 6 2.5C7.3 2.5 8.5 3.2 8.5 4C8.5 5 7 5.5 6 5.5C4.8 5.5 3.5 6 3.5 7C3.5 7.8 4.7 8.5 6 8.5C7.3 8.5 8.5 7.8 8.5 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
     </svg>
   );
+  if (label === "Gold") return (
+    <svg viewBox="0 0 12 12" fill="none" className={cls} aria-hidden="true">
+      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
+      <circle cx="6" cy="6" r="2.2" stroke="currentColor" strokeWidth="1"/>
+    </svg>
+  );
   if (label.includes("Bitcoin") || label === "BTC") return (
     <svg viewBox="0 0 12 12" fill="none" className={cls} aria-hidden="true">
       <path d="M5 2H8C9 2 9.8 2.8 9.8 3.8C9.8 4.8 9 5.5 8 5.5H5V2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
@@ -294,7 +300,6 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
             </span>
           )}
         </div>
-        <p className="text-[9px] text-white/15 mt-1.5">{item.source}</p>
       </div>
       {item.sparkPoints && item.sparkPoints.length >= 2 && (
         <div className="mt-1 self-center">
@@ -406,7 +411,7 @@ export default function MacroBoard() {
   }, []);
 
   // ── Build MARKET PRICES — from shared context snapshot ────────────────────
-  // Snapshot order: ["S&P 500", "10Y Yield", "WTI Oil", "BTC", "VIX", "DXY"]
+  // Snapshot order: ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "Gold", "DXY", "BTC"]
   // We filter to SNAPSHOT_MKT items (excludes 10Y Yield — lives in Rates section)
   // and sort into MARKET_ORDER display order.
 
@@ -470,7 +475,7 @@ export default function MacroBoard() {
 
   // ── Section visibility: show all skeletons while loading; hide empty after ─
   const ALL_SECTIONS = [
-    { key: "market", title: "Market Prices", type: "market" as const, items: marketPrices, skeletonCount: 5 },
+    { key: "market", title: "Market Prices", type: "market" as const, items: marketPrices, skeletonCount: 6 },
     { key: "rates",  title: "Rates",         type: "rates"  as const, items: rates,        skeletonCount: 4 },
     { key: "econ",   title: "Economic Data", type: "econ"   as const, items: econData,     skeletonCount: 4 },
   ];
@@ -509,6 +514,13 @@ export default function MacroBoard() {
               borderClass={borderClass}
             />
           ))}
+        </div>
+
+        {/* Data sources footer */}
+        <div className="px-4 sm:px-6 lg:px-8 py-2.5 border-t border-white/[0.05]">
+          <p className="text-[9px] text-white/20 text-right tracking-wide">
+            Data sources: Federal Reserve (FRED), Bureau of Labor Statistics, TwelveData, EIA
+          </p>
         </div>
 
       </div>

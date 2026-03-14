@@ -11,13 +11,14 @@ const MIN_POINTS    = 5;       // Minimum useful data points for a sparkline
 
 /**
  * GET /api/market-sparklines
- * Returns 30-day daily trendline data for five market indicators:
- *   S&P 500, VIX, WTI Oil, DXY, Bitcoin
+ * Returns 30-day daily trendline data for six market indicators:
+ *   S&P 500, VIX, WTI Oil, Gold, DXY, Bitcoin
  *
  * Sources:
  *   S&P 500      → FRED SP500 (30 daily closes)
  *   VIX          → FRED VIXCLS (30 daily closes)
  *   WTI Oil      → FRED DCOILWTICO (30 daily closes)
+ *   Gold         → TwelveData XAU/USD (30 daily) → FRED GOLDAMGBD228NLBM fallback
  *   DXY          → TwelveData DXY (30 daily) → FRED DTWEXBGS fallback
  *   Bitcoin      → TwelveData BTC/USD (30 daily)
  *
@@ -64,11 +65,12 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
   const validUntil = new Date(now.getTime() + CACHE_SECONDS * 1000);
 
   // Fetch all FRED series in parallel — each fails independently
-  const [sp500Res, vixRes, wtiRes, dxFredRes] = await Promise.allSettled([
-    fetchFredSeries("SP500",      30),
-    fetchFredSeries("VIXCLS",     30),
-    fetchFredSeries("DCOILWTICO", 30),
-    fetchFredSeries("DTWEXBGS",   30), // Fallback for Dollar Index
+  const [sp500Res, vixRes, wtiRes, dxFredRes, goldFredRes] = await Promise.allSettled([
+    fetchFredSeries("SP500",            30),
+    fetchFredSeries("VIXCLS",           30),
+    fetchFredSeries("DCOILWTICO",       30),
+    fetchFredSeries("DTWEXBGS",         30), // Fallback for Dollar Index
+    fetchFredSeries("GOLDAMGBD228NLBM", 30), // Fallback for Gold
   ]);
 
   const sparklines: SparklineSet[] = [];
@@ -85,13 +87,22 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
   const wtiPoints = fredToChronological(wtiRes.status === "fulfilled" ? wtiRes.value : []);
   if (wtiPoints.length >= MIN_POINTS) sparklines.push({ label: "WTI Oil", points: wtiPoints });
 
-  // Dollar Index + Bitcoin via TwelveData
+  // Gold + Dollar Index + Bitcoin via TwelveData
   const twKey = process.env.TWELVEDATA_API_KEY;
   if (twKey) {
-    const [dxySpark, btcSpark] = await Promise.allSettled([
-      fetchTwelveDataSeries(twKey, "DXY",    "DXY"),
-      fetchTwelveDataSeries(twKey, "BTC/USD", "Bitcoin"),
+    const [goldSpark, dxySpark, btcSpark] = await Promise.allSettled([
+      fetchTwelveDataSeries(twKey, "XAU/USD", "Gold"),
+      fetchTwelveDataSeries(twKey, "DXY",     "DXY"),
+      fetchTwelveDataSeries(twKey, "BTC/USD",  "Bitcoin"),
     ]);
+
+    if (goldSpark.status === "fulfilled" && goldSpark.value) {
+      sparklines.push(goldSpark.value);
+    } else {
+      // FRED GOLDAMGBD228NLBM fallback
+      const goldPoints = fredToChronological(goldFredRes.status === "fulfilled" ? goldFredRes.value : []);
+      if (goldPoints.length >= MIN_POINTS) sparklines.push({ label: "Gold", points: goldPoints });
+    }
 
     if (dxySpark.status === "fulfilled" && dxySpark.value) {
       sparklines.push(dxySpark.value);
@@ -106,7 +117,9 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
     }
     // No FRED fallback for BTC — omit sparkline rather than show stale data
   } else {
-    // No TwelveData key — use FRED DTWEXBGS for Dollar Index; skip BTC
+    // No TwelveData key — use FRED fallbacks for Gold + DXY; skip BTC
+    const goldPoints = fredToChronological(goldFredRes.status === "fulfilled" ? goldFredRes.value : []);
+    if (goldPoints.length >= MIN_POINTS) sparklines.push({ label: "Gold", points: goldPoints });
     const dxPoints = fredToChronological(dxFredRes.status === "fulfilled" ? dxFredRes.value : []);
     if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "DXY", points: dxPoints });
   }

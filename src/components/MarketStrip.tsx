@@ -5,7 +5,8 @@ import { useMarketData } from "@/contexts/MarketDataContext";
 
 // Display label overrides for the strip
 const STRIP_LABEL: Record<string, string> = {
-  BTC: "Bitcoin",
+  BTC:        "Bitcoin",
+  "10Y Yield": "10Y Treasury",
 };
 
 // ---------------------------------------------------------------------------
