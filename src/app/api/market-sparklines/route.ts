@@ -12,13 +12,13 @@ const MIN_POINTS    = 5;       // Minimum useful data points for a sparkline
 /**
  * GET /api/market-sparklines
  * Returns 30-day daily trendline data for five market indicators:
- *   S&P 500, VIX, WTI Oil, Dollar Index, Bitcoin
+ *   S&P 500, VIX, WTI Oil, DXY, Bitcoin
  *
  * Sources:
  *   S&P 500      → FRED SP500 (30 daily closes)
  *   VIX          → FRED VIXCLS (30 daily closes)
  *   WTI Oil      → FRED DCOILWTICO (30 daily closes)
- *   Dollar Index → TwelveData DXY (30 daily) → FRED DTWEXBGS fallback
+ *   DXY          → TwelveData DXY (30 daily) → FRED DTWEXBGS fallback
  *   Bitcoin      → TwelveData BTC/USD (30 daily)
  *
  * TTL: 15-minute server-side Redis cache
@@ -89,7 +89,7 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
   const twKey = process.env.TWELVEDATA_API_KEY;
   if (twKey) {
     const [dxySpark, btcSpark] = await Promise.allSettled([
-      fetchTwelveDataSeries(twKey, "DXY",    "Dollar Index"),
+      fetchTwelveDataSeries(twKey, "DXY",    "DXY"),
       fetchTwelveDataSeries(twKey, "BTC/USD", "Bitcoin"),
     ]);
 
@@ -98,7 +98,7 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
     } else {
       // FRED DTWEXBGS fallback
       const dxPoints = fredToChronological(dxFredRes.status === "fulfilled" ? dxFredRes.value : []);
-      if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "Dollar Index", points: dxPoints });
+      if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "DXY", points: dxPoints });
     }
 
     if (btcSpark.status === "fulfilled" && btcSpark.value) {
@@ -108,7 +108,7 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
   } else {
     // No TwelveData key — use FRED DTWEXBGS for Dollar Index; skip BTC
     const dxPoints = fredToChronological(dxFredRes.status === "fulfilled" ? dxFredRes.value : []);
-    if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "Dollar Index", points: dxPoints });
+    if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "DXY", points: dxPoints });
   }
 
   return {

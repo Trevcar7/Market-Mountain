@@ -11,9 +11,8 @@ const DISPLAY_LABEL: Record<string, string> = {
   "2-Year Yield":  "2Y Treasury",
   "Yield Curve":   "Yield Curve (10Y–2Y)",
   Unemployment:    "Unemployment Rate",
-  // Snapshot labels → human-readable Market Prices names
-  BTC:             "Bitcoin",
-  DXY:             "Dollar Index",
+  // Snapshot label → human-readable Market Prices name
+  BTC: "Bitcoin",
 };
 
 // Macro-board labels per section
@@ -126,8 +125,6 @@ function getChangeColor(label: string, displayLabel: string, direction: "up" | "
     return direction === "up" ? "text-emerald-400" : "text-red-400";
   if (NEGATIVE_UP.has(label) || NEGATIVE_UP.has(displayLabel))
     return direction === "up" ? "text-red-400" : "text-emerald-400";
-  if (label.includes("Oil") || label.includes("WTI"))
-    return direction === "up" ? "text-amber-400" : "text-emerald-400";
   return direction === "up" ? "text-emerald-400" : "text-red-400";
 }
 
