@@ -290,3 +290,16 @@ export interface MarketSnapshotData {
   generatedAt: string;   // ISO 8601
   validUntil: string;    // ISO 8601 — 60s TTL for strip
 }
+
+// ---------------------------------------------------------------------------
+// Market Prices — 5-item dashboard section (S&P 500, VIX, WTI, DXY, BTC)
+// Superset of snapshot with trading-session metadata for smart client refresh
+// ---------------------------------------------------------------------------
+
+export interface MarketPricesData {
+  items: MarketSnapshotItem[];
+  sessionStatus: "open" | "extended" | "closed";
+  refreshIntervalMs: number;  // Suggested client poll interval in ms
+  generatedAt: string;        // ISO 8601
+  validUntil: string;         // ISO 8601 — 60s TTL
+}

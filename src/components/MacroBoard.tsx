@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MacroBoardData, MarketSnapshotData, MacroIndicator } from "@/lib/news-types";
+import { useEffect, useRef, useState } from "react";
+import { MacroBoardData, MarketPricesData, MacroIndicator } from "@/lib/news-types";
 
 // ─── Display config ───────────────────────────────────────────────────────────
 
@@ -10,20 +10,11 @@ const DISPLAY_LABEL: Record<string, string> = {
   "2-Year Yield":  "2Y Treasury",
   "Yield Curve":   "Yield Curve (10Y–2Y)",
   Unemployment:    "Unemployment Rate",
-  "WTI Crude":     "WTI Oil",
-  DXY:             "Dollar Index",
-  BTC:             "Bitcoin",
 };
-
-// Snapshot items that belong in MARKET PRICES
-const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "DXY", "BTC"]);
 
 // Macro-board labels per section
 const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", "Yield Curve"]);
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);
-
-// Preferred display order for MARKET PRICES
-const MKT_ORDER = ["S&P 500", "VIX", "WTI Oil", "Dollar Index", "Bitcoin"];
 
 // Labels where UP = bullish (green)
 const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin"]);
@@ -56,6 +47,20 @@ interface DisplayItem {
   change?:      string;
   direction:    "up" | "down" | "flat";
   source:       string;
+}
+
+// ─── Client-side refresh interval (ET-aware) ─────────────────────────────────
+// Returns the appropriate poll interval in ms based on the current market session.
+// BTC trades 24/7 so we never stop completely — minimum is 5 min outside hours.
+
+function getClientRefreshMs(): number {
+  const etNow = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
+  );
+  const day = etNow.getDay();
+  const tm  = etNow.getHours() * 60 + etNow.getMinutes();
+  if (day >= 1 && day <= 5 && tm >= 9 * 60 + 30 && tm < 16 * 60) return 60_000;
+  return 5 * 60_000;
 }
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
@@ -309,74 +314,61 @@ function SignalTagRow({ tags }: { tags: SignalTag[] }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function MacroBoard() {
-  const [macroData,    setMacroData]    = useState<MacroBoardData | null>(null);
-  const [snapshotData, setSnapshotData] = useState<MarketSnapshotData | null>(null);
-  const [loading,      setLoading]      = useState(true);
+  const [macroData,   setMacroData]   = useState<MacroBoardData | null>(null);
+  const [pricesData,  setPricesData]  = useState<MarketPricesData | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Initial load — macro indicators (15-min Redis TTL) + snapshot (60s TTL)
+    // Initial parallel load — macro indicators (15-min Redis TTL) + market prices (60s TTL)
     Promise.all([
       fetch("/api/macro-board").then((r) => r.json()).catch(() => null),
-      fetch("/api/market-snapshot").then((r) => r.json()).catch(() => null),
-    ]).then(([macro, snap]) => {
+      fetch("/api/market-prices").then((r) => r.json()).catch(() => null),
+    ]).then(([macro, prices]) => {
       if (cancelled) return;
       setMacroData(macro as MacroBoardData | null);
-      setSnapshotData(snap as MarketSnapshotData | null);
+      setPricesData(prices as MarketPricesData | null);
       setLoading(false);
     });
 
-    // Refresh market prices every 60s on weekdays (Mon–Fri)
-    // Macro indicators (FRED/BLS) don't need frequent refresh — use Redis TTL
-    const interval = setInterval(() => {
-      const day = new Date().getDay(); // 0 = Sun, 6 = Sat
-      if (day < 1 || day > 5) return;
-      fetch("/api/market-snapshot")
-        .then((r) => r.json())
-        .then((snap) => { if (!cancelled) setSnapshotData(snap as MarketSnapshotData); })
-        .catch(() => {});
-    }, 60_000);
+    // Trading-hours-aware refresh for market prices
+    // Market open (9:30–4 ET M–F): 60s  |  All other times: 5min (BTC trades 24/7)
+    function scheduleRefresh() {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      const intervalMs = getClientRefreshMs();
+      intervalRef.current = setInterval(async () => {
+        const res = await fetch("/api/market-prices").then((r) => r.json()).catch(() => null);
+        if (res && !cancelled) {
+          setPricesData(res as MarketPricesData);
+          // Re-schedule if the session changed (e.g., market just opened/closed)
+          const newMs = getClientRefreshMs();
+          if (newMs !== intervalMs) scheduleRefresh();
+        }
+      }, intervalMs);
+    }
 
-    return () => { cancelled = true; clearInterval(interval); };
+    scheduleRefresh();
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, []);
 
-  // ── Build MARKET PRICES ──────────────────────────────────────────────────────
-  const mktRaw: Record<string, DisplayItem> = {};
+  // ── Build MARKET PRICES — directly from /api/market-prices ───────────────
+  // Items already have display-ready labels: "S&P 500", "VIX", "WTI Oil", "Dollar Index", "Bitcoin"
+  const marketPrices: DisplayItem[] = (pricesData?.items ?? []).map((item) => ({
+    label:        item.label,
+    displayLabel: item.label,
+    value:        item.value,
+    change:       item.change === "—" ? undefined : item.change,
+    direction:    item.direction,
+    source:       item.source,
+  }));
 
-  if (snapshotData) {
-    for (const item of snapshotData.items) {
-      if (!SNAPSHOT_MKT.has(item.label)) continue;
-      const dl = DISPLAY_LABEL[item.label] ?? item.label;
-      mktRaw[dl] = {
-        label:        item.label,
-        displayLabel: dl,
-        value:        item.value,
-        change:       item.change === "—" ? undefined : item.change,
-        direction:    item.direction,
-        source:       item.source,
-      };
-    }
-  }
-
-  // WTI Oil comes from macro-board (EIA)
-  if (macroData) {
-    const wti = macroData.indicators.find((i) => i.label === "WTI Crude");
-    if (wti) {
-      mktRaw["WTI Oil"] = {
-        label:        wti.label,
-        displayLabel: "WTI Oil",
-        value:        wti.value,
-        change:       wti.change,
-        direction:    wti.direction,
-        source:       wti.source,
-      };
-    }
-  }
-
-  const marketPrices: DisplayItem[] = MKT_ORDER.map((l) => mktRaw[l]).filter(Boolean) as DisplayItem[];
-
-  // ── Build RATES ──────────────────────────────────────────────────────────────
+  // ── Build RATES ──────────────────────────────────────────────────────────
   const rates: DisplayItem[] = macroData
     ? macroData.indicators
         .filter((i) => RATE_LABELS.has(i.label))
@@ -390,7 +382,7 @@ export default function MacroBoard() {
         }))
     : [];
 
-  // ── Build ECONOMIC DATA ───────────────────────────────────────────────────────
+  // ── Build ECONOMIC DATA ───────────────────────────────────────────────────
   const econData: DisplayItem[] = macroData
     ? macroData.indicators
         .filter((i) => ECON_LABELS.has(i.label))
@@ -404,7 +396,7 @@ export default function MacroBoard() {
         }))
     : [];
 
-  // ── Section visibility: show all skeletons while loading; hide empty after ───
+  // ── Section visibility: show all skeletons while loading; hide empty after ─
   const ALL_SECTIONS = [
     { key: "market", title: "Market Prices", type: "market" as const, items: marketPrices, skeletonCount: 5 },
     { key: "rates",  title: "Rates",         type: "rates"  as const, items: rates,        skeletonCount: 4 },
@@ -418,8 +410,8 @@ export default function MacroBoard() {
   // Don't render the board at all if data loaded with nothing to show
   if (!loading && visibleSections.length === 0) return null;
 
-  const colCount = (loading ? 3 : visibleSections.length) as 1 | 2 | 3;
-  const gridClass = GRID_CLASS[colCount] ?? GRID_CLASS[3];
+  const colCount    = (loading ? 3 : visibleSections.length) as 1 | 2 | 3;
+  const gridClass   = GRID_CLASS[colCount]   ?? GRID_CLASS[3];
   const borderClass = SECTION_BORDER[colCount] ?? SECTION_BORDER[3];
 
   // Build simple signal tags from live indicator data

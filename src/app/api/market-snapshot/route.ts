@@ -98,12 +98,12 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     const latest = parseFloat(vixObs[0].value);
     const prev   = vixObs.length >= 2 ? parseFloat(vixObs[1].value) : NaN;
     if (!isNaN(latest)) {
-      const change = !isNaN(prev) ? latest - prev : 0;
+      const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
       itemMap.set("VIX", {
         label:     "VIX",
         value:     latest.toFixed(2),
-        change:    Math.abs(change) < 0.005 ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(2)}`,
-        direction: change > 0.01 ? "up" : change < -0.01 ? "down" : "flat",
+        change:    Math.abs(pct) < 0.05 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+        direction: pct > 0.05 ? "up" : pct < -0.05 ? "down" : "flat",
         source:    "FRED",
       });
     }

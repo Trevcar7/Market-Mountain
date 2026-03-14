@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { MarketSnapshotData, MarketSnapshotItem } from "@/lib/news-types";
 
+// Display label overrides for the strip
+const STRIP_LABEL: Record<string, string> = {
+  BTC: "Bitcoin",
+};
+
 // ---------------------------------------------------------------------------
 // MarketStrip — live market price ticker
 // Auto-refreshes every 60 seconds. Graceful fallback on API failure.
@@ -36,10 +41,12 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
     ? "text-red-500"
     : "text-slate-400";
 
+  const displayLabel = STRIP_LABEL[item.label] ?? item.label;
+
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-r border-border/60 last:border-r-0 shrink-0">
       <span className="text-[11px] font-semibold tracking-wide text-text-muted uppercase whitespace-nowrap">
-        {item.label}
+        {displayLabel}
       </span>
       <span className="text-[13px] font-bold text-navy-900 whitespace-nowrap tabular-nums">
         {item.value}
