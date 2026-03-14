@@ -78,8 +78,8 @@ export default function MarketStrip() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center">
-          {/* Label */}
-          <div className="flex items-center gap-1.5 px-2 py-2 border-r border-border/60 shrink-0">
+          {/* Label — fixed width so right side can mirror it */}
+          <div className="w-[88px] flex items-center gap-1.5 px-2 py-2 border-r border-border/60 shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
             <span className="text-[10px] font-bold tracking-widest uppercase text-text-light whitespace-nowrap">
               Markets
@@ -91,9 +91,9 @@ export default function MarketStrip() {
             <SnapshotChip key={item.label} item={item} />
           ))}
 
-          {/* Timestamp */}
-          <div className="px-2 py-2 shrink-0 ml-auto hidden xl:block">
-            <span className="text-[10px] text-text-light tabular-nums">
+          {/* Timestamp — same fixed width as label; acts as silent spacer below xl */}
+          <div className="w-[88px] px-2 py-2 shrink-0 flex items-center justify-end">
+            <span className="text-[10px] text-text-light tabular-nums hidden xl:inline">
               {new Date(snapshot.generatedAt).toLocaleTimeString("en-US", {
                 hour: "2-digit",
                 minute: "2-digit",
