@@ -612,11 +612,13 @@ Review checklist:
 
 Strengthen any weak section before delivering. If sources are too thin to support the thesis, scale back claims — do not pad with qualifiers instead of facts.
 
-SENTENCE CLARITY (Step 16a)
-Write in short, direct sentences. Each sentence should carry one primary idea.
+SENTENCE CLARITY AND FLOW (Step 16a)
+Write in clear, tight sentences. Each sentence should carry one primary idea.
 - Break sentences that stack multiple subordinate clauses using "as", "while", or "and" into two separate sentences
 - Target 20–30 words per sentence for financial news writing
 - Long explanations should be distributed across 2–3 sentences, not compressed into one
+- When two closely related analytical clauses follow naturally from each other, prefer a semicolon over a full stop to preserve flow. Example: "This is not merely a commodity price event; it represents a repricing of inflation expectations" rather than two short fragments.
+- Avoid orphaned one-sentence paragraphs that could read as conclusions detached from their context
 
 ANALYTICAL CALIBRATION (Step 16b)
 Use precise but measured language. Avoid overstating the magnitude or uniqueness of events.
@@ -675,7 +677,16 @@ GOOD LEDES:
 
 Write for a financially literate reader who values accuracy, analysis, and forward-looking insight over hype.
 
-TAG STANDARD (Step 18)
+CHART CAPTION STANDARD (Step 18a)
+When a chart is present in the article, ensure the narrative paragraph preceding it contains a direct anchor sentence that sets up the chart. The anchor must:
+- Reference the specific metric shown in the chart (e.g., "WTI crude", "10-year yield")
+- Include a specific number from the data (e.g., "$101 per barrel", "4.71%")
+- Connect the data to its macro implication in one sentence
+- Read as natural prose — not as a caption label
+
+Caption tone: Bloomberg Markets style. Concise, analytical, no filler. Each caption should state (1) what the chart shows, (2) why the current level matters, (3) the macro implication for investors. Maximum 2 sentences.
+
+TAG STANDARD (Step 18b)
 Article tags must come exclusively from this controlled taxonomy:
 ENERGY · MACRO · RATES · EQUITIES · USD · GEOPOLITICS · COMMODITIES · TECH · FINANCIALS · AI · CRYPTO
 
@@ -1059,9 +1070,10 @@ export async function synthesizeGroupedArticles(
           chartCount++;
           chartData = [primary];
 
-          // For energy stories add a secondary 10Y yield chart (macro transmission mechanism)
-          // For bond_market/fed stories add a secondary S&P 500 chart (equity rate sensitivity)
+          // Companion chart routing — topic-aware secondary/tertiary charts
           const topicNorm = group.topic.toLowerCase().replace(/\s+/g, "_");
+
+          // Secondary chart: rates companion for energy, equities companion for rates/fed
           const secondaryTopic =
             topicNorm === "energy" || topicNorm === "trade_policy" ? "bond_market" :
             topicNorm === "bond_market" || topicNorm === "federal_reserve" || topicNorm === "fed_macro" ? "broad_market" :
@@ -1070,15 +1082,27 @@ export async function synthesizeGroupedArticles(
           if (secondaryTopic && chartCount < MAX_CHARTS_PER_RUN) {
             const secondary = await buildChartData(secondaryTopic);
             if (secondary) {
-              // Secondary chart's insertAfterParagraph should be later than primary's
               const primaryPos = primary.insertAfterParagraph ?? 0;
               secondary.insertAfterParagraph = Math.max(primaryPos + 2, 2);
-              // Give secondary chart a contextual label
-              if (!secondary.chartLabel) {
-                secondary.chartLabel = "Market Context";
-              }
+              if (!secondary.chartLabel) secondary.chartLabel = "MARKET CONTEXT";
               chartCount++;
               chartData.push(secondary);
+            }
+          }
+
+          // Optional tertiary DXY chart: add when article explicitly references dollar strength/weakness
+          // Applies to energy, macro, trade, and policy stories that discuss USD
+          const dollarMentions = (synthesizedText.match(/\b(dollar|USD|DXY|greenback|dollar\s+index|currency)\b/gi) ?? []).length;
+          const topicSupportsDxy = ["energy", "trade_policy", "trade_policy_tariff", "inflation", "federal_reserve", "fed_macro"].includes(topicNorm);
+          if (dollarMentions >= 2 && topicSupportsDxy && chartCount < MAX_CHARTS_PER_RUN) {
+            const dxy = await buildChartData("dxy");
+            if (dxy) {
+              // Place DXY chart after the last secondary chart
+              const lastPos = chartData[chartData.length - 1]?.insertAfterParagraph ?? 2;
+              dxy.insertAfterParagraph = Math.min(lastPos + 2, 4);
+              if (!dxy.chartLabel) dxy.chartLabel = "CURRENCY";
+              chartCount++;
+              chartData.push(dxy);
             }
           }
         }

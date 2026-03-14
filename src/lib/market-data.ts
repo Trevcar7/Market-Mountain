@@ -1222,6 +1222,15 @@ export async function fetchChartSeriesForTopic(
       return { ...series, title: "S&P 500 Index", unit: "Points", source: "FRED — St. Louis Fed", timeRange: "Last 12 months", type: "line" };
     }
 
+    case "currency":
+    case "dxy": {
+      // Nominal Broad U.S. Dollar Index (FRED: DTWEXBGS) — closest public proxy to DXY
+      // Using 3-month window for currency stories (FX moves faster than rates/macro)
+      const series = await fetchFredChartSeries("DTWEXBGS", 3);
+      if (!series) return null;
+      return { ...series, title: "U.S. Dollar Index (3-Month)", unit: "Index", source: "FRED — St. Louis Fed", timeRange: "Last 3 months", type: "line" };
+    }
+
     default:
       return null;
   }
@@ -1232,16 +1241,18 @@ export async function fetchChartSeriesForTopic(
 // ---------------------------------------------------------------------------
 
 const CHART_METADATA: Record<string, { chartLabel: string; insertAfterParagraph: number }> = {
-  energy:          { chartLabel: "Energy Markets",  insertAfterParagraph: 0 },
-  trade_policy:    { chartLabel: "Energy Markets",  insertAfterParagraph: 0 },
-  federal_reserve: { chartLabel: "Monetary Policy", insertAfterParagraph: 1 },
-  fed_macro:       { chartLabel: "Monetary Policy", insertAfterParagraph: 1 },
-  bond_market:     { chartLabel: "Rates",            insertAfterParagraph: 1 },
-  inflation:       { chartLabel: "Inflation",        insertAfterParagraph: 1 },
-  employment:      { chartLabel: "Labor Market",     insertAfterParagraph: 1 },
-  gdp:             { chartLabel: "Growth",           insertAfterParagraph: 1 },
-  broad_market:    { chartLabel: "Market Context",   insertAfterParagraph: 1 },
-  markets:         { chartLabel: "Market Context",   insertAfterParagraph: 1 },
+  energy:          { chartLabel: "ENERGY MARKETS",  insertAfterParagraph: 0 },
+  trade_policy:    { chartLabel: "ENERGY MARKETS",  insertAfterParagraph: 0 },
+  federal_reserve: { chartLabel: "MONETARY POLICY", insertAfterParagraph: 1 },
+  fed_macro:       { chartLabel: "MONETARY POLICY", insertAfterParagraph: 1 },
+  bond_market:     { chartLabel: "RATES",            insertAfterParagraph: 1 },
+  inflation:       { chartLabel: "INFLATION",        insertAfterParagraph: 1 },
+  employment:      { chartLabel: "LABOR MARKET",     insertAfterParagraph: 1 },
+  gdp:             { chartLabel: "GROWTH",           insertAfterParagraph: 1 },
+  broad_market:    { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
+  markets:         { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
+  currency:        { chartLabel: "CURRENCY",         insertAfterParagraph: 2 },
+  dxy:             { chartLabel: "CURRENCY",         insertAfterParagraph: 2 },
 };
 
 /**
