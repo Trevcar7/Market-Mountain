@@ -731,6 +731,14 @@ Every chart must pass this internal consistency check before inclusion:
 
 6. GEOPOLITICAL CAUSAL LANGUAGE IN CAPTIONS — Apply Step 16f here too. Prefer "amid escalating tensions" over "on Iran tanker attacks."
 
+7. TEXT/CHART CONSISTENCY — The article body, headline, and key takeaways must agree with the chart endpoint value. This is mandatory:
+   - If the chart endpoint shows $98.7, do NOT write "crossed $100" in the text. Write "surged toward $100" or "approached $100."
+   - If the chart endpoint shows 4.28%, do NOT write "yields surged to 4.71%" in the text.
+   - If the chart shows the dollar at 100.5, do NOT write "dollar index above 107" in the text.
+   - The chart is the authoritative data source. The prose must match it, not override it.
+   - Headlines must also agree: "Pushes Oil Toward $100" not "Pushes Oil Above $100" if the chart endpoint is below $100.
+   - When in doubt, hedge with language like "toward", "near", "approaching", "surged to" rather than claiming a specific level the data does not confirm.
+
 TAG STANDARD (Step 18b)
 Article tags must come exclusively from this controlled taxonomy:
 ENERGY · MACRO · RATES · EQUITIES · USD · GEOPOLITICS · COMMODITIES · TECH · FINANCIALS · AI · CRYPTO
