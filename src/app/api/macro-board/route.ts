@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { MacroBoardData, MacroIndicator } from "@/lib/news-types";
+import { MacroBoardData, MacroIndicator, RegimeDimensions } from "@/lib/news-types";
 import {
   fetchFredSeries,
   fetchWtiCrudePrice,
@@ -289,10 +289,64 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
 
   if (regimeTags.length === 0) regimeTags.push("Monitoring Mode");
 
+  // ---------------------------------------------------------------------------
+  // Regime dimensions — structured 4-axis snapshot derived from indicator data
+  // ---------------------------------------------------------------------------
+  const regimeDimensions: RegimeDimensions = {
+    inflation: "—",
+    policy:    "—",
+    growth:    "—",
+    liquidity: "—",
+  };
+
+  // Inflation dimension
+  if (inflationIndicator) {
+    const cpi = parseFloat(inflationIndicator.value);
+    if (cpi > 3.5)                                            regimeDimensions.inflation = "Persistent";
+    else if (cpi > 2.5 && inflationIndicator.direction !== "down") regimeDimensions.inflation = "Above Target";
+    else if (cpi >= 2.0 && inflationIndicator.direction === "down") regimeDimensions.inflation = "Disinflating";
+    else                                                       regimeDimensions.inflation = "Near Target";
+  }
+
+  // Policy dimension
+  if (fedRate) {
+    const rate = parseFloat(fedRate.value);
+    if (fedRate.direction === "down")      regimeDimensions.policy = "Easing";
+    else if (fedRate.direction === "up")   regimeDimensions.policy = "Tightening";
+    else if (rate > 4.0)                   regimeDimensions.policy = "Restrictive";
+    else if (rate < 2.5)                   regimeDimensions.policy = "Accommodative";
+    else                                   regimeDimensions.policy = "Neutral";
+  }
+
+  // Growth dimension — derived from payrolls + unemployment
+  const payrollsInd  = indicators.find((i) => i.label === "Nonfarm Payrolls");
+  const unemployInd  = indicators.find((i) => i.label === "Unemployment");
+  if (payrollsInd || unemployInd) {
+    const payrollsNum = payrollsInd
+      ? parseFloat(payrollsInd.value.replace(/[+K,]/g, ""))
+      : 200;
+    const unemployNum = unemployInd ? parseFloat(unemployInd.value) : 4.0;
+    if (payrollsNum > 150 && unemployNum < 4.5)   regimeDimensions.growth = "Solid";
+    else if (payrollsNum > 50 || unemployNum < 5.5) regimeDimensions.growth = "Moderating";
+    else                                            regimeDimensions.growth = "Slowing";
+  }
+
+  // Liquidity dimension — yield curve spread + Fed direction
+  if (yieldCurve) {
+    const spread = parseFloat(yieldCurve.value.replace(/[+%]/g, ""));
+    const isFedEasing = fedRate?.direction === "down";
+    if (isFedEasing)            regimeDimensions.liquidity = "Easing";
+    else if (spread < -0.25)    regimeDimensions.liquidity = "Tightening";
+    else if (spread < 0)        regimeDimensions.liquidity = "Tight";
+    else if (spread > 0.5)      regimeDimensions.liquidity = "Accommodative";
+    else                        regimeDimensions.liquidity = "Neutral";
+  }
+
   return {
     indicators,
     regime: regimeTags.join(", "),
     regimeTags,
+    regimeDimensions,
     generatedAt: now.toISOString(),
     validUntil: validUntil.toISOString(),
   };

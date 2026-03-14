@@ -27,6 +27,32 @@ export interface ChartDataset {
   referenceLabel?: string; // Label for reference line (e.g., "Fed 2% Target")
 }
 
+// ---------------------------------------------------------------------------
+// Market Impact — per-article asset impact display
+// ---------------------------------------------------------------------------
+
+export interface MarketImpactItem {
+  asset: string;      // e.g., "OIL", "S&P 500", "10Y Yield", "BTC"
+  change: string;     // e.g., "+4.1%", "-1.2%", "+8bps"
+  direction: "up" | "down" | "flat";
+}
+
+// ---------------------------------------------------------------------------
+// News Event — event-first architecture grouping related articles
+// ---------------------------------------------------------------------------
+
+export interface NewsEvent {
+  id: string;                        // Canonical event ID (e.g. "fed-rate-decision-mar-2026")
+  topicKey: string;                  // Matches NewsItem.topicKey (e.g. "federal_reserve")
+  title: string;                     // Human-readable event name
+  status: "active" | "cooling" | "closed"; // active=breaking, cooling=24-48h old, closed=resolved
+  startedAt: string;                 // ISO 8601 — when event first published
+  lastActivityAt: string;            // ISO 8601 — most recent update
+  leadArticleId: string;             // ID of the canonical lead article
+  relatedAssets: string[];           // e.g., ["SPY", "TLT", "USD"]
+  updateCount: number;               // Number of articles covering this event
+}
+
 export interface NewsItem {
   id: string; // UUID or hash of story
   title: string;
@@ -52,6 +78,11 @@ export interface NewsItem {
   chartData?: ChartDataset;        // Optional chart for data-driven stories
   keyTakeaways?: string[];         // 3-bullet editorial summary (displayed below headline)
   confidenceScore?: number;        // 0–1 editorial confidence gate (≥ 0.70 required to publish)
+
+  // Event-first architecture
+  eventId?: string;                // Links article to a NewsEvent (optional)
+  marketImpact?: MarketImpactItem[]; // Asset-level impact strip (e.g., OIL +4.1%, S&P -1.2%)
+  wordCount?: number;              // Approximate word count of story body
 }
 
 export interface NewsCollection {
@@ -226,10 +257,36 @@ export interface MacroIndicator {
   updatedAt: string;     // ISO 8601
 }
 
+export interface RegimeDimensions {
+  inflation: string;   // "Above Target" | "Persistent" | "Near Target" | "Disinflating"
+  policy: string;      // "Restrictive" | "Accommodative" | "Easing" | "Tightening" | "Neutral"
+  growth: string;      // "Solid" | "Moderating" | "Slowing"
+  liquidity: string;   // "Tightening" | "Tight" | "Neutral" | "Easing" | "Accommodative"
+}
+
 export interface MacroBoardData {
   indicators: MacroIndicator[];
-  regime: string;        // e.g., "Policy Restrictive, Disinflation Trend"
-  regimeTags: string[];  // e.g., ["Policy Restrictive", "Disinflation Trend"]
+  regime: string;                     // e.g., "Policy Restrictive, Disinflation Trend"
+  regimeTags: string[];               // e.g., ["Policy Restrictive", "Disinflation Trend"]
+  regimeDimensions?: RegimeDimensions; // structured 4-axis regime snapshot
+  generatedAt: string;                // ISO 8601
+  validUntil: string;                 // ISO 8601 — 15min TTL
+}
+
+// ---------------------------------------------------------------------------
+// Market Snapshot Strip — live price data for homepage strip
+// ---------------------------------------------------------------------------
+
+export interface MarketSnapshotItem {
+  label: string;         // e.g., "S&P 500", "BTC", "10Y Yield"
+  value: string;         // e.g., "5,234", "67,800", "4.28%"
+  change: string;        // e.g., "+1.2%", "-0.4%", "+6bps"
+  direction: "up" | "down" | "flat";
+  source: string;        // e.g., "FMP", "FRED", "EIA"
+}
+
+export interface MarketSnapshotData {
+  items: MarketSnapshotItem[];
   generatedAt: string;   // ISO 8601
-  validUntil: string;    // ISO 8601 — 15min TTL
+  validUntil: string;    // ISO 8601 — 60s TTL for strip
 }

@@ -5,6 +5,8 @@ import Link from "next/link";
 import NewsSection from "@/components/NewsSection";
 import MacroBoard from "@/components/MacroBoard";
 import SignalBar from "@/components/SignalBar";
+import MarketStrip from "@/components/MarketStrip";
+import WhatsMoving from "@/components/WhatsMoving";
 
 export default function HomePage() {
   const articles = getAllArticles();
@@ -40,8 +42,14 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Market Snapshot Strip — live price ticker (S&P, 10Y, Oil, BTC, VIX, DXY) */}
+      <MarketStrip />
+
       {/* Macro Board — live indicators + regime classification */}
       <MacroBoard />
+
+      {/* What's Moving Markets — top 3 AI-derived signal drivers (connects to MacroBoard) */}
+      <WhatsMoving />
 
       {/* Market Signal Bar — directional signals */}
       <SignalBar />
