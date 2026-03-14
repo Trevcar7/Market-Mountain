@@ -229,7 +229,9 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
 
 interface TwelveDataQuote {
   close?:          string;
-  percent_change?: string;
+  previous_close?: string;       // absolute previous close — used for pct fallback
+  change?:         string;       // absolute change from previous close
+  percent_change?: string | null; // may be null for some commodity/forex symbols
   code?:           number;
   message?:        string;
 }
@@ -260,7 +262,15 @@ async function fetchTwelveDataSingle(
     const price = parseFloat(raw.close);
     if (isNaN(price)) return null;
 
-    const pct = parseFloat(raw.percent_change ?? "0");
+    // Prefer API's percent_change; fall back to change/previous_close if null/NaN
+    // (TwelveData returns percent_change: null for some commodity/forex quotes)
+    let pct = raw.percent_change != null ? parseFloat(raw.percent_change) : NaN;
+    if (isNaN(pct)) {
+      const chg  = raw.change         != null ? parseFloat(raw.change)         : NaN;
+      const prev = raw.previous_close != null ? parseFloat(raw.previous_close) : NaN;
+      pct = (!isNaN(chg) && !isNaN(prev) && prev > 0) ? (chg / prev) * 100 : 0;
+    }
+
     return {
       label,
       value:     formatValue(price),
