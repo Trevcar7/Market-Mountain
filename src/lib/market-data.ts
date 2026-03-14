@@ -1224,11 +1224,21 @@ export async function fetchChartSeriesForTopic(
 
     case "currency":
     case "dxy": {
-      // Nominal Broad U.S. Dollar Index (FRED: DTWEXBGS) — closest public proxy to DXY
+      // FRED DTWEXBGS = Nominal Broad U.S. Dollar Index (trade-weighted, Jan 2006 = 100)
+      // NOTE: This is NOT the ICE DXY (6-currency basket, ~97-110 range).
+      // DTWEXBGS trades at a different level (~115-130). Label and source must reflect this.
+      // Do NOT use "DXY" or ICE DXY language for this chart.
       // Using 3-month window for currency stories (FX moves faster than rates/macro)
       const series = await fetchFredChartSeries("DTWEXBGS", 3);
       if (!series) return null;
-      return { ...series, title: "U.S. Dollar Index (3-Month)", unit: "Index", source: "FRED — St. Louis Fed", timeRange: "Last 3 months", type: "line" };
+      return {
+        ...series,
+        title: "Nominal Broad U.S. Dollar Index (3-Month)",
+        unit: "Index (Jan 2006=100)",
+        source: "FRED — DTWEXBGS (Nominal Broad Dollar Index)",
+        timeRange: "Last 3 months",
+        type: "line",
+      };
     }
 
     default:
@@ -1251,8 +1261,8 @@ const CHART_METADATA: Record<string, { chartLabel: string; insertAfterParagraph:
   gdp:             { chartLabel: "GROWTH",           insertAfterParagraph: 1 },
   broad_market:    { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
   markets:         { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
-  currency:        { chartLabel: "CURRENCY",         insertAfterParagraph: 2 },
-  dxy:             { chartLabel: "CURRENCY",         insertAfterParagraph: 2 },
+  currency:        { chartLabel: "DOLLAR INDEX",     insertAfterParagraph: 2 },
+  dxy:             { chartLabel: "DOLLAR INDEX",     insertAfterParagraph: 2 },
 };
 
 /**

@@ -707,6 +707,30 @@ When a chart is present in the article, ensure the narrative paragraph preceding
 
 Caption tone: Bloomberg Markets style. Concise, analytical, no filler. Each caption should state (1) what the chart shows, (2) why the current level matters, (3) the macro implication for investors. Maximum 2 sentences.
 
+CHART DATA INTEGRITY (Step 18c)
+Every chart must pass this internal consistency check before inclusion:
+
+1. SERIES IDENTITY — Title, source, caption, and plotted values must all refer to the exact same instrument.
+   - BAD: Title = "U.S. Dollar Index (DXY)", Source = "FRED DTWEXBGS", Values = 120–127
+   - GOOD: Title = "Nominal Broad U.S. Dollar Index", Source = "FRED — DTWEXBGS", Values = 115–130
+   - GOOD: Title = "U.S. Dollar Index (DXY)", Source = "ICE / Bloomberg", Values = 95–115
+
+2. DXY vs FRED BROAD DOLLAR — These are two distinct instruments. Never mix them:
+   - ICE DXY (6-currency basket): Typical level 95–115. Cite as: "ICE / Bloomberg — DXY"
+   - FRED DTWEXBGS (Nominal Broad Index): Typical level 115–135. Cite as: "FRED — DTWEXBGS"
+   - Do not use "DXY" in a caption or title if the data source is DTWEXBGS, and vice versa.
+
+3. SPOT vs MONTHLY AVERAGE — If the endpoint is a current spot price and the historical series is monthly averages, the caption must note this. Example: "Latest: $98.70 spot (Mar 13, 2026); historical bars = monthly average."
+
+4. ENDPOINT ACCURACY — The final data point should reflect actual recent market data, not an invented or forward-projected value. If the endpoint is narrative (e.g., an anticipated move), the caption must say "projected" or "as of [date]."
+
+5. SOURCE FORMAT:
+   - FRED series: "FRED — [Series Name] ([Ticker])" e.g., "FRED — GS10 (Monthly Average)" or "EIA — WTI Cushing Spot (MCOILWTICO)"
+   - ICE DXY: "ICE / Bloomberg — U.S. Dollar Index (DXY)"
+   - EIA oil: "EIA — WTI Cushing Spot Price (MCOILWTICO)"
+
+6. GEOPOLITICAL CAUSAL LANGUAGE IN CAPTIONS — Apply Step 16f here too. Prefer "amid escalating tensions" over "on Iran tanker attacks."
+
 TAG STANDARD (Step 18b)
 Article tags must come exclusively from this controlled taxonomy:
 ENERGY · MACRO · RATES · EQUITIES · USD · GEOPOLITICS · COMMODITIES · TECH · FINANCIALS · AI · CRYPTO
