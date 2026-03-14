@@ -186,7 +186,7 @@ function buildSignalTags(
     const v = parseFloat(vixSnap.value);
     if (!isNaN(v)) {
       if (v >= 35)
-        candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 88 });
+        candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 88 });
       else if (v >= 25)
         candidates.push({ label: `Market Volatility Elevated (VIX ${vixSnap.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 60 });
       else if (v <= 12)
@@ -200,7 +200,7 @@ function buildSignalTags(
     const v = parseFloat(fedRate.value);
     if (!isNaN(v)) {
       if (v > 5.0)
-        candidates.push({ label: `Rates Restrictive (Fed Funds ${fedRate.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",            priority: 72 });
+        candidates.push({ label: `Rates Restrictive (Fed Funds ${fedRate.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 72 });
       else if (v > 4.0)
         candidates.push({ label: `Rates Elevated (Fed Funds ${fedRate.value})`,    colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 50 });
       else if (v < 1.0)
@@ -214,7 +214,7 @@ function buildSignalTags(
     const v = parseFloat(tenYear.value);
     if (!isNaN(v)) {
       if (v >= 5.0)
-        candidates.push({ label: `Rates Pressure Building (10Y ${tenYear.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",       priority: 80 });
+        candidates.push({ label: `Rates Pressure Building (10Y ${tenYear.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 80 });
       else if (v >= 4.5)
         candidates.push({ label: `Rates Pressure Building (10Y ${tenYear.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 55 });
     }
@@ -230,7 +230,7 @@ function buildSignalTags(
       else if (v < 0)
         candidates.push({ label: `Yield Curve Inverted (${yc.value})`,   colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25",      priority: 58 });
       else if (v > 1.0)
-        candidates.push({ label: `Yield Curve Steepening (${yc.value})`, colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25", priority: 30 });
+        candidates.push({ label: `Yield Curve Steepening (${yc.value})`, colorClass: "bg-slate-500/15 text-slate-300 border-slate-500/25",     priority: 30 });
     }
   }
 
@@ -240,7 +240,7 @@ function buildSignalTags(
     const v = parseFloat(wtiSnap.value.replace(/[$,]/g, ""));
     if (!isNaN(v)) {
       if (v >= 100)
-        candidates.push({ label: `Energy Prices Elevated (Oil $${Math.round(v)})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25",       priority: 78 });
+        candidates.push({ label: `Energy Prices Elevated (Oil $${Math.round(v)})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 78 });
       else if (v >= 85)
         candidates.push({ label: `Energy Prices Elevated (Oil $${Math.round(v)})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 45 });
     }
@@ -251,7 +251,7 @@ function buildSignalTags(
   if (dxySnap) {
     const v = parseFloat(dxySnap.value);
     if (!isNaN(v) && v >= 120)
-      candidates.push({ label: `Dollar Strength Rising (DXY ${v.toFixed(1)})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25", priority: 40 });
+      candidates.push({ label: `Dollar Strength Rising (DXY ${v.toFixed(1)})`, colorClass: "bg-slate-500/15 text-slate-300 border-slate-500/25", priority: 40 });
   }
 
   // Return top 5 by priority
