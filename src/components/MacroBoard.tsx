@@ -88,9 +88,9 @@ function buildSignalTags(indicators: MacroIndicator[]): SignalTag[] {
   if (fedRate) {
     const rate = parseFloat(fedRate.value);
     if (rate > 4.0) {
-      tags.push({ label: `Rates Elevated · ${fedRate.value}`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25" });
+      tags.push({ label: `Rates Elevated (${fedRate.value})`, colorClass: "bg-red-500/15 text-red-300 border-red-500/25" });
     } else if (rate < 1.5) {
-      tags.push({ label: `Rates Near Zero · ${fedRate.value}`, colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" });
+      tags.push({ label: `Rates Near Zero (${fedRate.value})`, colorClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" });
     }
   }
 
@@ -100,7 +100,7 @@ function buildSignalTags(indicators: MacroIndicator[]): SignalTag[] {
     const val = parseFloat(inflationInd.value);
     if (val > 2.5) {
       const label = coreCpi ? "Core CPI" : "CPI";
-      tags.push({ label: `Inflation Above Target · ${label} ${inflationInd.value}`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25" });
+      tags.push({ label: `Inflation Above Target (${label} ${inflationInd.value})`, colorClass: "bg-amber-500/15 text-amber-300 border-amber-500/25" });
     }
   }
 
@@ -230,7 +230,7 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
           {item.displayLabel}
         </p>
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className={`text-[16px] font-bold leading-none tabular-nums ${valueColor}`}>
+          <span className={`text-[18px] font-bold leading-none tabular-nums ${valueColor}`}>
             {item.value}
           </span>
           {item.change && (
@@ -240,7 +240,7 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
             </span>
           )}
         </div>
-        <p className="text-[9px] text-white/20 mt-1.5">Source: {item.source}</p>
+        <p className="text-[9px] text-white/15 mt-1.5">{item.source}</p>
       </div>
     </div>
   );
@@ -315,6 +315,8 @@ export default function MacroBoard() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Initial load — macro indicators (15-min Redis TTL) + snapshot (60s TTL)
     Promise.all([
       fetch("/api/macro-board").then((r) => r.json()).catch(() => null),
       fetch("/api/market-snapshot").then((r) => r.json()).catch(() => null),
@@ -324,7 +326,19 @@ export default function MacroBoard() {
       setSnapshotData(snap as MarketSnapshotData | null);
       setLoading(false);
     });
-    return () => { cancelled = true; };
+
+    // Refresh market prices every 60s on weekdays (Mon–Fri)
+    // Macro indicators (FRED/BLS) don't need frequent refresh — use Redis TTL
+    const interval = setInterval(() => {
+      const day = new Date().getDay(); // 0 = Sun, 6 = Sat
+      if (day < 1 || day > 5) return;
+      fetch("/api/market-snapshot")
+        .then((r) => r.json())
+        .then((snap) => { if (!cancelled) setSnapshotData(snap as MarketSnapshotData); })
+        .catch(() => {});
+    }, 60_000);
+
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   // ── Build MARKET PRICES ──────────────────────────────────────────────────────
