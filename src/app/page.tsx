@@ -18,28 +18,36 @@ export default function HomePage() {
     <>
       {/* Hero */}
       <section className="bg-navy-900 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 flex flex-col items-center text-center">
-          <div className="mb-8">
-            <Logo variant="light" size="lg" />
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20 flex flex-col items-center text-center">
+          <div className="mb-5">
+            <Logo variant="light" size="xl" />
           </div>
-          <p className="text-white/60 text-base sm:text-lg max-w-xl leading-relaxed">
-            Independent equity research, macroeconomic analysis, and disciplined
-            investment frameworks.
+          <p className="text-white/55 text-base sm:text-lg max-w-lg leading-relaxed">
+            Market news, equity research, and macro commentary — independent and disciplined.
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+          <div className="mt-7 flex flex-col sm:flex-row gap-3">
             <Link
               href="/articles"
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-accent-500 hover:bg-accent-400 text-navy-950 font-semibold text-sm transition-colors"
             >
-              Browse All Articles
+              Latest Analysis
             </Link>
             <Link
-              href="/about"
+              href="/news"
               className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-white/20 hover:bg-white/10 text-white font-medium text-sm transition-colors"
             >
-              About the Author
+              Latest News
             </Link>
           </div>
+          <Link
+            href="/briefing"
+            className="mt-4 inline-flex items-center gap-1 text-[11px] font-medium text-white/35 hover:text-white/60 tracking-wide transition-colors"
+          >
+            Morning Brief
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+              <path d="M2 5h6M5 2l3 3-3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </Link>
         </div>
       </section>
 

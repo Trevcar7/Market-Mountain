@@ -2,7 +2,7 @@ import Link from "next/link";
 
 interface LogoProps {
   variant?: "light" | "dark";
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   showText?: boolean;
 }
 
@@ -15,6 +15,7 @@ export default function Logo({
     sm: { icon: 28, text: "text-lg" },
     md: { icon: 36, text: "text-xl" },
     lg: { icon: 52, text: "text-3xl" },
+    xl: { icon: 68, text: "text-4xl" },
   };
 
   const { icon, text } = sizes[size];
