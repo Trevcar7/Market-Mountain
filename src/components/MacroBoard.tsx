@@ -15,25 +15,39 @@ const DISPLAY_LABEL: Record<string, string> = {
   BTC:             "Bitcoin",
 };
 
-// Labels fetched from snapshot that belong in MARKET PRICES
+// Snapshot items that belong in MARKET PRICES
 const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "DXY", "BTC"]);
 
-// Labels from macro-board that belong in each section
+// Macro-board labels per section
 const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", "Yield Curve"]);
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);
 
 // Preferred display order for MARKET PRICES
 const MKT_ORDER = ["S&P 500", "VIX", "WTI Oil", "Dollar Index", "Bitcoin"];
 
-// Labels where direction UP = bullish / green
+// Labels where UP = bullish (green)
 const POSITIVE_UP = new Set(["S&P 500", "Nonfarm Payrolls", "Bitcoin"]);
 
-// Labels where direction UP = bearish / red
+// Labels where UP = bearish (red)
 const NEGATIVE_UP = new Set([
   "Fed Funds Rate", "10Y Treasury", "10-Year Yield",
   "2Y Treasury", "2-Year Yield",
   "VIX", "CPI (YoY)", "Core CPI (YoY)",
 ]);
+
+// Static border class maps — written out in full so Tailwind includes them
+const SECTION_BORDER: Record<1 | 2 | 3, string> = {
+  1: "border-b border-white/[0.07] last:border-b-0",
+  2: "border-b sm:border-b-0 sm:border-r sm:last:border-r-0 border-white/[0.07]",
+  3: "border-b lg:border-b-0 lg:border-r lg:last:border-r-0 border-white/[0.07]",
+};
+
+const GRID_CLASS: Record<0 | 1 | 2 | 3, string> = {
+  0: "grid-cols-1",
+  1: "grid-cols-1",
+  2: "grid-cols-1 sm:grid-cols-2",
+  3: "grid-cols-1 lg:grid-cols-3",
+};
 
 interface DisplayItem {
   label:        string;
@@ -44,7 +58,7 @@ interface DisplayItem {
   source:       string;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Color helpers ────────────────────────────────────────────────────────────
 
 function getChangeColor(label: string, displayLabel: string, direction: "up" | "down" | "flat"): string {
   if (direction === "flat") return "text-white/35";
@@ -54,10 +68,8 @@ function getChangeColor(label: string, displayLabel: string, direction: "up" | "
     return direction === "up" ? "text-emerald-400" : "text-red-400";
   if (NEGATIVE_UP.has(label) || NEGATIVE_UP.has(displayLabel))
     return direction === "up" ? "text-red-400" : "text-emerald-400";
-  // WTI Oil — up = inflationary pressure (amber warning)
   if (label.includes("Oil") || label.includes("WTI"))
     return direction === "up" ? "text-amber-400" : "text-emerald-400";
-  // DXY — neutral green/red
   return direction === "up" ? "text-emerald-400" : "text-red-400";
 }
 
@@ -189,33 +201,31 @@ function SectionIcon({ type }: { type: "market" | "rates" | "econ" }) {
 
 function IndicatorCard({ item }: { item: DisplayItem }) {
   const changeColor = getChangeColor(item.label, item.displayLabel, item.direction);
+  // Yield Curve bps format: "-22 bps" starts with "-" so isInverted still works
   const isInverted  = item.label === "Yield Curve" && item.value.startsWith("-");
   const valueColor  = isInverted ? "text-red-400" : "text-white";
 
   return (
     <div className="flex items-start gap-2.5 py-3 sm:py-3.5 border-b border-white/[0.06] last:border-0">
-      {/* Icon */}
       <div className="mt-[4px]">
         <IndicatorIcon label={item.displayLabel} />
       </div>
-
-      {/* Data */}
       <div className="min-w-0 flex-1">
         <p className="text-[9px] font-semibold tracking-[0.12em] uppercase text-white/35 mb-1 truncate">
           {item.displayLabel}
         </p>
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className={`text-[15px] font-bold leading-none tabular-nums ${valueColor}`}>
+          <span className={`text-[16px] font-bold leading-none tabular-nums ${valueColor}`}>
             {item.value}
           </span>
           {item.change && (
-            <span className={`text-[10px] font-semibold flex items-center gap-0.5 tabular-nums leading-none ${changeColor}`}>
+            <span className={`text-[11px] font-semibold flex items-center gap-0.5 tabular-nums leading-none ${changeColor}`}>
               <ArrowIcon direction={item.direction} />
               {item.change}
             </span>
           )}
         </div>
-        <p className="text-[9px] text-white/20 mt-1.5 tabular-nums">Source: {item.source}</p>
+        <p className="text-[9px] text-white/20 mt-1.5">Source: {item.source}</p>
       </div>
     </div>
   );
@@ -236,30 +246,26 @@ function IndicatorSkeleton() {
 // ─── Section column ───────────────────────────────────────────────────────────
 
 interface SectionProps {
-  title: string;
-  type: "market" | "rates" | "econ";
-  items: DisplayItem[];
-  loading: boolean;
+  title:         string;
+  type:          "market" | "rates" | "econ";
+  items:         DisplayItem[];
+  loading:       boolean;
   skeletonCount?: number;
+  borderClass:   string;
 }
 
-function Section({ title, type, items, loading, skeletonCount = 4 }: SectionProps) {
+function Section({ title, type, items, loading, skeletonCount = 4, borderClass }: SectionProps) {
   return (
-    <div className="border-b lg:border-b-0 lg:border-r border-white/[0.07] last:border-0">
-      {/* Section header */}
+    <div className={borderClass}>
       <div className="flex items-center gap-2 px-5 sm:px-6 lg:px-5 xl:px-6 pt-4 pb-1">
         <SectionIcon type={type} />
         <p className="text-[9px] font-bold tracking-[0.16em] uppercase text-white/40">
           {title}
         </p>
       </div>
-
-      {/* Indicators */}
       <div className="px-5 sm:px-6 lg:px-5 xl:px-6 pb-5">
         {loading
           ? Array.from({ length: skeletonCount }).map((_, i) => <IndicatorSkeleton key={i} />)
-          : items.length === 0
-          ? <p className="text-white/20 text-xs py-4">Data unavailable</p>
           : items.map((item) => <IndicatorCard key={item.label} item={item} />)
         }
       </div>
@@ -267,39 +273,39 @@ function Section({ title, type, items, loading, skeletonCount = 4 }: SectionProp
   );
 }
 
-// ─── Regime panel ─────────────────────────────────────────────────────────────
+// ─── Regime panel — always shows all 4 dimensions ────────────────────────────
 
 function dimensionColor(dim: string, value: string): string {
   const v = value.toLowerCase();
   if (dim === "inflation") {
-    if (v.includes("persistent"))               return "bg-red-500/20 text-red-300 border-red-500/20";
-    if (v.includes("above"))                    return "bg-amber-500/20 text-amber-300 border-amber-500/20";
-    if (v.includes("disinflat") || v.includes("near")) return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
+    if (v.includes("persistent"))                        return "bg-red-500/20 text-red-300 border-red-500/20";
+    if (v.includes("above"))                             return "bg-amber-500/20 text-amber-300 border-amber-500/20";
+    if (v.includes("disinflat") || v.includes("near"))  return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
   }
   if (dim === "policy") {
     if (v.includes("restrict") || v.includes("tighten")) return "bg-red-500/20 text-red-300 border-red-500/20";
     if (v.includes("easing") || v.includes("accommod")) return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
-    if (v.includes("neutral"))                  return "bg-white/10 text-white/45 border-white/10";
+    if (v.includes("neutral"))                           return "bg-white/10 text-white/45 border-white/10";
   }
   if (dim === "growth") {
-    if (v.includes("solid"))                    return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
-    if (v.includes("moderat"))                  return "bg-amber-500/20 text-amber-300 border-amber-500/20";
-    if (v.includes("slow"))                     return "bg-red-500/20 text-red-300 border-red-500/20";
+    if (v.includes("solid"))                             return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
+    if (v.includes("moderat"))                           return "bg-amber-500/20 text-amber-300 border-amber-500/20";
+    if (v.includes("slow"))                              return "bg-red-500/20 text-red-300 border-red-500/20";
   }
   if (dim === "liquidity") {
-    if (v.includes("tighten") || v === "tight") return "bg-red-500/20 text-red-300 border-red-500/20";
-    if (v.includes("neutral"))                  return "bg-amber-500/20 text-amber-300 border-amber-500/20";
+    if (v.includes("tighten") || v === "tight")          return "bg-red-500/20 text-red-300 border-red-500/20";
+    if (v.includes("neutral"))                           return "bg-amber-500/20 text-amber-300 border-amber-500/20";
     if (v.includes("easing") || v.includes("accommod")) return "bg-emerald-500/20 text-emerald-300 border-emerald-500/20";
   }
   return "bg-white/10 text-white/40 border-white/10";
 }
 
 const REGIME_ENTRIES = [
-  { key: "inflation", label: "Inflation" },
-  { key: "policy",    label: "Policy" },
-  { key: "growth",    label: "Growth" },
-  { key: "liquidity", label: "Liquidity" },
-] as const;
+  { key: "inflation" as const, label: "Inflation" },
+  { key: "policy"    as const, label: "Policy" },
+  { key: "growth"    as const, label: "Growth" },
+  { key: "liquidity" as const, label: "Liquidity" },
+];
 
 function RegimePanel({ dimensions }: { dimensions: RegimeDimensions }) {
   return (
@@ -310,15 +316,18 @@ function RegimePanel({ dimensions }: { dimensions: RegimeDimensions }) {
       <div className="flex flex-wrap gap-2">
         {REGIME_ENTRIES.map(({ key, label }) => {
           const value = dimensions[key];
-          if (!value || value === "—") return null;
-          const colorClass = dimensionColor(key, value);
+          const hasData = Boolean(value) && value !== "—";
+          // Always render all 4 slots; missing ones are very subtle
+          const colorClass = hasData
+            ? dimensionColor(key, value)
+            : "bg-white/[0.04] text-white/20 border-white/[0.06]";
           return (
             <div
               key={key}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium ${colorClass}`}
             >
               <span className="opacity-60 font-normal">{label}:</span>
-              <span className="font-semibold">{value}</span>
+              <span className="font-semibold">{hasData ? value : "—"}</span>
             </div>
           );
         })}
@@ -330,10 +339,10 @@ function RegimePanel({ dimensions }: { dimensions: RegimeDimensions }) {
 function RegimeSkeleton() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 pt-5 pb-4 animate-pulse">
-      <div className="h-2 bg-white/10 rounded w-28 mb-3" />
+      <div className="h-2 bg-white/10 rounded w-32 mb-3" />
       <div className="flex gap-2">
-        {[80, 72, 60, 76].map((w, i) => (
-          <div key={i} className="h-7 bg-white/8 rounded-lg border border-white/10" style={{ width: w }} />
+        {[96, 88, 72, 88].map((w, i) => (
+          <div key={i} className="h-7 bg-white/[0.06] rounded-lg border border-white/[0.08]" style={{ width: w }} />
         ))}
       </div>
     </div>
@@ -361,7 +370,7 @@ export default function MacroBoard() {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Build MARKET PRICES (snapshot items + WTI from macro-board) ─────────────
+  // ── Build MARKET PRICES ──────────────────────────────────────────────────────
   const mktRaw: Record<string, DisplayItem> = {};
 
   if (snapshotData) {
@@ -379,6 +388,7 @@ export default function MacroBoard() {
     }
   }
 
+  // WTI Oil comes from macro-board (EIA)
   if (macroData) {
     const wti = macroData.indicators.find((i) => i.label === "WTI Crude");
     if (wti) {
@@ -423,48 +433,49 @@ export default function MacroBoard() {
         }))
     : [];
 
-  // Don't render if data loaded but completely empty
-  if (!loading && marketPrices.length === 0 && rates.length === 0 && econData.length === 0) return null;
+  // ── Section visibility: show all skeletons while loading; hide empty after ───
+  const ALL_SECTIONS = [
+    { key: "market", title: "Market Prices", type: "market" as const, items: marketPrices, skeletonCount: 5 },
+    { key: "rates",  title: "Rates",         type: "rates"  as const, items: rates,        skeletonCount: 4 },
+    { key: "econ",   title: "Economic Data", type: "econ"   as const, items: econData,     skeletonCount: 4 },
+  ];
+
+  const visibleSections = loading
+    ? ALL_SECTIONS
+    : ALL_SECTIONS.filter((s) => s.items.length > 0);
+
+  // Don't render the board at all if data loaded with nothing to show
+  if (!loading && visibleSections.length === 0) return null;
+
+  const colCount = (loading ? 3 : visibleSections.length) as 1 | 2 | 3;
+  const gridClass = GRID_CLASS[colCount] ?? GRID_CLASS[3];
+  const borderClass = SECTION_BORDER[colCount] ?? SECTION_BORDER[3];
 
   // Resolve regime dimensions
-  const dims: RegimeDimensions | null = macroData?.regimeDimensions
-    ?? (macroData?.regimeTags?.length
-        ? parseDimensionsFromTags(macroData.regimeTags)
-        : null);
+  const dims: RegimeDimensions | null =
+    macroData?.regimeDimensions
+    ?? (macroData?.regimeTags?.length ? parseDimensionsFromTags(macroData.regimeTags) : null);
 
   return (
-    <div className="bg-navy-950 text-white border-t-2 border-white/[0.04]">
+    <div className="bg-navy-950 text-white border-t-2 border-white/[0.06]">
       <div className="mx-auto max-w-7xl">
 
-        {/* Regime panel */}
-        {loading
-          ? <RegimeSkeleton />
-          : dims && <RegimePanel dimensions={dims} />
-        }
+        {/* Regime panel — always rendered (skeleton while loading, all 4 dims after) */}
+        {loading ? <RegimeSkeleton /> : dims ? <RegimePanel dimensions={dims} /> : null}
 
-        {/* Three-section indicator grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 border-t border-white/[0.07]">
-          <Section
-            title="Market Prices"
-            type="market"
-            items={marketPrices}
-            loading={loading}
-            skeletonCount={5}
-          />
-          <Section
-            title="Rates"
-            type="rates"
-            items={rates}
-            loading={loading}
-            skeletonCount={4}
-          />
-          <Section
-            title="Economic Data"
-            type="econ"
-            items={econData}
-            loading={loading}
-            skeletonCount={4}
-          />
+        {/* Indicator grid — only populated sections */}
+        <div className={`grid ${gridClass} border-t border-white/[0.07]`}>
+          {(loading ? ALL_SECTIONS : visibleSections).map((section) => (
+            <Section
+              key={section.key}
+              title={section.title}
+              type={section.type}
+              items={section.items}
+              loading={loading}
+              skeletonCount={section.skeletonCount}
+              borderClass={borderClass}
+            />
+          ))}
         </div>
 
       </div>

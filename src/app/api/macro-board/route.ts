@@ -152,9 +152,10 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
     const prevTwo = twoYearData.length > 1 ? parseFloat(twoYearData[1].value) : two;
     const prevSpread = prevTen - prevTwo;
     const changeBps = Math.round((spread - prevSpread) * 100);
+    const spreadBps = Math.round(spread * 100);
     indicators.push({
       label: "Yield Curve",
-      value: `${spread >= 0 ? "+" : ""}${spread.toFixed(2)}%`,
+      value: `${spreadBps >= 0 ? "+" : ""}${spreadBps} bps`,  // e.g. "+22 bps" instead of "+0.22%"
       change: Math.abs(changeBps) > 0 ? `${changeBps > 0 ? "+" : ""}${changeBps}bps` : undefined,
       direction: spread > prevSpread + 0.01 ? "up" : spread < prevSpread - 0.01 ? "down" : "flat",
       source: "FRED",

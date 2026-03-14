@@ -82,7 +82,8 @@ export default function MarketStrip() {
   if (!data && !error) return null;
 
   // Silent failure — strip disappears rather than showing an error state
-  if (error || !data || data.items.length === 0) return null;
+  // Require at least 3 items to avoid a sparse single-item ticker
+  if (error || !data || data.items.length < 3) return null;
 
   return (
     <div
