@@ -33,20 +33,24 @@ function DirectionArrow({ direction }: { direction: "up" | "down" | "flat" }) {
   return <span aria-hidden="true">—</span>;
 }
 
+// Items where rising = bearish (rates, vol, oil, dollar) — same rule as MacroBoard
+const STRIP_NEGATIVE_UP = new Set(["10Y Yield", "VIX", "WTI Oil", "Broad U.S. Dollar Index"]);
+
 function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
   const isUp   = item.direction === "up";
   const isDown = item.direction === "down";
 
+  const negativeUp = STRIP_NEGATIVE_UP.has(item.label);
   const changeColor = isUp
-    ? "text-emerald-600"
+    ? (negativeUp ? "text-red-500"     : "text-emerald-600")
     : isDown
-    ? "text-red-500"
+    ? (negativeUp ? "text-emerald-600" : "text-red-500")
     : "text-slate-400";
 
   const displayLabel = STRIP_LABEL[item.label] ?? item.label;
 
   return (
-    <div className="flex items-center justify-center gap-0.5 px-3 sm:px-4 py-2 border-r border-border/60 last:border-r-0">
+    <div className="flex items-center justify-center gap-0.5 px-4 sm:px-6 py-2 border-r border-border/60 last:border-r-0">
       <span className="text-[11px] font-semibold tracking-wide text-text-muted uppercase whitespace-nowrap">
         {displayLabel}
       </span>
