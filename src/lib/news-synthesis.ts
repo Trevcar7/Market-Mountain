@@ -1192,17 +1192,25 @@ export async function synthesizeGroupedArticles(
       // ── Pre-synthesis content gate ─────────────────────────────────────
       // Skip groups where articles have insufficient body content (headline-only).
       // Claude refuses to write from just headlines, wasting API credits.
-      // Require at least 100 chars of combined summary text across all articles.
+      //
+      // Two-tier check:
+      //   1. Total chars ≥ 400 across all articles (raised from 100 — two 150-char
+      //      headlines sum to ~300 chars and still produce Claude refusals)
+      //   2. At least one article must have ≥ 150 chars of body text (not just a
+      //      headline repeated across two outlets)
       const totalSummaryChars = formattedArticles.reduce(
         (sum, a) => sum + (a.summary?.length ?? 0), 0
       );
-      if (totalSummaryChars < 100) {
+      const maxSingleArticleChars = formattedArticles.reduce(
+        (max, a) => Math.max(max, a.summary?.length ?? 0), 0
+      );
+      if (totalSummaryChars < 400 || maxSingleArticleChars < 150) {
         stats.preRejected++;
         stats.rejectedTopics.push(group.topic);
         console.warn(
           `[synthesis] Content-gate reject "${group.topic}" — ` +
-          `only ${totalSummaryChars} chars of summary across ${formattedArticles.length} articles ` +
-          `(need ≥100). Articles are headline-only; skipping to save API credits.`
+          `total=${totalSummaryChars} chars (need ≥400), maxSingle=${maxSingleArticleChars} chars (need ≥150). ` +
+          `Articles appear to be headline-only stubs; skipping to save API credits.`
         );
         continue;
       }
@@ -1236,11 +1244,14 @@ export async function synthesizeGroupedArticles(
       }
 
       // ── Refusal detection ──────────────────────────────────────────────
-      // Claude sometimes refuses to write when source materials are too thin
-      // (headline-only articles with no body text). Detect common refusal
-      // patterns early and skip, rather than wasting QA/fact-check budget on
-      // what is essentially a non-article.
+      // Claude sometimes refuses to write when source materials are too thin.
+      // Two-pronged check:
+      //   1. Regex anchors on synthesizedText.substring(0, 400) — catches clean refusals
+      //   2. substring().includes() fallback — catches refusals with leading whitespace
+      //      or invisible chars that could defeat the ^ anchor
       const firstLine = synthesizedText.split("\n")[0].trim().toLowerCase();
+      const head400 = synthesizedText.substring(0, 400);
+      const head400Lower = head400.toLowerCase().trimStart();
       const REFUSAL_PATTERNS = [
         /^i cannot/i,
         /^i'm unable/i,
@@ -1251,8 +1262,22 @@ export async function synthesizeGroupedArticles(
         /^i can't write/i,
         /^there is insufficient/i,
       ];
-      if (REFUSAL_PATTERNS.some((p) => p.test(synthesizedText.substring(0, 200)))) {
+      const REFUSAL_SUBSTRINGS = [
+        "i cannot write this article",
+        "i cannot write an article",
+        "i'm unable to write",
+        "i can't write this article",
+        "the source materials provided contain only",
+        "both sources are identical stub",
+        "insufficient source content",
+        "only a headline",
+      ];
+      const isRefusal =
+        REFUSAL_PATTERNS.some((p) => p.test(head400)) ||
+        REFUSAL_SUBSTRINGS.some((s) => head400Lower.includes(s));
+      if (isRefusal) {
         stats.errors++;
+        stats.rejectedTopics.push(group.topic);
         console.warn(
           `[synthesis] Claude refused to write "${group.topic}" — ` +
           `likely insufficient source content. First line: "${firstLine.substring(0, 100)}"`
