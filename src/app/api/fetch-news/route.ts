@@ -11,6 +11,10 @@ import {
 } from "@/lib/news";
 import { synthesizeGroupedArticles } from "@/lib/news-synthesis";
 import { NewsCollection, ArchivedNewsCollection, NewsItem } from "@/lib/news-types";
+import {
+  validateCoPublication,
+  CO_PUB_WINDOW_HOURS,
+} from "@/lib/co-publication-validator";
 
 export const maxDuration = 60; // Vercel Pro: up to 60s (synthesis takes 25-50s)
 export const runtime = "nodejs";
@@ -430,28 +434,76 @@ async function handleNewsFetch() {
       `posted=${synthStats.posted}, rejected=${synthStats.rejected}, errors=${synthStats.errors}`
     );
 
-    // 5b. Publish Decision Layer
+    // 5b. Co-publication validation
+    // Runs when ≥1 story is ready to publish. Checks the incoming batch against
+    // each other AND against any stories already published within CO_PUB_WINDOW_HOURS.
+    // Stories outside that window (evolving coverage) are never affected.
+    let publishCandidates: NewsItem[] = stories;
+
+    if (stories.length > 0) {
+      const windowMs = CO_PUB_WINDOW_HOURS * 60 * 60 * 1000;
+      const recentlyPublished = existingActive.filter((s) => {
+        const ageMs = Date.now() - new Date(s.publishedAt).getTime();
+        return ageMs < windowMs;
+      });
+
+      const coValidation = validateCoPublication(stories, recentlyPublished);
+
+      if (coValidation.issues.length > 0) {
+        for (const issue of coValidation.issues) {
+          console.log(
+            `[co-pub-validator] ${issue.severity.toUpperCase()} [${issue.type}] ${issue.description}`
+          );
+        }
+      }
+
+      if (coValidation.rejectedIds.length > 0) {
+        publishCandidates = stories.filter(
+          (s) => !coValidation.rejectedIds.includes(s.id)
+        );
+        const coRejectionReasons = coValidation.issues
+          .filter((i) => i.severity === "reject")
+          .map((i) => `co-pub [${i.type}]: ${i.description.substring(0, 140)}`);
+        stats.rejectionDetails.push(...coRejectionReasons);
+        stats.rejected += coValidation.rejectedIds.length;
+        stats.posted = Math.max(0, stats.posted - coValidation.rejectedIds.length);
+        console.log(
+          `[co-pub-validator] Removed ${coValidation.rejectedIds.length} story(ies) from publish batch ` +
+          `(${publishCandidates.length} remain). Rejected: [${coValidation.rejectedIds.join(", ")}]`
+        );
+      } else if (coValidation.warningIds.length > 0) {
+        console.log(
+          `[co-pub-validator] ${coValidation.warningIds.length} warning(s) — stories will publish with logged notice`
+        );
+      } else if (stories.length > 0) {
+        console.log(
+          `[co-pub-validator] All ${stories.length} candidate(s) passed co-publication checks`
+        );
+      }
+    }
+
+    // 5c. Publish Decision Layer
     // Bootstrap (empty feed): require ≥MIN_STORIES_TO_PUBLISH for a quality initial batch.
     // Ongoing (feed has content): publish with ≥1 new story — the 3-story gate is only
     //   meaningful for first-run quality; subsequent hourly runs often produce 1-2 stories
     //   due to cross-run topic dedup windows, so blocking them prevents any updates.
-    const qualityStories = stories.filter(
+    const qualityStories = publishCandidates.filter(
       (s) => s.whyThisMatters && s.whyThisMatters.length > 10
     );
     stats.storiesWithWhyMatters = qualityStories.length;
-    stats.storiesWithKeyData = stories.filter((s) => (s.keyDataPoints?.length ?? 0) > 0).length;
+    stats.storiesWithKeyData = publishCandidates.filter((s) => (s.keyDataPoints?.length ?? 0) > 0).length;
 
     const feedIsEmpty = existingActive.length === 0;
     // Bootstrap: need MIN_STORIES_TO_PUBLISH. Ongoing: any new story is publishable.
     const meetsThreshold = feedIsEmpty
-      ? stories.length >= MIN_STORIES_TO_PUBLISH
-      : stories.length >= 1;
+      ? publishCandidates.length >= MIN_STORIES_TO_PUBLISH
+      : publishCandidates.length >= 1;
 
     if (!meetsThreshold) {
       stats.publishDecision = "insufficient";
       stats.executionMs = Date.now() - startTime;
       console.warn(
-        `[fetch-news] Publish decision: INSUFFICIENT — ${stories.length} new stories ` +
+        `[fetch-news] Publish decision: INSUFFICIENT — ${publishCandidates.length} new stories after co-pub validation ` +
         (feedIsEmpty
           ? `(bootstrap requires ${MIN_STORIES_TO_PUBLISH} for a quality initial feed, ` +
             `${REBUILD_MODE ? "rebuild" : "production"} mode). ` +
@@ -462,7 +514,7 @@ async function handleNewsFetch() {
         success: true,
         message:
           feedIsEmpty
-            ? `Only ${stories.length} new stories synthesized — bootstrap threshold not met (need ${MIN_STORIES_TO_PUBLISH}). ` +
+            ? `Only ${publishCandidates.length} new stories synthesized — bootstrap threshold not met (need ${MIN_STORIES_TO_PUBLISH}). ` +
               (!REBUILD_MODE ? "Hint: set REBUILD_MODE=true to lower thresholds." : "")
             : `No new stories synthesized this run — existing feed preserved.`,
         stats,
@@ -472,20 +524,20 @@ async function handleNewsFetch() {
     stats.publishDecision = "published";
     if (feedIsEmpty) {
       console.log(
-        `[fetch-news] Publish decision: BOOTSTRAP PUBLISH — ${stories.length} story(ies) ` +
+        `[fetch-news] Publish decision: BOOTSTRAP PUBLISH — ${publishCandidates.length} story(ies) ` +
         `(feed was empty; bootstrap threshold met)`
       );
     }
     console.log(
-      `[fetch-news] Publish decision: PUBLISH — ${stories.length} new stories ` +
+      `[fetch-news] Publish decision: PUBLISH — ${publishCandidates.length} new stories ` +
       `(${stats.storiesWithWhyMatters} with why-matters, ${stats.storiesWithKeyData} with key data, ` +
       `rebuild=${REBUILD_MODE})`
     );
 
     // 5a. Write newly covered topics to Redis for cross-run memory
-    if (stories.length > 0) {
+    if (publishCandidates.length > 0) {
       const topicUpdates: Record<string, string> = {};
-      for (const story of stories) {
+      for (const story of publishCandidates) {
         if (story.topicKey) {
           topicUpdates[story.topicKey] = story.publishedAt;
         }
@@ -502,7 +554,7 @@ async function handleNewsFetch() {
     }
 
     // 6. Merge new stories with existing (topicKey-aware dedup)
-    const allStories = mergeNewsWithDedup([...stories, ...existingActive]);
+    const allStories = mergeNewsWithDedup([...publishCandidates, ...existingActive]);
 
     // 7. Separate active (last 30 days) from archive
     const now = Date.now();
@@ -582,7 +634,7 @@ async function handleNewsFetch() {
     }
 
     // 11. Trigger briefing generation asynchronously (fire-and-forget, don't block response)
-    if (stats.posted > 0) {
+    if (publishCandidates.length > 0 && stats.posted > 0) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
       const secret = process.env.FETCH_NEWS_SECRET ?? "";
       fetch(`${siteUrl}/api/briefing`, {
