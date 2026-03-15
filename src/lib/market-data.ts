@@ -331,22 +331,24 @@ async function fetchEiaData(
   if (!apiKey) return [];
 
   try {
-    const params = new URLSearchParams({
+    // EIA v2 requires literal bracket notation in query params (data[0]=, facets[series][]=, etc.).
+    // URLSearchParams percent-encodes brackets (%5B%5D), which EIA rejects with HTTP 400.
+    // Build the query string manually to preserve literal brackets.
+    const base = new URLSearchParams({
       api_key: apiKey,
       frequency,
-      "data[0]": "value",
-      "sort[0][column]": "period",
-      "sort[0][order]": "desc",
       length: String(length),
     });
-
+    let qs = base.toString();
+    qs += "&data[0]=value";
+    qs += "&sort[0][column]=period&sort[0][order]=desc";
     for (const [facet, values] of Object.entries(facets)) {
       for (const v of values) {
-        params.append(`facets[${facet}][]`, v);
+        qs += `&facets[${facet}][]=${encodeURIComponent(v)}`;
       }
     }
 
-    const url = `https://api.eia.gov/v2/${route}/data/?${params.toString()}`;
+    const url = `https://api.eia.gov/v2/${route}/data/?${qs}`;
     const res = await fetch(url, { signal: withTimeout() });
 
     if (!res.ok) {

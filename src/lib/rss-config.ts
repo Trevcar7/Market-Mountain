@@ -59,12 +59,16 @@ export const RSS_FEEDS: RssSourceConfig[] = [
   // ─── Tier 1 — Premium financial journalism ───────────────────────────────
 
   // Reuters
+  // Note: feeds.reuters.com is deprecated; requests from server-side IPs
+  // (e.g. Vercel) fail with a network error. Reuters articles arrive via
+  // Finnhub and NewsAPI. Disabled until Reuters publishes a new RSS endpoint.
   {
     name: "Reuters Business News",
     source: "Reuters",
     url: "https://feeds.reuters.com/reuters/businessNews",
     category: "business",
     priority: 1,
+    disabled: true,
   },
   {
     name: "Reuters Markets News",
@@ -72,6 +76,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.reuters.com/reuters/marketsNews",
     category: "markets",
     priority: 1,
+    disabled: true,
   },
   {
     name: "Reuters Finance News",
@@ -79,15 +84,20 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.reuters.com/news/archivedContent",
     category: "macro",
     priority: 1,
+    disabled: true,
   },
 
   // Associated Press
+  // Note: feeds.apnews.com blocks non-browser server requests. AP articles
+  // arrive via Finnhub and NewsAPI. Disabled until a stable server-accessible
+  // AP RSS endpoint is available.
   {
     name: "AP Business News",
     source: "Associated Press",
     url: "https://feeds.apnews.com/rss/apf-business",
     category: "business",
     priority: 1,
+    disabled: true,
   },
   {
     name: "AP Economy News",
@@ -95,6 +105,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.apnews.com/rss/apf-economy",
     category: "macro",
     priority: 1,
+    disabled: true,
   },
 
   // CNBC
@@ -185,12 +196,16 @@ export const RSS_FEEDS: RssSourceConfig[] = [
   },
 
   // Barron's
+  // Note: barrons.com/feed/rss/news returns HTTP 403 from server-side IPs.
+  // Barron's headlines arrive via Finnhub. Disabled until a public endpoint
+  // is confirmed accessible.
   {
     name: "Barron's Markets",
     source: "Barron's",
     url: "https://www.barrons.com/feed/rss/news",
     category: "markets",
     priority: 1,
+    disabled: true,
   },
 
   // The Economist
@@ -228,6 +243,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.reuters.com/reuters/worldNews",
     category: "geopolitics",
     priority: 1,
+    disabled: true, // feeds.reuters.com blocks server-side IPs
   },
   {
     name: "Reuters Politics",
@@ -235,6 +251,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.reuters.com/reuters/politicsNews",
     category: "geopolitics",
     priority: 1,
+    disabled: true, // feeds.reuters.com blocks server-side IPs
   },
   {
     name: "AP International News",
@@ -242,6 +259,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.apnews.com/rss/apf-intlnews",
     category: "geopolitics",
     priority: 1,
+    disabled: true, // feeds.apnews.com blocks server-side IPs
   },
   {
     name: "AP Politics",
@@ -249,6 +267,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.apnews.com/rss/apf-politics",
     category: "policy",
     priority: 1,
+    disabled: true, // feeds.apnews.com blocks server-side IPs
   },
   {
     name: "Financial Times World",
