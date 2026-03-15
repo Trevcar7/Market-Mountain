@@ -229,6 +229,10 @@ export const TIER_1_SOURCES = [
   "barron",
   "the economist",
   "economist.com",
+  // Added with BBC/Guardian RSS expansion
+  "bbc",
+  "the guardian",
+  "guardian",
 ];
 
 /**
@@ -270,6 +274,12 @@ export const TIER_2_SOURCES = [
   "coindesk",
   "the block",
   "cointelegraph",
+  // Added with RSS expansion
+  "npr",
+  "politico",
+  "nasdaq",
+  "techcrunch",
+  "wired",
 ];
 
 /**
@@ -345,6 +355,14 @@ const TRUSTED_FINANCIAL_SOURCES = [
   "globe newswire",
   "globenewswire",
   "dow jones",
+  // Expanded RSS sources
+  "bbc",
+  "the guardian",
+  "guardian",
+  "nasdaq",
+  "techcrunch",
+  "coindesk",
+  "cointelegraph",
 ];
 
 /**

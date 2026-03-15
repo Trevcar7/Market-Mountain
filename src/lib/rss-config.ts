@@ -122,6 +122,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://www.cnbc.com/id/20910258/device/rss/rss.html",
     category: "macro",
     priority: 1,
+    disabled: true, // consistently 0 items in production logs
   },
   {
     name: "CNBC Finance",
@@ -145,15 +146,19 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.marketwatch.com/marketwatch/realtimeheadlines/",
     category: "markets",
     priority: 1,
+    disabled: true, // consistently 0 items in production logs
   },
 
   // Wall Street Journal
+  // Note: feeds.a.dj.com endpoints consistently return 0 items from server-side
+  // IPs (likely auth-gated at the CDN level). WSJ articles arrive via Finnhub.
   {
     name: "WSJ Markets News",
     source: "Wall Street Journal",
     url: "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
     category: "markets",
     priority: 1,
+    disabled: true, // 0 items from server-side IPs — Dow Jones CDN blocks
   },
   {
     name: "WSJ Business News",
@@ -161,6 +166,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml",
     category: "business",
     priority: 1,
+    disabled: true, // 0 items from server-side IPs — Dow Jones CDN blocks
   },
 
   // Financial Times
@@ -277,6 +283,38 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     priority: 1,
   },
 
+  // BBC — publicly accessible RSS, no server-side IP restrictions
+  {
+    name: "BBC Business News",
+    source: "BBC",
+    url: "https://feeds.bbci.co.uk/news/business/rss.xml",
+    category: "business",
+    priority: 1,
+  },
+  {
+    name: "BBC World News",
+    source: "BBC",
+    url: "https://feeds.bbci.co.uk/news/world/rss.xml",
+    category: "geopolitics",
+    priority: 1,
+  },
+
+  // The Guardian — open RSS platform, no server-side IP restrictions
+  {
+    name: "The Guardian Business",
+    source: "The Guardian",
+    url: "https://www.theguardian.com/uk/business/rss",
+    category: "business",
+    priority: 1,
+  },
+  {
+    name: "The Guardian Economics",
+    source: "The Guardian",
+    url: "https://www.theguardian.com/business/economics/rss",
+    category: "macro",
+    priority: 1,
+  },
+
   // ─── Tier 2 — Quality financial outlets ──────────────────────────────────
 
   // Yahoo Finance
@@ -295,15 +333,19 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://fortune.com/feed/fortune-feed/",
     category: "business",
     priority: 2,
+    disabled: true, // HTTP 404 in production logs
   },
 
   // Forbes
+  // Note: forbes.com RSS endpoints return HTTP 404 from server-side IPs.
+  // Forbes articles arrive via NewsAPI.
   {
     name: "Forbes Business",
     source: "Forbes",
     url: "https://www.forbes.com/feeds/forbesglobalmarkets.rss",
     category: "business",
     priority: 2,
+    disabled: true, // HTTP 404 in production logs
   },
   {
     name: "Forbes Money",
@@ -311,6 +353,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://www.forbes.com/money/feed/",
     category: "markets",
     priority: 2,
+    disabled: true, // HTTP 404 in production logs
   },
 
   // Business Insider
@@ -345,6 +388,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://news.morningstar.com/rss/topStories.xml",
     category: "markets",
     priority: 2,
+    disabled: true, // connection timeout in production logs
   },
 
   // The Street — stock analysis and financial news
@@ -354,6 +398,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://www.thestreet.com/rss/index.xml",
     category: "markets",
     priority: 2,
+    disabled: true, // HTTP 403 in production logs
   },
 
   // Seeking Alpha (editorial, not community)
@@ -372,6 +417,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://www.investopedia.com/feedbuilder/feed/getfeed?feedName=rss_headline",
     category: "markets",
     priority: 2,
+    disabled: true, // HTTP 404 in production logs
   },
 
   // Investing.com — global markets, economy, earnings, commodities
@@ -490,6 +536,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://home.treasury.gov/system/files/206/treasury-press-releases.rss",
     category: "policy",
     priority: 2,
+    disabled: true, // connection timeout in production logs
   },
 
   // CFTC (Commodity Futures Trading Commission) — regulatory/derivatives/commodities
@@ -499,6 +546,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://www.cftc.gov/rss/pressreleases.xml",
     category: "policy",
     priority: 2,
+    disabled: true, // HTTP 404 in production logs
   },
 
   // Foreign Policy — geopolitical analysis with direct market implications
@@ -507,6 +555,119 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     source: "Foreign Policy",
     url: "https://foreignpolicy.com/feed/",
     category: "geopolitics",
+    priority: 2,
+  },
+
+  // NPR — open feeds, no server-side IP restrictions
+  {
+    name: "NPR Business",
+    source: "NPR",
+    url: "https://feeds.npr.org/1006/rss.xml",
+    category: "business",
+    priority: 2,
+  },
+  {
+    name: "NPR Economy",
+    source: "NPR",
+    url: "https://feeds.npr.org/1017/rss.xml",
+    category: "macro",
+    priority: 2,
+  },
+
+  // Politico — policy and economic news
+  {
+    name: "Politico Economy",
+    source: "Politico",
+    url: "https://rss.politico.com/economy.xml",
+    category: "policy",
+    priority: 2,
+  },
+
+  // FRED Blog (St. Louis Fed) — economic research and data commentary
+  {
+    name: "FRED Blog",
+    source: "Federal Reserve Bank of St. Louis",
+    url: "https://fredblog.stlouisfed.org/feed/",
+    category: "macro",
+    priority: 2,
+  },
+
+  // Nasdaq — official market and company news from Nasdaq's newsroom
+  {
+    name: "Nasdaq Market News",
+    source: "Nasdaq",
+    url: "https://www.nasdaq.com/feed/rssoutbound?category=Markets",
+    category: "markets",
+    priority: 2,
+  },
+
+  // TechCrunch — technology business, M&A, and venture funding (market signals)
+  {
+    name: "TechCrunch",
+    source: "TechCrunch",
+    url: "https://techcrunch.com/feed/",
+    category: "business",
+    priority: 2,
+  },
+
+  // CoinDesk — crypto markets and blockchain news (digital asset price signals)
+  {
+    name: "CoinDesk News",
+    source: "CoinDesk",
+    url: "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    category: "markets",
+    priority: 2,
+  },
+
+  // CoinTelegraph — crypto and blockchain markets
+  {
+    name: "CoinTelegraph",
+    source: "CoinTelegraph",
+    url: "https://cointelegraph.com/rss",
+    category: "markets",
+    priority: 2,
+  },
+
+  // World Bank Blog — global economic development and emerging market signals
+  {
+    name: "World Bank Blog",
+    source: "World Bank",
+    url: "https://blogs.worldbank.org/rss.xml",
+    category: "global",
+    priority: 2,
+  },
+
+  // IMF Blog — supplementary to IMF News; in-depth macro analysis
+  {
+    name: "IMF Blog",
+    source: "IMF",
+    url: "https://www.imf.org/en/blogs/rss",
+    category: "macro",
+    priority: 2,
+  },
+
+  // CNBC additional sections (alternative feed IDs)
+  {
+    name: "CNBC Investing",
+    source: "CNBC",
+    url: "https://www.cnbc.com/id/15839069/device/rss/rss.html",
+    category: "markets",
+    priority: 1,
+  },
+  {
+    name: "CNBC Top News",
+    source: "CNBC",
+    url: "https://www.cnbc.com/id/100003241/device/rss/rss.html",
+    category: "markets",
+    priority: 1,
+  },
+
+  // Wired Business — AI, tech, and corporate strategy stories with market impact
+  {
+    name: "Wired Business",
+    source: "Wired",
+    url: "https://www.wired.com/feed/category/business/latest/rss",
+    category: "business",
     priority: 2,
   },
 
