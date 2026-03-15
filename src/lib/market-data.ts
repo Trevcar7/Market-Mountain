@@ -1300,6 +1300,13 @@ export async function fetchChartSeriesForTopic(
       return null;
     }
 
+    case "earnings": {
+      // Earnings articles get S&P 500 context — individual earnings drive the index
+      const series = await fetchFredChartSeries("SP500", 90);
+      if (!series) return null;
+      return { ...series, title: "S&P 500 Index — Earnings Context", unit: "Points", source: "FRED — St. Louis Fed", timeRange: computeTimeRange(series.labels), type: "line" };
+    }
+
     case "broad_market":
     case "markets": {
       // S&P 500 index level — FRED daily series (SP500)
@@ -1344,6 +1351,7 @@ const CHART_METADATA: Record<string, { chartLabel: string; insertAfterParagraph:
   inflation:       { chartLabel: "INFLATION",        insertAfterParagraph: 1 },
   employment:      { chartLabel: "LABOR MARKET",     insertAfterParagraph: 1 },
   gdp:             { chartLabel: "GROWTH",           insertAfterParagraph: 1 },
+  earnings:        { chartLabel: "EARNINGS CONTEXT",  insertAfterParagraph: 1 },
   broad_market:    { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
   markets:         { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
   currency:        { chartLabel: "DOLLAR INDEX",     insertAfterParagraph: 2 },

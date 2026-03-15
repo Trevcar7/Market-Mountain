@@ -943,7 +943,7 @@ From: ${article.source}`
     (sum, a) => sum + (a.summary?.length ?? 0), 0
   );
   const thinSourcesNote = totalSourceChars < 400
-    ? `\nIMPORTANT: The source summaries are brief. Use the MARKET DATA section and your knowledge of current financial markets to write a substantive analysis. Do NOT refuse to write — always produce a complete article in the required format. The SOURCES provide the event; the MARKET DATA provides the numbers; your analysis connects them.`
+    ? `\nIMPORTANT: The source summaries are brief. Lean heavily on the MARKET DATA section above to write a substantive, data-grounded analysis. Do NOT refuse to write — always produce a complete article in the required format. The SOURCES provide the event; the MARKET DATA provides the numbers; your analysis connects them. Do NOT invent numbers or facts not present in the SOURCES or MARKET DATA.`
     : "";
 
   return `Write one cohesive financial news story about "${group.topic}"
@@ -1503,6 +1503,24 @@ export async function synthesizeGroupedArticles(
           // genuinely discusses broad market dynamics, not just references them.
           minMatches: 4,
           pattern: /\b(S&P\s*500?|Nasdaq|Dow Jones|Dow\b|equit(?:y|ies)|stock market|market rall(?:y|ied)|market sell.?off|risk.?off|risk.?on)\b/gi,
+        },
+        {
+          topic: "currency",
+          label: "DOLLAR INDEX",
+          minMatches: 2,
+          pattern: /\b(dollar|USD|DXY|greenback|dollar index|trade.?weighted|strong dollar|weak dollar|king dollar)\b/gi,
+        },
+        {
+          topic: "broad_market",
+          label: "VIX / VOLATILITY",
+          minMatches: 2,
+          pattern: /\b(VIX|volatility index|CBOE|implied volatility|vol spike|fear gauge|risk premium|volatility)\b/gi,
+        },
+        {
+          topic: "employment",
+          label: "LABOR MARKET",
+          minMatches: 2,
+          pattern: /\b(unemployment|jobless|non.?farm payrolls?|NFP|labor market|jobs report|hiring|layoffs|initial claims|employment)\b/gi,
         },
       ];
 

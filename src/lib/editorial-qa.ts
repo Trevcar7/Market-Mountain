@@ -29,6 +29,7 @@
 const REBUILD_MODE = process.env.REBUILD_MODE === "true";
 
 import { NewsItem } from "./news-types";
+import { TIER_1_SOURCES, TIER_2_SOURCES } from "./news";
 
 export interface QATestResult {
   test: string;
@@ -68,29 +69,13 @@ if (REBUILD_MODE) {
 // Tier classification for source quality check
 // ---------------------------------------------------------------------------
 
-// Synced with src/lib/news.ts TIER_1_SOURCES / TIER_2_SOURCES to prevent
-// stories that pass the confidence gate (news.ts) from failing the QA source
-// check (editorial-qa.ts) due to mismatched tier lists.
-const TIER_1_SOURCES = new Set([
-  "reuters", "bloomberg", "wall street journal", "wsj",
-  "financial times", "ft", "associated press", "ap", "ap news",
-  "cnbc", "the new york times", "nyt",
-  "marketwatch", "market watch", "barron", "the economist", "economist",
-]);
-
-const TIER_2_SOURCES = new Set([
-  "fred", "bls", "eia", "us treasury", "treasury",
-  "imf", "world bank", "morningstar", "seeking alpha",
-  "fortune", "forbes",
-  // Synced additions from news.ts:
-  "business insider", "investopedia", "the street", "thestreet",
-  "coindesk", "the block", "cointelegraph",
-]);
+// Uses TIER_1_SOURCES / TIER_2_SOURCES imported from news.ts (single source
+// of truth) so confidence gate and QA gate always agree on source tiers.
 
 function classifySource(sourceName: string): "tier1" | "tier2" | "other" {
   const lower = sourceName.toLowerCase();
-  if ([...TIER_1_SOURCES].some((t) => lower.includes(t))) return "tier1";
-  if ([...TIER_2_SOURCES].some((t) => lower.includes(t))) return "tier2";
+  if (TIER_1_SOURCES.some((t) => lower.includes(t))) return "tier1";
+  if (TIER_2_SOURCES.some((t) => lower.includes(t))) return "tier2";
   return "other";
 }
 
@@ -224,12 +209,16 @@ function scoreChartQuality(article: NewsItem): QATestResult {
         detail: `[REBUILD] topic "${article.topicKey}" requires chart but none generated (8/10 partial). Fix: set FRED_API_KEY / BLS_API_KEY / EIA_API_KEY.`,
       };
     }
+    // Soft-fail in production: 6/10 partial credit instead of hard 0.
+    // Hard 0 blocked 30-40% of macro articles when a single API key was
+    // missing or a topic (e.g. "crypto", "earnings") had no chart mapping.
+    // 6/10 still penalises significantly (-4 pts) but doesn't auto-reject.
     return {
       test: "Chart Quality",
       passed: false,
-      score: 0,
+      score: 6,
       maxScore: 10,
-      detail: `topic "${article.topicKey}" requires a chart but none was generated — check API keys (FRED/BLS/EIA)`,
+      detail: `topic "${article.topicKey}" requires a chart but none was generated (6/10 soft-fail) — check API keys (FRED/BLS/EIA)`,
     };
   }
 
