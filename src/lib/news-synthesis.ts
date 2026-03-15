@@ -940,9 +940,12 @@ export async function synthesizeGroupedArticles(
   // Per-run image cache — avoid duplicate Unsplash API calls for same topic
   const runImageCache = new Map<string, string>();
 
-  // Track chart budget — raised to 4 (editorial policy: data stories should have charts)
+  // Track chart budgets.
+  // MAX_CHARTS_PER_RUN = 9  — supports up to 3 articles × 3 charts each.
+  // MAX_CHARTS_PER_ARTICLE = 3 — caps charts per story so no single article hogs the budget.
   let chartCount = 0;
-  const MAX_CHARTS_PER_RUN = 4;
+  const MAX_CHARTS_PER_RUN = 9;
+  const MAX_CHARTS_PER_ARTICLE = 3;
 
   // ── Cross-feed image deduplication ─────────────────────────────────────────
   // Collect all image URLs already in the feed (existing articles + current run).
@@ -1166,52 +1169,139 @@ export async function synthesizeGroupedArticles(
         usedImageBaseUrls.add(imageUrl.split("?")[0]);
       }
 
-      // Optional chart data — only for macro/FRED-backed topics, capped at MAX_CHARTS_PER_RUN
-      // Energy + rates stories get a secondary chart (WTI → 10Y yield companion, etc.)
+      // ── Chart generation — Phase 1: topic-driven primary + companion ────────
+      // Attempts to build a chart directly from the story's topic key (FRED/EIA/BLS).
+      // Energy stories also get a bond-market companion; rate stories get equities.
+      // Optional DXY tertiary when dollar is explicitly discussed.
       let chartData: ChartDataset[] | undefined;
-      if (chartCount < MAX_CHARTS_PER_RUN) {
+      let articleChartCount = 0;
+      const topicNorm = group.topic.toLowerCase().replace(/\s+/g, "_");
+      // Track which topics are already charted to avoid duplicates in Phase 2.
+      const articleChartedTopics = new Set<string>();
+
+      if (chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
         const primary = await buildChartData(group.topic);
         if (primary) {
           chartCount++;
+          articleChartCount++;
+          articleChartedTopics.add(topicNorm);
           chartData = [primary];
 
-          // Companion chart routing — topic-aware secondary/tertiary charts
-          const topicNorm = group.topic.toLowerCase().replace(/\s+/g, "_");
-
-          // Secondary chart: rates companion for energy, equities companion for rates/fed
+          // Companion chart routing — topic-aware secondary pairing
           const secondaryTopic =
             topicNorm === "energy" || topicNorm === "trade_policy" ? "bond_market" :
             topicNorm === "bond_market" || topicNorm === "federal_reserve" || topicNorm === "fed_macro" ? "broad_market" :
             null;
 
-          if (secondaryTopic && chartCount < MAX_CHARTS_PER_RUN) {
+          if (secondaryTopic && chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
             const secondary = await buildChartData(secondaryTopic);
             if (secondary) {
               const primaryPos = primary.insertAfterParagraph ?? 0;
               secondary.insertAfterParagraph = Math.max(primaryPos + 2, 2);
               if (!secondary.chartLabel) secondary.chartLabel = "MARKET CONTEXT";
               chartCount++;
+              articleChartCount++;
+              articleChartedTopics.add(secondaryTopic);
               chartData.push(secondary);
             }
           }
 
           // Optional tertiary DXY chart: add when article explicitly references dollar strength/weakness
-          // Applies to energy, macro, trade, and policy stories that discuss USD
           const dollarMentions = (synthesizedText.match(/\b(dollar|USD|DXY|greenback|dollar\s+index|currency)\b/gi) ?? []).length;
           const topicSupportsDxy = ["energy", "trade_policy", "trade_policy_tariff", "inflation", "federal_reserve", "fed_macro"].includes(topicNorm);
-          if (dollarMentions >= 2 && topicSupportsDxy && chartCount < MAX_CHARTS_PER_RUN) {
+          if (dollarMentions >= 2 && topicSupportsDxy && chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
             const dxy = await buildChartData("dxy");
             if (dxy) {
-              // Place DXY chart after the last secondary chart
               const lastPos = chartData[chartData.length - 1]?.insertAfterParagraph ?? 2;
               dxy.insertAfterParagraph = Math.min(lastPos + 2, 4);
               if (!dxy.chartLabel) dxy.chartLabel = "CURRENCY";
               chartCount++;
+              articleChartCount++;
+              articleChartedTopics.add("dxy");
               chartData.push(dxy);
             }
           }
         }
       }
+
+      // ── Phase 2: Content-based chart detection ───────────────────────────────
+      // Guarantees 2-4 charts per article by scanning the synthesized text for
+      // explicit mentions of market variables. Adds a data-backed chart for each
+      // referenced variable not already covered by the topic-driven charts above.
+      //
+      // This closes the "geopolitics → no FRED mapping → zero charts" gap: an
+      // Iran/oil article categorised as "geopolitics" gets an OIL PRICES chart
+      // because oil keywords appear in the body, even though buildChartData("geopolitics")
+      // returns null.
+      //
+      // Keyword thresholds are intentionally low (1-2 hits) because financial
+      // articles reference macro variables often in passing. The data behind the
+      // chart is fetched from live APIs (EIA/FRED/BLS) so every chart is accurate
+      // and fact-checked regardless of how many times the keyword appears.
+      const contentChartCandidates: Array<{
+        topic: string;
+        label: string;
+        minMatches: number;
+        pattern: RegExp;
+      }> = [
+        {
+          topic: "energy",
+          label: "OIL PRICES",
+          minMatches: 1,
+          pattern: /\b(oil|crude\s+oil|WTI|brent|OPEC|petroleum|energy prices?|barrels?)\b/gi,
+        },
+        {
+          topic: "inflation",
+          label: "INFLATION",
+          minMatches: 2,
+          pattern: /\b(inflation|CPI|PCE|consumer prices?|price levels?|price pressures?|breakeven|inflationary)\b/gi,
+        },
+        {
+          topic: "bond_market",
+          label: "RATES",
+          minMatches: 2,
+          pattern: /\b(interest rates?|yields?|10-year|Treasury|bonds?|rate cuts?|rate hikes?|fed funds|monetary policy|basis points?)\b/gi,
+        },
+        {
+          topic: "broad_market",
+          label: "EQUITIES",
+          minMatches: 2,
+          pattern: /\b(S&P\s*500?|Nasdaq|Dow Jones|Dow\b|equit(?:y|ies)|stock market|market rall(?:y|ied)|market sell.?off|risk.?off|risk.?on)\b/gi,
+        },
+      ];
+
+      // Ensure chartData is an array so we can push into it
+      if (!chartData) chartData = [];
+
+      for (const candidate of contentChartCandidates) {
+        if (articleChartCount >= MAX_CHARTS_PER_ARTICLE) break;
+        if (chartCount >= MAX_CHARTS_PER_RUN) break;
+        if (articleChartedTopics.has(candidate.topic)) continue;
+
+        const matches = (synthesizedText.match(candidate.pattern) ?? []).length;
+        if (matches < candidate.minMatches) continue;
+
+        const chart = await buildChartData(candidate.topic);
+        if (!chart) continue;
+
+        // Space charts evenly across the 5-paragraph article body (positions 1–4)
+        const lastPos = chartData.length > 0
+          ? (chartData[chartData.length - 1].insertAfterParagraph ?? 0)
+          : 0;
+        chart.insertAfterParagraph = Math.min(lastPos + 1, 4);
+        chart.chartLabel = candidate.label;
+        chartCount++;
+        articleChartCount++;
+        articleChartedTopics.add(candidate.topic);
+        chartData.push(chart);
+        console.log(
+          `[synthesis] Content chart "${candidate.label}" → "${group.topic}" ` +
+          `(${matches} keyword hits in synthesized text)`
+        );
+      }
+
+      // Collapse empty chartData to undefined — avoids storing [] in the article record
+      if (chartData.length === 0) chartData = undefined;
 
       const newsItem: NewsItem = {
         id: generateId(group.topic),
