@@ -46,9 +46,10 @@ function baseFormatLabel(label: string): string {
  * Problem: 90 daily DGS10 points spanning 4 months produce many dates in the
  * same month, all formatting to "Mar '26" — creating 5+ identical tick labels.
  *
- * Fix: first occurrence of each "Mon 'YY" gets the full label; subsequent
- * occurrences in the same month show just the day number (e.g., "15").
- * Monthly-series repeats (YYYY-MM) are skipped entirely.
+ * Fix: first occurrence of each "Mon 'YY" gets the full label; any subsequent
+ * tick that maps to the same month label is silently omitted. This gives clean
+ * month-boundary labels (e.g. "Dec '25", "Jan '26", "Feb '26", "Mar '26")
+ * with no floating day numbers.
  */
 function buildDisplayLabels(
   labels: string[],
@@ -65,12 +66,8 @@ function buildDisplayLabels(
     if (!seen.has(base)) {
       seen.add(base);
       result.set(i, base);
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(labels[i])) {
-      // Daily series: show just the day number for repeated months
-      const day = parseInt(labels[i].split("-")[2], 10);
-      result.set(i, String(day));
     }
-    // Monthly series with duplicate: omit label (don't add to map)
+    // Duplicate month label: skip entirely — no floating day numbers
   }
 
   return result;
