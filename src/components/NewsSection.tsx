@@ -26,6 +26,127 @@ function formatRelativeTime(iso: string): string {
   return `${hrs} hours ago`;
 }
 
+// ── Topic-cluster deduplication ────────────────────────────────────────────────
+// Prevents simultaneous topic clusters from dominating the visible feed.
+// The hero (first story after sort) is locked in. Any subsequent story that is
+// BOTH highly similar to the hero AND published within TIME_WINDOW_HOURS is
+// deferred to the back of the list — not deleted, just deprioritised.
+//
+// Similarity is scored across three independent signals; the highest wins:
+//   1. topicKey match   → 0.80  (same editorial cluster: e.g. "energy", "fed_macro")
+//   2. ticker overlap   → up to 0.70  (same assets: e.g. USO, XLE appear in both)
+//   3. title Jaccard    → up to 0.90  (shared keywords after stop-word removal)
+//
+// Threshold : 0.75  (any single signal can exceed this on its own)
+// Time window: 6 hours  (stories further apart are always shown regardless)
+//
+// This means:
+//   "Iran Conflict Pushes Oil Toward $100" (topicKey=energy, tickers=[USO, OIL])
+//   "Middle East Tensions Drive Crude Rally" (topicKey=energy, tickers=[USO, OIL])
+//   → topicKey match → score 0.80 ≥ 0.75, within 6h → deferred ✓
+//
+//   "Oil Breaks $100 as Iran Conflict Escalates" — published 8h later
+//   → score 0.80 ≥ 0.75 BUT timeDiff 8h > 6h → displayed ✓ (evolving coverage)
+//
+//   "Airline Stocks Fall as Oil Surge Hits Transport Sector"
+//   → topicKey=markets ≠ energy, tickers=[DAL, UAL] ≠ [USO, OIL], low title overlap
+//   → score < 0.75 → displayed ✓ (secondary market reaction)
+// ──────────────────────────────────────────────────────────────────────────────
+
+const SIMILARITY_THRESHOLD = 0.75;
+const TIME_WINDOW_HOURS    = 6;
+
+const STOP_WORDS = new Set([
+  "the","a","an","and","or","but","in","on","at","to","for","of","with","as",
+  "is","are","was","were","be","been","being","it","its","by","from","that",
+  "this","these","those","will","would","could","should","may","might","has",
+  "have","had","not","no","new","all","more","after","than","into","up","out",
+  "s","do","did","its","over","said","say","says","their","they","we","us",
+]);
+
+function tokenize(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+  );
+}
+
+function jaccardSimilarity(a: string, b: string): number {
+  const setA = tokenize(a);
+  const setB = tokenize(b);
+  if (setA.size === 0 || setB.size === 0) return 0;
+  const intersection = [...setA].filter((w) => setB.has(w)).length;
+  const union = new Set([...setA, ...setB]).size;
+  return intersection / union;
+}
+
+function storySimilarity(hero: NewsItem, candidate: NewsItem): number {
+  let score = 0;
+
+  // Signal 1 — topicKey cluster match (0.80)
+  if (
+    hero.topicKey &&
+    candidate.topicKey &&
+    hero.topicKey === candidate.topicKey
+  ) {
+    score = Math.max(score, 0.80);
+  }
+
+  // Signal 2 — shared ticker overlap (up to 0.70)
+  const heroTickers = new Set(hero.relatedTickers ?? []);
+  const candTickers = candidate.relatedTickers ?? [];
+  if (heroTickers.size > 0 && candTickers.length > 0) {
+    const shared = candTickers.filter((t) => heroTickers.has(t)).length;
+    if (shared > 0) {
+      const tickerScore =
+        shared / Math.min(heroTickers.size, candTickers.length);
+      score = Math.max(score, tickerScore * 0.70);
+    }
+  }
+
+  // Signal 3 — title word overlap via Jaccard similarity (up to 0.90)
+  const jaccard = jaccardSimilarity(hero.title, candidate.title);
+  score = Math.max(score, jaccard * 0.90);
+
+  return score;
+}
+
+/**
+ * Reorder `sorted` so that stories simultanously similar to the hero
+ * (sorted[0]) appear after topically distinct stories.
+ *
+ * - Stories beyond TIME_WINDOW_HOURS of the hero are always kept in place
+ *   (evolving coverage / new developments are not affected).
+ * - Deferred stories are appended at the end — nothing is discarded.
+ */
+function deduplicateForDisplay(sorted: NewsItem[]): NewsItem[] {
+  if (sorted.length <= 1) return sorted;
+
+  const hero    = sorted[0];
+  const heroMs  = new Date(hero.publishedAt).getTime();
+  const windowMs = TIME_WINDOW_HOURS * 60 * 60 * 1000;
+
+  const displayed: NewsItem[] = [hero];
+  const deferred:  NewsItem[] = [];
+
+  for (const candidate of sorted.slice(1)) {
+    const timeDiff   = Math.abs(new Date(candidate.publishedAt).getTime() - heroMs);
+    const similarity = storySimilarity(hero, candidate);
+
+    // Suppress only when BOTH conditions hold simultaneously
+    if (timeDiff <= windowMs && similarity >= SIMILARITY_THRESHOLD) {
+      deferred.push(candidate);
+    } else {
+      displayed.push(candidate);
+    }
+  }
+
+  // Deferred stories follow the diverse ones — still reachable by scrolling
+  return [...displayed, ...deferred];
+}
 
 export default function NewsSection({
   initialNews = [],
@@ -93,6 +214,13 @@ export default function NewsSection({
         );
     }
   });
+
+  // Topic-cluster deduplication — only in default editorial ordering.
+  // Skipped when user has manually chosen importance or sentiment sort,
+  // since they expect full unfiltered results in those modes.
+  if (sortBy === "recent") {
+    filtered = deduplicateForDisplay(filtered);
+  }
 
   // Limit results
   filtered = filtered.slice(0, limit);
