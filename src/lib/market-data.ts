@@ -1131,27 +1131,76 @@ function computeTimeRange(labels: string[]): string {
   const first = labels[0];
   const last = labels[labels.length - 1];
 
-  // Parse YYYY-MM-DD or YYYY-MM dates
+  const MONTH_MAP: Record<string, number> = {
+    Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5,
+    Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11,
+  };
+
+  // Parse YYYY-MM-DD, YYYY-MM, or "Mar 2026" dates
   const parseDate = (s: string): Date | null => {
-    const m = s.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
-    if (!m) return null;
-    return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3] || "1"));
+    // ISO format: YYYY-MM-DD or YYYY-MM
+    const isoMatch = s.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
+    if (isoMatch) {
+      return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3] || "1"));
+    }
+    // BLS format: "Mar 2026" or "Jan 2025"
+    const blsMatch = s.match(/^([A-Z][a-z]{2})\s+(\d{4})$/);
+    if (blsMatch && MONTH_MAP[blsMatch[1]] !== undefined) {
+      return new Date(parseInt(blsMatch[2]), MONTH_MAP[blsMatch[1]], 1);
+    }
+    return null;
   };
 
   const d1 = parseDate(first);
   const d2 = parseDate(last);
   if (!d1 || !d2) return "Recent";
 
-  const diffMs = d2.getTime() - d1.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  // Use month-based math for cleaner labels
+  const diffMonths = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+  const diffDays = Math.abs(Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
 
   if (diffDays <= 14) return "Last 2 weeks";
-  if (diffDays <= 45) return "Last month";
-  if (diffDays <= 100) return "Last 3 months";
-  if (diffDays <= 200) return "Last 6 months";
-  if (diffDays <= 400) return "Last 12 months";
-  if (diffDays <= 800) return "Last 2 years";
+  if (diffMonths <= 1) return "Last month";
+  if (diffMonths <= 3) return "Last 3 months";
+  if (diffMonths <= 6) return "Last 6 months";
+  if (diffMonths <= 12) return "Last 12 months";
+  if (diffMonths <= 24) return "Last 2 years";
   return "Historical";
+}
+
+/**
+ * Generate an editorial chart caption from the data.
+ * Bloomberg Markets style: what the chart shows + why the level matters.
+ */
+function generateChartCaption(
+  title: string,
+  values: number[],
+  unit: string,
+  timeRange: string
+): string {
+  if (values.length < 2) return "";
+
+  const first = values[0];
+  const last = values[values.length - 1];
+  const change = last - first;
+  const pctChange = first !== 0 ? ((change / Math.abs(first)) * 100) : 0;
+  const direction = change > 0 ? "rose" : change < 0 ? "fell" : "held steady at";
+
+  const formatVal = (v: number): string => {
+    if (unit === "%") return `${v.toFixed(2)}%`;
+    if (unit === "$/bbl") return `$${v.toFixed(2)}`;
+    if (unit === "$B") return `$${v.toFixed(1)}B`;
+    if (unit === "Points") return v >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v.toFixed(0);
+    return v.toFixed(2);
+  };
+
+  const absChange = Math.abs(pctChange);
+  const changeMag = absChange >= 5 ? "sharply" : absChange >= 2 ? "notably" : "modestly";
+
+  if (unit === "%") {
+    return `${title} ${direction} ${changeMag} from ${formatVal(first)} to ${formatVal(last)} over the ${timeRange.replace("Last ", "past ").toLowerCase()}.`;
+  }
+  return `${title} ${direction} ${changeMag} to ${formatVal(last)} over the ${timeRange.replace("Last ", "past ").toLowerCase()}, a ${Math.abs(pctChange).toFixed(1)}% move.`;
 }
 
 /**
@@ -1319,12 +1368,20 @@ export async function buildNewsChartData(
     // Append timeframe to title if not already present (e.g., "(12-Month)")
     let title = result.title;
     if (result.timeRange && !title.includes("(")) {
-      // Derive short label: "Last 12 months" → "(12-Month)", "Last 8 quarters" → "(8-Quarter)"
-      const m12 = result.timeRange.match(/last\s+(\d+)\s+month/i);
-      const m8q = result.timeRange.match(/last\s+(\d+)\s+quarter/i);
-      if (m12) title = `${title} (${m12[1]}-Month)`;
-      else if (m8q) title = `${title} (${m8q[1]}-Quarter)`;
+      const mMonth = result.timeRange.match(/last\s+(\d+)\s+month/i);
+      const mQuarter = result.timeRange.match(/last\s+(\d+)\s+quarter/i);
+      const mWeek = result.timeRange.match(/last\s+(\d+)\s+week/i);
+      const mYear = result.timeRange.match(/last\s+(\d+)\s+year/i);
+      const mSingularMonth = result.timeRange.match(/^last\s+month$/i);
+      if (mMonth) title = `${title} (${mMonth[1]}-Month)`;
+      else if (mQuarter) title = `${title} (${mQuarter[1]}-Quarter)`;
+      else if (mWeek) title = `${title} (${mWeek[1]}-Week)`;
+      else if (mYear) title = `${title} (${mYear[1]}-Year)`;
+      else if (mSingularMonth) title = `${title} (1-Month)`;
     }
+
+    // Generate editorial caption from actual data
+    const caption = generateChartCaption(result.title, result.values, result.unit, result.timeRange);
 
     const dataset: ChartDataset = {
       title,
@@ -1336,6 +1393,7 @@ export async function buildNewsChartData(
       timeRange: result.timeRange,
       chartLabel: meta?.chartLabel,
       insertAfterParagraph: meta?.insertAfterParagraph,
+      caption: caption || undefined,
     };
 
     // Attach well-known benchmark reference lines for editorial context

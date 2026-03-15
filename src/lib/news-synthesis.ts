@@ -324,10 +324,12 @@ function computeConfidenceScore(
       return String(raw.title ?? raw.headline ?? "").toLowerCase();
     });
     const coherence = computeGroupCoherence(headlines);
-    // If coherence < 0.15 (very low overlap), apply -0.15 penalty
-    // If coherence < 0.25, apply -0.10 penalty
-    if (coherence < 0.15) score -= 0.15;
-    else if (coherence < 0.25) score -= 0.10;
+    // If coherence < 0.15 (very low overlap), apply -0.20 penalty (was -0.15)
+    // If coherence < 0.25, apply -0.15 penalty (was -0.10)
+    // Strengthened: low-coherence groups produce sector-confused articles
+    // (e.g., EPAM IT services mixed with HUM healthcare)
+    if (coherence < 0.15) score -= 0.20;
+    else if (coherence < 0.25) score -= 0.15;
   }
 
   return Math.round(Math.min(1.0, Math.max(0, score)) * 100) / 100;
@@ -953,6 +955,11 @@ ${thinSourcesNote}
 
 SOURCE RELEVANCE: Some sources in the list above may not be directly related to the main story. Use ONLY sources that are relevant to the cohesive narrative. Do NOT force unrelated sources into the story — ignore them if they don't fit the topic.
 
+SECTOR COHERENCE (CRITICAL): If the sources span different sectors or industries (e.g., a healthcare analyst downgrade alongside an IT services price target raise), write about the DOMINANT topic only. Do NOT synthesize companies from unrelated sectors into a single narrative. Specifically:
+- Never characterize a company as belonging to a sector it does not belong to (e.g., do not call an IT services company a "healthcare play")
+- If a source is about a company in a different sector, IGNORE it completely
+- The article must be about ONE coherent sector or theme
+
 Editorial angle: ${angle}
 
 CRITICAL: You MUST output your response starting with "HEADLINE:" followed by the headline. Do not add any preamble, commentary, or refusal before the HEADLINE line. Always produce the full structured output.
@@ -1236,59 +1243,12 @@ export async function synthesizeGroupedArticles(
 
       console.log(`[synthesis] Generated ${synthesizedText.length} chars for "${group.topic}"`);
 
-      // Fact-check — extract claims, verify, score, and log results
-      const claims = extractClaimsFromStory(synthesizedText);
-      const { results: factCheckResults, overallScore } = await verifyClaims(claims);
-      const adjustedScore = scoreFactCheckResult(factCheckResults); // Uses actual results (not empty array)
-
-      // Log claim-to-source mapping for transparency (Step 14)
-      if (factCheckResults.length > 0) {
-        console.log(`[synthesis] Fact-check for "${group.topic}": score=${overallScore} (adjusted=${adjustedScore})`);
-        for (const r of factCheckResults) {
-          const status = r.verified ? "✓" : "✗";
-          const src = r.sources && r.sources.length > 0 ? ` [${r.sources[0]}]` : "";
-          console.log(`  ${status} "${r.claim.substring(0, 60)}..." — confidence=${r.confidence}${src}`);
-        }
-      }
-
-      // Reject if adjusted score too low — threshold=55 blocks low-confidence outputs
-      // while allowing well-formed financial journalism through.
-      // REBUILD_MODE: lower to 20 — the heuristic fact-checker (no Google API key) returns
-      // artificially low scores for company/event-specific claims (IPO, earnings) that lack
-      // explicit "%" or "$" triggers, blocking legitimate stories before the QA gate.
-      // The QA gate (72/100) remains the real quality filter during bootstrapping.
-      const FACT_CHECK_THRESHOLD = REBUILD_MODE ? 20 : 55;
-      if (shouldRejectStory(adjustedScore, FACT_CHECK_THRESHOLD)) {
-        stats.rejected++;
-        const reason = `"${group.topic}" fact-check ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`;
-        stats.rejectionDetails.push(reason);
-        stats.rejectedTopics.push(group.topic);
-        console.warn(`[synthesis] Rejected ${reason}`);
-        logRejection(group.topic, `Fact check score: ${adjustedScore}`, adjustedScore);
-        continue;
-      }
-
-      // Confidence score — composite quality gate (source tier + corroboration + recency + fact-check)
-      const groupHasTier1 = hasQualitySource(group.articles);
-      const confidenceScore = computeConfidenceScore(group, overallScore, groupHasTier1);
-      if (confidenceScore < CONFIDENCE_THRESHOLD) {
-        stats.rejected++;
-        const reason = `"${group.topic}" confidence ${confidenceScore} < ${CONFIDENCE_THRESHOLD} (tier1=${groupHasTier1}, sources=${group.articles.length}, factCheck=${overallScore})`;
-        stats.rejectionDetails.push(reason);
-        stats.rejectedTopics.push(group.topic);
-        console.warn(`[synthesis] Rejected — ${reason}`);
-        logRejection(group.topic, `Confidence score: ${confidenceScore}`, adjustedScore);
-        continue;
-      }
-      console.log(`[synthesis] Confidence check passed: "${group.topic}" — score=${confidenceScore}`);
-
-      // Parse structured output
+      // Parse structured output FIRST — fact-check needs parsed story body,
+      // not raw Claude output (which contains HEADLINE:/KEY_TAKEAWAYS:/etc. prefixes)
       const parsed = parseStructuredOutput(synthesizedText, group.topic);
 
       // Validate required fields
       // Word-count check (not char-length) — catches fallback-to-topic-key cases.
-      // e.g. "iran war puts" is 14 chars (passes length<5) but only 3 words — a
-      // failed parse where the topic key was used as the title. Require ≥5 words.
       const titleWords = parsed.title?.trim().split(/\s+/).filter(Boolean) ?? [];
       if (!parsed.title || parsed.title.length < 5 || titleWords.length < 5) {
         stats.errors++;
@@ -1305,6 +1265,47 @@ export async function synthesizeGroupedArticles(
         console.error(`[synthesis] Story body too short for "${group.topic}"`);
         continue;
       }
+
+      // Fact-check — extract claims from PARSED STORY BODY (not raw output)
+      const claims = extractClaimsFromStory(parsed.story);
+      const { results: factCheckResults, overallScore } = await verifyClaims(claims);
+      const adjustedScore = scoreFactCheckResult(factCheckResults);
+
+      // Log claim-to-source mapping for transparency
+      if (factCheckResults.length > 0) {
+        console.log(`[synthesis] Fact-check for "${group.topic}": score=${overallScore} (adjusted=${adjustedScore})`);
+        for (const r of factCheckResults) {
+          const status = r.verified ? "✓" : "✗";
+          const src = r.sources && r.sources.length > 0 ? ` [${r.sources[0]}]` : "";
+          console.log(`  ${status} "${r.claim.substring(0, 60)}..." — confidence=${r.confidence}${src}`);
+        }
+      }
+
+      // Reject if adjusted score too low
+      const FACT_CHECK_THRESHOLD = REBUILD_MODE ? 20 : 55;
+      if (shouldRejectStory(adjustedScore, FACT_CHECK_THRESHOLD)) {
+        stats.rejected++;
+        const reason = `"${group.topic}" fact-check ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`;
+        stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
+        console.warn(`[synthesis] Rejected ${reason}`);
+        logRejection(group.topic, `Fact check score: ${adjustedScore}`, adjustedScore);
+        continue;
+      }
+
+      // Confidence score — composite quality gate
+      const groupHasTier1 = hasQualitySource(group.articles);
+      const confidenceScore = computeConfidenceScore(group, overallScore, groupHasTier1);
+      if (confidenceScore < CONFIDENCE_THRESHOLD) {
+        stats.rejected++;
+        const reason = `"${group.topic}" confidence ${confidenceScore} < ${CONFIDENCE_THRESHOLD} (tier1=${groupHasTier1}, sources=${group.articles.length}, factCheck=${overallScore})`;
+        stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
+        console.warn(`[synthesis] Rejected — ${reason}`);
+        logRejection(group.topic, `Confidence score: ${confidenceScore}`, adjustedScore);
+        continue;
+      }
+      console.log(`[synthesis] Confidence check passed: "${group.topic}" — score=${confidenceScore}`);
 
       // ── Image resolution (Editorial Match Rule) ───────────────────────────
       // Step 1: Detect the story's true subject regardless of topic categorization.
@@ -1496,7 +1497,11 @@ export async function synthesizeGroupedArticles(
         {
           topic: "broad_market",
           label: "EQUITIES",
-          minMatches: 2,
+          // Raised from 2→4: sector-specific articles (earnings, healthcare) mention
+          // "equities" or "S&P 500" in passing without being about the broad market.
+          // A threshold of 4 ensures the S&P 500 chart only fires when the article
+          // genuinely discusses broad market dynamics, not just references them.
+          minMatches: 4,
           pattern: /\b(S&P\s*500?|Nasdaq|Dow Jones|Dow\b|equit(?:y|ies)|stock market|market rall(?:y|ied)|market sell.?off|risk.?off|risk.?on)\b/gi,
         },
       ];
@@ -1550,7 +1555,10 @@ export async function synthesizeGroupedArticles(
         relatedTickers: generateTags(group.topic, synthesizedText, group.category),
         sourcesUsed: filterRelevantSources(group.articles, parsed.story, parsed.title),
         factCheckScore: overallScore,
-        verifiedClaims: claims.slice(0, 3),
+        verifiedClaims: factCheckResults
+          .filter((r) => r.verified)
+          .map((r) => r.claim)
+          .slice(0, 3),
         // Editorial enrichment
         whyThisMatters: parsed.whyThisMatters || undefined,
         whatToWatchNext: parsed.whatToWatchNext || undefined,
@@ -1559,8 +1567,14 @@ export async function synthesizeGroupedArticles(
         chartData,
         keyTakeaways: parsed.keyTakeaways.length > 0 ? parsed.keyTakeaways : undefined,
         confidenceScore,
-        // Event-first architecture
-        marketImpact: parsed.marketImpact.length > 0 ? parsed.marketImpact : undefined,
+        // Event-first architecture — filter marketImpact to valid format only
+        // Parser already enforces +/-N.N% or +/-Nbps, but defensive filter
+        // catches any manually injected or edge-case bad formats
+        marketImpact: parsed.marketImpact.length > 0
+          ? parsed.marketImpact.filter((mi) =>
+              /^[+\-]\d+[.,]?\d*\s*(%|bps|bp)$/i.test(mi.change.trim())
+            )
+          : undefined,
         wordCount: parsed.story.trim().split(/\s+/).length,
       };
 
@@ -1722,6 +1736,23 @@ function filterRelevantSources(
       score,
     };
   });
+
+  // Cross-sector contamination guard: if a source headline names a ticker
+  // that doesn't appear anywhere in the synthesized article, halve its score.
+  // This catches cases where generic financial vocabulary ("stock", "price",
+  // "target") inflates overlap for unrelated companies (e.g., EPAM in a healthcare article).
+  const TICKER_PATTERN = /\b[A-Z]{2,5}\b/g;
+  const TICKER_STOPWORDS = new Set(["THE", "FOR", "AND", "NOT", "ALL", "ARE", "BUT", "ITS", "HAS", "WAS", "NEW", "CEO", "IPO", "ETF", "GDP", "CPI", "FED"]);
+  for (const s of scored) {
+    const headlineTickers = (s.source.title.match(TICKER_PATTERN) ?? [])
+      .filter((t) => t.length >= 2 && !TICKER_STOPWORDS.has(t));
+    if (headlineTickers.length > 0) {
+      const tickerInArticle = headlineTickers.some((t) => articleText.includes(t.toLowerCase()));
+      if (!tickerInArticle) {
+        s.score *= 0.5;
+      }
+    }
+  }
 
   // Keep sources with ≥30% headline word overlap with synthesized article
   const relevant = scored.filter((s) => s.score >= 0.3);

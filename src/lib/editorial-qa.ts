@@ -883,6 +883,135 @@ function scoreUpdateLanguage(article: NewsItem): QATestResult {
 }
 
 // ---------------------------------------------------------------------------
+// Source coherence — validates sources are topically related to article
+// ---------------------------------------------------------------------------
+
+function scoreSourceCoherence(article: NewsItem): QATestResult {
+  const STOP = new Set(["the","and","for","are","but","not","all","can","was","has","have","been","will","with","this","that","from","they","than","into","over","such","what","when","how","each","which","their","said","were","after","about","would","could","also","more","just","like","does","some","only","very"]);
+
+  // Extract significant words from article title + story
+  const articleText = `${article.title} ${article.story}`.toLowerCase();
+  const articleWords = new Set(
+    articleText.split(/\W+/).filter((w) => w.length > 3 && !STOP.has(w))
+  );
+
+  const sources = article.sourcesUsed ?? [];
+  if (sources.length === 0) {
+    return { test: "Source Coherence", passed: false, score: 0, maxScore: 5, detail: "no sources listed" };
+  }
+
+  // For each source title, compute word overlap with article
+  let coherentSources = 0;
+  const incoherent: string[] = [];
+
+  for (const src of sources) {
+    const srcWords = (src.title ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 3 && !STOP.has(w));
+    const overlap = srcWords.filter((w) => articleWords.has(w)).length;
+    const ratio = srcWords.length > 0 ? overlap / srcWords.length : 0;
+    if (ratio >= 0.2) {
+      coherentSources++;
+    } else {
+      incoherent.push(src.source);
+    }
+  }
+
+  const coherenceRatio = coherentSources / sources.length;
+
+  let score: number;
+  let detail: string | undefined;
+
+  if (coherenceRatio >= 0.8) {
+    score = 5;
+  } else if (coherenceRatio >= 0.6) {
+    score = 3;
+    detail = `${incoherent.length} source(s) have low topical relevance: ${incoherent.join(", ")}`;
+  } else {
+    score = 0;
+    detail = `most sources (${incoherent.length}/${sources.length}) are topically unrelated to the article`;
+  }
+
+  return { test: "Source Coherence", passed: score >= 3, score, maxScore: 5, detail };
+}
+
+// ---------------------------------------------------------------------------
+// Metadata validation — category, sentiment, tickers match content
+// ---------------------------------------------------------------------------
+
+function scoreMetadataAccuracy(article: NewsItem): QATestResult {
+  let score = 0;
+  const details: string[] = [];
+  const lower = `${article.title} ${article.story}`.toLowerCase();
+
+  // 1. Validate relatedTickers appear in the article text (2 pts)
+  const tickers = article.relatedTickers ?? [];
+  if (tickers.length > 0) {
+    const tickersInText = tickers.filter((t) => {
+      const tickerLower = t.toLowerCase();
+      // Check for ticker symbol or common company name
+      return lower.includes(tickerLower) || lower.includes(t);
+    });
+    if (tickersInText.length === tickers.length) {
+      score += 2;
+    } else if (tickersInText.length > 0) {
+      score += 1;
+      details.push(`${tickers.length - tickersInText.length} ticker(s) not found in article text`);
+    } else {
+      details.push(`none of the tickers [${tickers.join(",")}] appear in article text`);
+    }
+  } else {
+    // Generic tags like MACRO, RATES are acceptable
+    score += 1;
+  }
+
+  // 2. Validate sentiment matches content direction (2 pts)
+  const posPatterns = [/\b(?:beat|surpass|exceed|rally|surge|gain|climb|raise|upgrade|bullish)\b/];
+  const negPatterns = [/\b(?:cut|downgrade|decline|fall|drop|slump|miss|bearish|pressure|headwind|compress)\b/];
+  const posHits = posPatterns.filter((p) => p.test(lower)).length;
+  const negHits = negPatterns.filter((p) => p.test(lower)).length;
+
+  const sentiment = article.sentiment ?? "neutral";
+  if (sentiment === "positive" && negHits > posHits + 1) {
+    details.push(`sentiment "positive" contradicts content (${negHits} negative vs ${posHits} positive signals)`);
+  } else if (sentiment === "negative" && posHits > negHits + 1) {
+    details.push(`sentiment "negative" contradicts content (${posHits} positive vs ${negHits} negative signals)`);
+  } else {
+    score += 2;
+  }
+
+  // 3. Validate marketImpact direction matches change sign AND format (1 pt)
+  if (article.marketImpact && article.marketImpact.length > 0) {
+    const inconsistent = article.marketImpact.filter((mi) => {
+      if (mi.direction === "up" && mi.change.startsWith("-")) return true;
+      if (mi.direction === "down" && mi.change.startsWith("+")) return true;
+      return false;
+    });
+    // Validate change format: should be +/-NUMBER% or +/-NUMBERbps (pipeline standard)
+    const VALID_CHANGE_FORMAT = /^[+\-]\d+[.,]?\d*\s*(%|bps|bp)$/i;
+    const badFormat = article.marketImpact.filter(
+      (mi) => !VALID_CHANGE_FORMAT.test(mi.change.trim())
+    );
+    if (inconsistent.length === 0 && badFormat.length === 0) {
+      score += 1;
+    } else {
+      if (inconsistent.length > 0)
+        details.push(`marketImpact direction/change mismatch for ${inconsistent.map((m) => m.asset).join(", ")}`);
+      if (badFormat.length > 0)
+        details.push(`marketImpact change format invalid for ${badFormat.map((m) => `${m.asset}="${m.change}"`).join(", ")} — expected +/-N.N% or +/-Nbps`);
+    }
+  } else {
+    score += 1; // No marketImpact is acceptable (not all articles have it)
+  }
+
+  return {
+    test: "Metadata Accuracy",
+    passed: score >= 3,
+    score,
+    maxScore: 5,
+    detail: details.length > 0 ? details.join("; ") : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // MAIN: Run all QA tests
 // ---------------------------------------------------------------------------
 
@@ -902,6 +1031,8 @@ export function runEditorialQA(
     scoreConfidence(article),
     scoreFactCheck(article),
     scoreSourceQuality(article),
+    scoreSourceCoherence(article),
+    scoreMetadataAccuracy(article),
     scoreTitle(article.title),
     scoreThesisClarity(article),
     scoreChartQuality(article),

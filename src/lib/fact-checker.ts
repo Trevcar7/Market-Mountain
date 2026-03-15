@@ -20,36 +20,52 @@ interface GoogleFactCheckResponse {
 }
 
 /**
- * Extract verifiable claims/facts from synthesized story text
- * Looks for statements that can be fact-checked
+ * Extract verifiable claims/facts from synthesized story text.
+ *
+ * IMPORTANT: Pass only the parsed story body — NOT raw Claude output.
+ * Raw output contains HEADLINE:, KEY_TAKEAWAYS:, etc. prefixes that
+ * produce garbage claims and inflated scores.
  */
 export function extractClaimsFromStory(story: string): string[] {
+  // Strip any residual structured output prefixes (defensive)
+  const cleaned = story
+    .replace(/^(HEADLINE|KEY_TAKEAWAYS|WHY_MATTERS|SECOND_ORDER|WHAT_WATCH|MARKET_IMPACT):\s*/gm, "")
+    .replace(/^[•\-\*]\s*/gm, "");
+
   const claims: string[] = [];
 
-  // Split into sentences
-  const sentences = story.match(/[^.!?]+[.!?]+/g) || [];
+  // Split into sentences — handle both period-terminated and newline-separated
+  const sentences = cleaned.match(/[^.!?\n]+[.!?]+/g) || [];
+
+  // Opinion/prediction filters — claims containing these are unverifiable
+  const OPINION_PATTERNS = [
+    "I think", "should", "may ", "could ", "might ",
+    "appears to be", "likely", "unlikely", "expected to",
+    "analysts believe", "experts suggest", "projected to",
+    "would ", "in our view", "arguably",
+  ];
 
   for (const sentence of sentences) {
     const trimmed = sentence.trim();
 
-    // Look for fact-based statements (not opinions)
-    // Filter: exclude pure opinions, subjective assessments
     if (
-      trimmed.length > 20 &&
-      !trimmed.includes("I think") &&
-      !trimmed.includes("should") &&
-      !trimmed.includes("may") &&
-      !trimmed.includes("could") &&
-      !trimmed.includes("appears to be")
+      trimmed.length > 30 &&
+      !OPINION_PATTERNS.some((p) => trimmed.toLowerCase().includes(p.toLowerCase()))
     ) {
-      // Extract specific factual claim (first 15-20 words)
+      // Prefer claims with concrete data — prioritize sentences with numbers
       const words = trimmed.split(" ");
-      const claim = words.slice(0, Math.min(15, words.length)).join(" ");
+      const claim = words.slice(0, Math.min(25, words.length)).join(" ");
       claims.push(claim);
     }
   }
 
-  // Return top 3-5 most important claims
+  // Prioritize claims containing numbers (more verifiable)
+  claims.sort((a, b) => {
+    const aHasNum = /\d/.test(a) ? 1 : 0;
+    const bHasNum = /\d/.test(b) ? 1 : 0;
+    return bHasNum - aHasNum;
+  });
+
   return claims.slice(0, 5);
 }
 
@@ -62,7 +78,9 @@ export async function verifyClaims(claims: string[]): Promise<{
   overallScore: number;
 }> {
   if (!claims || claims.length === 0) {
-    return { results: [], overallScore: 50 }; // Default to medium confidence if no claims
+    // Zero extractable claims is suspicious — may indicate formatting issues
+    // or content too vague to verify. Score below threshold to flag for review.
+    return { results: [], overallScore: 35 };
   }
 
   const results: FactCheckResult[] = [];
@@ -192,7 +210,7 @@ function heuristicFactCheck(claim: string): FactCheckResult {
  * Returns 0-100 confidence that story is accurate
  */
 export function scoreFactCheckResult(results: FactCheckResult[]): number {
-  if (results.length === 0) return 70; // Default: assume accurate if no claims
+  if (results.length === 0) return 40; // No claims = cannot verify = low score
 
   const verifiedCount = results.filter((r) => r.verified).length;
   const avgConfidence = Math.round(
