@@ -513,6 +513,27 @@ Before writing, identify:
   2. EVIDENCE: The specific numbers and facts that verify the thesis
   3. NARRATIVE: A 3-paragraph story built only from the thesis and evidence
 
+STANDALONE ARTICLE MANDATE (CRITICAL)
+Every article must be a standalone analytical piece, not an incremental update to a previous story.
+
+Rules:
+- NEVER write an "update" article. Each piece must stand alone as if the reader has no prior context.
+- NEVER use update language: "continues to", "remains elevated", "still above", "persists", "ongoing"
+- If the sources describe an ongoing situation (e.g., a multi-day oil spike), analyze the STRUCTURAL IMPLICATIONS rather than restating what happened:
+  BAD: "Oil prices remain elevated above $95 as Iran tensions continue to weigh on markets."
+  GOOD: "A sustained $95 floor for WTI crude is compressing refining margins and forcing airlines to hedge at levels not seen since 2022."
+- Each article must have a DISTINCT THESIS that is not merely "X is still happening."
+  BAD THESIS: "Iran tensions continue to push oil prices higher."
+  GOOD THESIS: "Sustained crude above $95 is triggering a repricing of airline and shipping equities that markets have not yet fully absorbed."
+- Test: If the headline could have been published yesterday on the same story, the thesis is too generic. Rewrite.
+- The thesis must identify a NEW CONSEQUENCE, a new data point, a new sector implication, or a new comparison that distinguishes this analysis from prior coverage.
+
+EDITORIAL INDEPENDENCE
+Each article must offer a genuinely differentiated analytical perspective:
+- Identify the non-obvious implication: What does this event mean for a sector, asset class, or policy outlook that the headlines have not covered?
+- Name specific second-order effects: If oil rises, do not just say "inflation risk." Name which CPI subcomponents are affected, which sectors face margin compression, and which rate expectations shift.
+- Provide a concrete forward-looking signal: Not "watch for volatility" but "the March FOMC dot plot and April CPI print will determine whether the 10-year holds above 4.5%."
+
 STRUCTURE
 Output your response in this exact format — no deviations:
 
@@ -534,14 +555,14 @@ MARKET_IMPACT:
 STORY RULES
 
 1 Target 500–800 words across five sections — no single section may be less than 60 words
-2 Section 1 (Event Summary): Open with the single most important fact. Inverted pyramid. Most impactful number first.
-3 Section 2 (Market Reaction): How markets responded in price terms. Specific index, sector, or asset moves with percentages or basis points.
-4 Section 3 (Macro Analysis): Why this happened. Economic context, precedent, and the broader macro narrative.
-5 Section 4 (Investor Implications): Which sectors, tickers, or strategies benefit or suffer. Name specific assets.
-6 Section 5 (What to Watch Next): The most important catalyst or data point to monitor over the next 1–4 weeks.
+2 Section 1 (Event Summary): Open with the single most important fact. Inverted pyramid. Most impactful number first. Write in the style of a Reuters flash or FT front-page lede: one sentence, one number, one consequence.
+3 Section 2 (Market Reaction): How markets responded in price terms. Specific index, sector, or asset moves with percentages or basis points. Name at least 2 specific assets or indices. Bloomberg Markets standard: "The S&P 500 fell 1.2%, led by energy names including Exxon (down 3.1%) and Chevron (down 2.8%)."
+4 Section 3 (Macro Analysis): Why this happened. Economic context, precedent, and the broader macro narrative. Include a historical comparison or prior-period reference (e.g., "the largest single-day move since March 2023" or "the third consecutive month above the Fed's 2% target"). Bloomberg/FT standard: connect the event to the macro cycle, not just the headline.
+5 Section 4 (Investor Implications): Which sectors, tickers, or strategies benefit or suffer. Name specific assets. Barron's standard: name at least one ETF, sector, or strategy that benefits and one that faces headwinds. Include a specific price level, valuation multiple, or spread that supports the call.
+6 Section 5 (What to Watch Next): The most important catalyst or data point to monitor over the next 1–4 weeks. CNBC/Reuters standard: name the specific date, event, or data release (e.g., "March 19 FOMC statement" or "April 10 CPI print"). Do not write vague catalysts like "upcoming data releases" or "future Fed decisions."
 7 Separate each section with a blank line. Do NOT label sections with headers.
 8 Use specific numbers, company names, dates, and percentage figures from the sources
-9 Include at least three numerical data points distributed across the story body
+9 Include at least FIVE numerical data points distributed across the story body (not clustered in one paragraph)
 10 Synthesize — do not repeat the same fact in multiple sections
 11 Write with analytical depth and measured tone — not sensationalism
 12 Do not invent any facts not present in the provided sources or the MARKET DATA section
@@ -572,6 +593,15 @@ Where data points are used from MARKET DATA, attribute them. Examples:
   "CPI rose 2.4% year over year in February, according to the Bureau of Labor Statistics."
   "The 10-year Treasury yield stood near 4.28%, per Treasury data."
   "WTI crude rose above $92, according to EIA spot price data."
+
+DATA CONSISTENCY (Step 12c)
+When the MARKET DATA section provides specific figures, you MUST use those exact figures throughout. Never:
+- Round differently in different sections (e.g., "$92.3" in one place and "$92" in another)
+- State a figure as a level in one paragraph and as a change in another without making the relationship clear
+- Use a stale figure from a source article when a fresher figure is in MARKET DATA
+- Quote a percentage move from yesterday's close when MARKET DATA shows a different reference point
+
+Cross-reference rule: When writing about multiple related metrics (e.g., oil price AND inflation AND rate expectations), ensure the causal chain is internally consistent. If you say oil is at $95, and this feeds through to inflation, the inflation figure you cite must be consistent with an oil price at that level.
 
 CONTENT QUALITY (Step 13)
 Avoid:
@@ -621,6 +651,9 @@ Review checklist:
 □ Is the forward-looking signal specific and actionable — not just "watch for volatility"?
 □ Is this story meaningfully different from generic macro uncertainty coverage?
 □ For earnings stories: is the sector or index read-through clearly stated?
+□ STANDALONE CHECK: Could this article have been published yesterday on the same event? If yes, the thesis is too generic — rewrite with a distinct angle.
+□ UPDATE LANGUAGE CHECK: Does the article use "continues to", "remains", "still", "ongoing", "persists"? If yes, reframe around a new consequence or data point.
+□ BENCHMARK CHECK: Would this fit on the front page of Bloomberg Markets or Barron's "Up and Down Wall Street"? If it reads like a wire recap, add analytical depth.
 
 Strengthen any weak section before delivering. If sources are too thin to support the thesis, scale back claims — do not pad with qualifiers instead of facts.
 
@@ -1125,9 +1158,19 @@ export async function synthesizeGroupedArticles(
           topicAndTitles
         );
 
+      // Rule C: mis-categorized trade/tariff story — catch tariff/trade war keywords
+      //   in macro/broad_market articles. Trade stories need shipping/port imagery,
+      //   not generic NYSE trading floor images.
+      const isTradeStory =
+        !["trade_policy", "trade_policy_tariff"].includes(group.topic) &&
+        /\btariff\b|\btrade\s+war\b|\btrade\s+policy\b|\bcustoms?\b|\bimport\s+dut/i.test(
+          topicAndTitles
+        );
+
       // Step 2: Pick Unsplash query — override for mis-categorized stories.
       //   Oil story beats crypto story (energy is primary driver if both match).
-      const imageTopicOverride = isOilStory ? "energy" : isCryptoStory ? "crypto" : group.topic;
+      //   Trade/tariff beats generic macro. Oil beats all.
+      const imageTopicOverride = isOilStory ? "energy" : isCryptoStory ? "crypto" : isTradeStory ? "trade_policy" : group.topic;
 
       if (isOilStory) {
         console.log(
@@ -1136,6 +1179,10 @@ export async function synthesizeGroupedArticles(
       } else if (isCryptoStory) {
         console.log(
           `[synthesis] Image override: "${group.topic}" → "crypto" (crypto keywords detected in titles)`
+        );
+      } else if (isTradeStory) {
+        console.log(
+          `[synthesis] Image override: "${group.topic}" → "trade_policy" (trade/tariff keywords detected in titles)`
         );
       }
       let unsplashUrl = await fetchUnsplashImage(imageTopicOverride, runImageCache);

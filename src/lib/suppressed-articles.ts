@@ -59,4 +59,13 @@ export const SUPPRESSED_ARTICLE_IDS = new Set<string>([
 
   "news-1773575410020-673",   // "Bitcoin Surges Past $73,000 Amid Geopolitical Tension and Institutional Inflows"
 
+  // ── March 15, 2026 — Iran/oil canonical article (suppressed: update, not standalone) ──
+  // This was the "canonical" Iran/oil article but it was an incremental update to the
+  // same event covered since March 12, not a standalone analysis piece. Deleted as part
+  // of the editorial pipeline audit. The improved pipeline will generate fresh standalone
+  // articles on distinct events going forward.
+  // To permanently remove from KV: POST /api/admin/clean-feed with all IDs in this set.
+
+  "news-1773590264851-650",   // "Iran Crisis Lifts Oil, Strains Refiners and Reshapes Energy Supply Chains" (update article — same event since Mar 12)
+
 ]);

@@ -785,6 +785,88 @@ function scoreStoryCompleteness(article: NewsItem): QATestResult {
 }
 
 // ---------------------------------------------------------------------------
+// Update Language Detector — prevents incremental update articles
+// ---------------------------------------------------------------------------
+
+/**
+ * Detects update-style language that indicates the article is an incremental
+ * update to an ongoing story rather than a standalone analytical piece.
+ *
+ * Penalty-based: awards 0 bonus points but can impose a deduction of up to
+ * -10 points from the total QA score. This is a hard quality gate.
+ *
+ * Update language patterns:
+ *   - "continues to" / "remain elevated" / "still above" / "ongoing"
+ *   - "as tensions persist" / "continues its climb"
+ *   - Restating a thesis that could have been published yesterday
+ */
+const UPDATE_LANGUAGE_PATTERNS: RegExp[] = [
+  /\bcontinues?\s+to\b/i,
+  /\bcontinues?\s+(its?|their|the)\b/i,
+  /\bremain[s]?\s+(elevated|high|low|above|below|near|steady|subdued|depressed|strong|weak)\b/i,
+  /\bstill\s+(above|below|near|trading|holding|at)\b/i,
+  /\bongoing\s+(tensions?|concerns?|pressure|volatility|uncertainty|conflict|crisis|disruption)\b/i,
+  /\bpersist[s]?\b/i,
+  /\bsustained\s+pressure\b/i,
+  /\bextended\s+(rally|decline|selloff|sell-off|downturn|slide)\b/i,
+  /\bfurther\s+(escalat|deteriorat|weaken|strengthen)/i,
+  /\bdeepen(s|ed|ing)?\s+(the|its?|their)\b/i,
+];
+
+/** Phrases that indicate a genuine analytical use of these words, not update language */
+const UPDATE_LANGUAGE_EXCEPTIONS: RegExp[] = [
+  /\bcontinues?\s+to\s+(compress|widen|tighten|diverge|outperform|underperform)\b/i,
+  /\bif\s+(tensions?|prices?|rates?)\s+remain\b/i,
+  /\bshould\s+(tensions?|prices?|rates?)\s+(persist|remain|continue)\b/i,
+];
+
+function scoreUpdateLanguage(article: NewsItem): QATestResult {
+  const text = article.title + " " + article.story + " " + (article.whyThisMatters ?? "");
+
+  const matches: string[] = [];
+  for (const pattern of UPDATE_LANGUAGE_PATTERNS) {
+    const m = text.match(pattern);
+    if (m) {
+      // Check if this match is actually an exception (analytical use)
+      const isException = UPDATE_LANGUAGE_EXCEPTIONS.some((exc) => {
+        // Check a 50-char window around the match for the exception pattern
+        const idx = text.toLowerCase().indexOf(m[0].toLowerCase());
+        const window = text.slice(Math.max(0, idx - 10), idx + 60);
+        return exc.test(window);
+      });
+      if (!isException) {
+        matches.push(m[0]);
+      }
+    }
+  }
+
+  // Scoring: 0 matches = 0 penalty, 1 match = -3 penalty, 2+ = -7 penalty, 3+ = -10 penalty
+  let penalty = 0;
+  let detail: string | undefined;
+
+  if (matches.length === 0) {
+    // No update language — good
+  } else if (matches.length === 1) {
+    penalty = -3;
+    detail = `1 update-language phrase detected: "${matches[0]}" — article may read as an incremental update`;
+  } else if (matches.length === 2) {
+    penalty = -7;
+    detail = `2 update-language phrases detected: "${matches.slice(0, 2).join('", "')}" — article reads as an incremental update, not standalone analysis`;
+  } else {
+    penalty = -10;
+    detail = `${matches.length} update-language phrases detected — article is an incremental update, not standalone analysis. Matches: "${matches.slice(0, 3).join('", "')}"`;
+  }
+
+  return {
+    test: "Update Language",
+    passed: penalty > -7,     // 1 instance is a warning, 2+ is a fail
+    score: penalty,           // Negative score (penalty)
+    maxScore: 0,              // No positive contribution
+    detail,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // MAIN: Run all QA tests
 // ---------------------------------------------------------------------------
 
@@ -811,6 +893,7 @@ export function runEditorialQA(
     scoreOriginality(article, existingArticles),
     scoreEditorialVoice(article),
     scoreImageQuality(article, existingArticles),
+    scoreUpdateLanguage(article),
   ];
 
   const score = tests.reduce((sum, t) => sum + t.score, 0);

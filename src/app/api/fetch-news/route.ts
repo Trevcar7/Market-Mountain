@@ -63,6 +63,7 @@ const DEFAULT_DEDUP_HOURS = 8; // was 6
 // ---------------------------------------------------------------------------
 const ONGOING_EVENT_WINDOW_HOURS = 72;
 const ENTITY_OVERLAP_THRESHOLD = 0.55; // 55% shared entities = same ongoing story
+const HEADLINE_SIMILARITY_THRESHOLD = 0.50; // 50% word overlap = likely same story
 
 /**
  * Extract a normalized set of key entities from a collection of text strings.
@@ -130,6 +131,38 @@ function computeEntityOverlap(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
   const intersection = [...a].filter((e) => b.has(e)).length;
   return intersection / Math.min(a.size, b.size);
+}
+
+/**
+ * Compute headline similarity as a word-level Jaccard coefficient.
+ * Stops words (the, a, and, in, of, etc.) are excluded to focus on
+ * meaningful content words. Returns 0–1 where 1.0 = identical headlines.
+ *
+ * This catches near-duplicate headlines that entity matching may miss
+ * (e.g. "Oil Prices Rise on Iran Tensions" vs "Iran Tensions Push Oil Higher").
+ */
+const STOP_WORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+  "of", "with", "by", "from", "as", "is", "are", "was", "were", "be",
+  "been", "being", "have", "has", "had", "do", "does", "did", "will",
+  "would", "could", "should", "may", "might", "shall", "can", "that",
+  "this", "these", "those", "it", "its", "not", "no", "nor", "so",
+  "yet", "both", "each", "all", "any", "more", "most", "other", "some",
+  "such", "than", "too", "very", "just", "also", "amid", "after",
+  "before", "between", "during", "into", "over", "under", "about",
+]);
+
+function computeHeadlineSimilarity(headline1: string, headline2: string): number {
+  const tokenize = (s: string): Set<string> => {
+    const words = s.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+    return new Set(words.filter((w) => !STOP_WORDS.has(w) && w.length > 1));
+  };
+  const a = tokenize(headline1);
+  const b = tokenize(headline2);
+  if (a.size === 0 || b.size === 0) return 0;
+  const intersection = [...a].filter((w) => b.has(w)).length;
+  const union = new Set([...a, ...b]).size;
+  return union > 0 ? intersection / union : 0;
 }
 
 /**
@@ -574,47 +607,79 @@ async function handleNewsFetch() {
     // (prevents TWO new groups in the same run from publishing on the same cluster)
     const claimedEntityClusters: Set<string>[] = [];
 
+    // Also track claimed headlines for in-run headline similarity suppression
+    const claimedGroupHeadlines: string[] = [];
+
     const afterEntityMatch = afterTierCheck.filter((g) => {
       const groupTitles = g.articles.map((a) => {
         const raw = a as Record<string, unknown>;
         return String(raw.headline ?? raw.title ?? "");
       });
       const groupEntities = extractEventEntities([g.topic, ...groupTitles]);
+      const compositeHeadline = groupTitles.join(" ");
 
-      // Need at least 2 entities to do meaningful matching (1-entity groups are
-      // too broad — "oil" alone would match everything in an oil-driven run)
-      if (groupEntities.size < 2) return true;
-
-      // Check against published articles in the ongoing-event window
+      // ── Headline similarity check (catches near-dupes entity matching misses) ──
+      // Compare group's headlines against recently published article titles.
       for (const sig of existingEntitySigs) {
-        if (sig.entities.size < 2) continue;
-        const overlap = computeEntityOverlap(groupEntities, sig.entities);
-        if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+        const sim = computeHeadlineSimilarity(compositeHeadline, sig.title);
+        if (sim >= HEADLINE_SIMILARITY_THRESHOLD) {
           console.log(
-            `[fetch-news] Entity-match suppress: "${g.topic}" ` +
-            `(${Math.round(overlap * 100)}% entity overlap with published ` +
-            `"${sig.title.slice(0, 60)}" [${sig.topicKey}] — same ongoing story)`
+            `[fetch-news] Headline-similarity suppress: "${g.topic}" ` +
+            `(${Math.round(sim * 100)}% word overlap with published ` +
+            `"${sig.title.slice(0, 60)}" [${sig.topicKey}])`
           );
           return false;
         }
       }
 
-      // Check against other groups already accepted in this run
-      for (const claimedEntities of claimedEntityClusters) {
-        if (claimedEntities.size < 2) continue;
-        const overlap = computeEntityOverlap(groupEntities, claimedEntities);
-        if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+      // Check headline similarity against other groups already accepted in this run
+      for (const claimed of claimedGroupHeadlines) {
+        const sim = computeHeadlineSimilarity(compositeHeadline, claimed);
+        if (sim >= HEADLINE_SIMILARITY_THRESHOLD) {
           console.log(
-            `[fetch-news] Entity-match suppress: "${g.topic}" ` +
-            `(${Math.round(overlap * 100)}% entity overlap with another group in this run — ` +
-            `same ongoing story, only first group synthesized)`
+            `[fetch-news] Headline-similarity suppress: "${g.topic}" ` +
+            `(${Math.round(sim * 100)}% word overlap with another group in this run)`
           );
           return false;
+        }
+      }
+
+      // ── Entity-based matching ──
+      // Need at least 2 entities to do meaningful matching (1-entity groups are
+      // too broad — "oil" alone would match everything in an oil-driven run)
+      if (groupEntities.size >= 2) {
+        // Check against published articles in the ongoing-event window
+        for (const sig of existingEntitySigs) {
+          if (sig.entities.size < 2) continue;
+          const overlap = computeEntityOverlap(groupEntities, sig.entities);
+          if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+            console.log(
+              `[fetch-news] Entity-match suppress: "${g.topic}" ` +
+              `(${Math.round(overlap * 100)}% entity overlap with published ` +
+              `"${sig.title.slice(0, 60)}" [${sig.topicKey}] — same ongoing story)`
+            );
+            return false;
+          }
+        }
+
+        // Check against other groups already accepted in this run
+        for (const claimedEntities of claimedEntityClusters) {
+          if (claimedEntities.size < 2) continue;
+          const overlap = computeEntityOverlap(groupEntities, claimedEntities);
+          if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+            console.log(
+              `[fetch-news] Entity-match suppress: "${g.topic}" ` +
+              `(${Math.round(overlap * 100)}% entity overlap with another group in this run — ` +
+              `same ongoing story, only first group synthesized)`
+            );
+            return false;
+          }
         }
       }
 
       // This group's entity cluster is novel — claim it and allow synthesis
       claimedEntityClusters.push(groupEntities);
+      claimedGroupHeadlines.push(compositeHeadline);
       return true;
     });
 
@@ -622,8 +687,8 @@ async function handleNewsFetch() {
 
     if (stats.entityMatchSuppressed > 0) {
       console.log(
-        `[fetch-news] Entity-match: ${stats.entityMatchSuppressed} group(s) suppressed ` +
-        `(same ongoing story as a recently published article)`
+        `[fetch-news] Entity/headline-match: ${stats.entityMatchSuppressed} group(s) suppressed ` +
+        `(same ongoing story or near-duplicate headlines)`
       );
     }
 
@@ -642,10 +707,53 @@ async function handleNewsFetch() {
     });
     stats.categoryCapDropped = catCapBefore - afterCategoryCap.length;
 
+    // 4d.5. Diversification promotion — re-sort groups to promote category diversity.
+    //
+    // Problem: When one macro event dominates (e.g., Iran/oil), all top-importance
+    // groups cluster in the same category ("macro" or "policy"). The per-category cap
+    // drops excess groups, but they were already the highest-ranked, so we lose good
+    // stories while potentially missing distinct sector/earnings angles.
+    //
+    // Solution: Re-sort groups so that categories already heavily represented in the
+    // recent feed (last 24h) are ranked lower, and underrepresented categories get a
+    // promotion boost. This does NOT override hard caps — it just changes priority
+    // ordering so the 3-group cap picks a diverse mix.
+    const recentCategoryHistogram: Record<string, number> = {};
+    const dayMs = 24 * 60 * 60 * 1000;
+    for (const s of existingActive) {
+      if (Date.now() - new Date(s.publishedAt).getTime() < dayMs) {
+        const cat = s.category || "other";
+        recentCategoryHistogram[cat] = (recentCategoryHistogram[cat] ?? 0) + 1;
+      }
+    }
+
+    const diversifiedGroups = [...afterCategoryCap].sort((a, b) => {
+      const aCatCount = recentCategoryHistogram[a.category] ?? 0;
+      const bCatCount = recentCategoryHistogram[b.category] ?? 0;
+
+      // Diversification bonus: groups in underrepresented categories get priority.
+      // Each existing article in the same category reduces the group's effective
+      // importance by 2 points, making room for different angles.
+      const aEffective = a.importance - (aCatCount * 2);
+      const bEffective = b.importance - (bCatCount * 2);
+
+      // Primary sort: effective importance (higher first)
+      if (bEffective !== aEffective) return bEffective - aEffective;
+      // Tie-break: raw importance
+      return b.importance - a.importance;
+    });
+
+    if (Object.keys(recentCategoryHistogram).length > 0) {
+      console.log(
+        `[fetch-news] Diversification: recent 24h categories = ${JSON.stringify(recentCategoryHistogram)}. ` +
+        `Re-sorted ${diversifiedGroups.length} groups to promote underrepresented categories.`
+      );
+    }
+
     // 4e. Minimum importance floor (lower in single-source fallback mode)
-    const impBefore = afterCategoryCap.length;
+    const impBefore = diversifiedGroups.length;
     const importanceFloor = usingFallback ? MIN_IMPORTANCE_SINGLE_SOURCE : MIN_IMPORTANCE;
-    const afterImportanceFloor = afterCategoryCap.filter((g) => {
+    const afterImportanceFloor = diversifiedGroups.filter((g) => {
       if (g.importance < importanceFloor) {
         console.log(`[fetch-news] Low importance: dropping "${g.topic}" (score=${g.importance} < floor=${importanceFloor})`);
         return false;
