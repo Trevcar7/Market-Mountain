@@ -157,6 +157,20 @@ export interface FinnhubArticle {
   related?: string[];
 }
 
+/**
+ * RSS articles are normalized into FinnhubArticle shape so they flow through
+ * the existing pipeline (filterByAge, filterByRelevance, deduplicateNews, etc.)
+ * without any downstream changes.
+ *
+ * The `source` field carries the canonical outlet name (e.g. "Reuters") which
+ * is matched against TIER_1_SOURCES / TIER_2_SOURCES in news.ts automatically.
+ * Author attribution (when present) is stored as "author:<name>" in `related`.
+ *
+ * This type alias exists purely for documentation; at runtime it is identical
+ * to FinnhubArticle.
+ */
+export type RssArticle = FinnhubArticle;
+
 export interface NewsAPIArticle {
   source: {
     id: string | null;

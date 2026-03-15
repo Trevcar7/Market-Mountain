@@ -15,6 +15,12 @@ import {
   validateCoPublication,
   CO_PUB_WINDOW_HOURS,
 } from "@/lib/co-publication-validator";
+import { fetchRSSFeeds, RssFetchStats } from "@/lib/rss-fetch";
+import {
+  fetchMarketauxNews,
+  fetchNewsDataNews,
+  fetchGNewsNews,
+} from "@/lib/news-apis";
 
 export const maxDuration = 60; // Vercel Pro: up to 60s (synthesis takes 25-50s)
 export const runtime = "nodejs";
@@ -112,16 +118,21 @@ function healthCheck(): HealthStatus {
   if (!process.env.FINNHUB_API_KEY) warnings.push("FINNHUB_API_KEY not set — Finnhub source disabled");
   if (!process.env.NEWSAPI_API_KEY) warnings.push("NEWSAPI_API_KEY not set — NewsAPI source disabled");
   if (!process.env.UNSPLASH_ACCESS_KEY) warnings.push("UNSPLASH_ACCESS_KEY not set — using fallback images");
+  // RSS feeds are always attempted (no API key required) — individual feed failures are non-fatal
 
   // Optional enrichment API keys — presence/absence logged for diagnostics
   const optional: Record<string, boolean> = {
-    FRED_API_KEY: !!process.env.FRED_API_KEY,
-    BLS_API_KEY: !!process.env.BLS_API_KEY,
-    EIA_API_KEY: !!process.env.EIA_API_KEY,
-    FMP_API_KEY: !!process.env.FMP_API_KEY,
-    ALPHAVANTAGE_API_KEY: !!process.env.ALPHAVANTAGE_API_KEY,
-    POLYGON_API_KEY: !!process.env.POLYGON_API_KEY,
-    NEXT_PUBLIC_SITE_URL: !!process.env.NEXT_PUBLIC_SITE_URL,
+    FRED_API_KEY:          !!process.env.FRED_API_KEY,
+    BLS_API_KEY:           !!process.env.BLS_API_KEY,
+    EIA_API_KEY:           !!process.env.EIA_API_KEY,
+    FMP_API_KEY:           !!process.env.FMP_API_KEY,
+    ALPHAVANTAGE_API_KEY:  !!process.env.ALPHAVANTAGE_API_KEY,
+    POLYGON_API_KEY:       !!process.env.POLYGON_API_KEY,
+    NEXT_PUBLIC_SITE_URL:  !!process.env.NEXT_PUBLIC_SITE_URL,
+    // Extended news sources — each degrades gracefully when absent
+    MARKETAUX_API_KEY:     !!process.env.MARKETAUX_API_KEY,
+    NEWSDATA_API_KEY:      !!process.env.NEWSDATA_API_KEY,
+    GNEWS_API_KEY:         !!process.env.GNEWS_API_KEY,
   };
 
   const status =
@@ -211,6 +222,12 @@ async function handleNewsFetch() {
   const stats = {
     fetchedFinnhub: 0,
     fetchedNewsAPI: 0,
+    fetchedRSS: 0,
+    rssFeedsOk: 0,
+    rssFeedsFailed: 0,
+    fetchedMarketaux: 0,
+    fetchedNewsData: 0,
+    fetchedGNews: 0,
     filtered: 0,
     deduplicated: 0,
     grouped: 0,
@@ -230,6 +247,7 @@ async function handleNewsFetch() {
     storiesWithKeyData: 0,
     rebuildMode: REBUILD_MODE,
     rejectionDetails: [] as string[],  // Per-story rejection reasons for diagnostics
+    rssFeedStats: null as RssFetchStats | null,
   };
 
   try {
@@ -244,19 +262,57 @@ async function handleNewsFetch() {
       );
     }
 
-    // 1. Fetch from both sources in parallel
-    const [finnhubArticles, newsapiArticles] = await Promise.all([
+    // 1. Fetch from all sources in parallel.
+    //    All six sources run concurrently — total wall-clock time ≈ slowest single source.
+    //    Each source is fully isolated: one failure returns [] and never aborts the others.
+    const [
+      finnhubArticles,
+      newsapiArticles,
+      rssResult,
+      marketauxArticles,
+      newsdataArticles,
+      gnewsArticles,
+    ] = await Promise.all([
       fetchFinnhubNews(process.env.FINNHUB_API_KEY || ""),
       fetchNewsAPIMultiple(process.env.NEWSAPI_API_KEY || ""),
+      fetchRSSFeeds(),                                              // no API key required
+      fetchMarketauxNews(process.env.MARKETAUX_API_KEY || ""),
+      fetchNewsDataNews(process.env.NEWSDATA_API_KEY || ""),
+      fetchGNewsNews(process.env.GNEWS_API_KEY || ""),
     ]);
 
-    stats.fetchedFinnhub = finnhubArticles.length;
-    stats.fetchedNewsAPI = newsapiArticles.length;
+    stats.fetchedFinnhub  = finnhubArticles.length;
+    stats.fetchedNewsAPI  = newsapiArticles.length;
+    stats.fetchedRSS      = rssResult.articles.length;
+    stats.rssFeedsOk      = rssResult.stats.feedsSucceeded;
+    stats.rssFeedsFailed  = rssResult.stats.feedsFailed;
+    stats.rssFeedStats    = rssResult.stats;
+    stats.fetchedMarketaux = marketauxArticles.length;
+    stats.fetchedNewsData  = newsdataArticles.length;
+    stats.fetchedGNews     = gnewsArticles.length;
 
-    console.log(`[fetch-news] Fetched: Finnhub=${finnhubArticles.length}, NewsAPI=${newsapiArticles.length}`);
+    const totalFetched =
+      finnhubArticles.length + newsapiArticles.length + rssResult.articles.length +
+      marketauxArticles.length + newsdataArticles.length + gnewsArticles.length;
 
-    // 2. Age-filter (48h) then relevance-filter — 48h accommodates NewsAPI free-tier's ~24h delay
-    const allArticles = [...finnhubArticles, ...newsapiArticles];
+    console.log(
+      `[fetch-news] Fetched ${totalFetched} total articles — ` +
+      `Finnhub=${finnhubArticles.length}, NewsAPI=${newsapiArticles.length}, ` +
+      `RSS=${rssResult.articles.length} (${rssResult.stats.feedsSucceeded}/${rssResult.stats.feedsAttempted} feeds), ` +
+      `Marketaux=${marketauxArticles.length}, NewsData=${newsdataArticles.length}, GNews=${gnewsArticles.length}`
+    );
+
+    // 2. Combine all sources into one pool, then age-filter and relevance-filter.
+    //    All six sources are treated identically from this point forward — there is
+    //    no source-specific branching in deduplication, grouping, or synthesis.
+    const allArticles = [
+      ...finnhubArticles,
+      ...newsapiArticles,
+      ...rssResult.articles,
+      ...marketauxArticles,
+      ...newsdataArticles,
+      ...gnewsArticles,
+    ];
     const fresh = filterByAge(allArticles, 48);
     const relevant = filterByRelevance(fresh);
     stats.filtered = relevant.length;
@@ -703,9 +759,18 @@ async function handleNewsFetch() {
 
     console.log(`[fetch-news] FINAL STATS: ${JSON.stringify(stats)}`);
 
+    const totalArticlesFetched =
+      stats.fetchedFinnhub + stats.fetchedNewsAPI + stats.fetchedRSS +
+      stats.fetchedMarketaux + stats.fetchedNewsData + stats.fetchedGNews;
+
     return NextResponse.json({
       success: true,
-      message: `Fetched ${stats.fetchedFinnhub + stats.fetchedNewsAPI} articles, posted ${stats.posted} stories`,
+      message:
+        `Fetched ${totalArticlesFetched} articles ` +
+        `(Finnhub=${stats.fetchedFinnhub}, NewsAPI=${stats.fetchedNewsAPI}, ` +
+        `RSS=${stats.fetchedRSS}/${stats.rssFeedsOk + stats.rssFeedsFailed} feeds, ` +
+        `Marketaux=${stats.fetchedMarketaux}, NewsData=${stats.fetchedNewsData}, GNews=${stats.fetchedGNews}), ` +
+        `posted ${stats.posted} stories`,
       stats,
       health: health.warnings,
       nextUpdate: newsCollection.meta.nextUpdate,

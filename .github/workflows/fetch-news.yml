@@ -17,11 +17,30 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # ── Single entry point: POST /api/fetch-news ──────────────────────────
+      # This endpoint orchestrates the full 11-stage pipeline in one call.
+      # All six news sources run in parallel (Stage 1):
+      #   • Finnhub API            (FINNHUB_API_KEY)
+      #   • NewsAPI                (NEWSAPI_API_KEY)
+      #   • RSS feeds              (35 feeds, no key required — src/lib/rss-config.ts)
+      #   • Marketaux              (MARKETAUX_API_KEY)
+      #   • NewsData.io            (NEWSDATA_API_KEY)
+      #   • GNews                  (GNEWS_API_KEY)
+      # A missing key or failing source returns [] — pipeline always continues.
+      # Remaining stages (2–11):
+      #   2. Combine all → age-filter (48h) → relevance-filter
+      #   3. URL+headline deduplication (cross-source same-article detection)
+      #   4. Topic clustering (extractTopicKey with broad synonym map)
+      #   5. Cross-run topic cooldown + tier check + category cap + importance floor
+      #   6. Synthesize top groups with Claude (structured NewsItems)
+      #   7. Fact-check + Editorial QA gate (≥85/100 required)
+      #   8. Co-publication validation (topical overlap + factual conflict)
+      #   9. Publish to Vercel KV + trigger briefing generation
       - name: Fetch news from Market Mountain API
         run: |
           SITE_URL="${{ secrets.SITE_URL }}"
           if [ -z "$SITE_URL" ]; then
-            SITE_URL="https://marketmountainfinance.com"
+            SITE_URL="https://market-mountain.com"
           fi
 
           echo "Triggering news fetch at $SITE_URL/api/fetch-news"
@@ -54,9 +73,41 @@ jobs:
             exit 1
           fi
 
-          # Log stories posted count
-          posted=$(echo "$response_body" | grep -o '"posted":[0-9]*' | head -1)
-          suppressed=$(echo "$response_body" | grep -o '"crossRunSuppressed":[0-9]*' | head -1)
-          published=$(echo "$response_body" | grep -o '"publishDecision":"[^"]*"' | head -1)
-          echo "Stories posted: $posted | Cross-run suppressed: $suppressed | $published"
+          # ── Source ingestion stats ──────────────────────────────────────────
+          finnhub=$(echo "$response_body"    | grep -o '"fetchedFinnhub":[0-9]*'   | grep -o '[0-9]*$')
+          newsapi=$(echo "$response_body"    | grep -o '"fetchedNewsAPI":[0-9]*'    | grep -o '[0-9]*$')
+          rss_articles=$(echo "$response_body" | grep -o '"fetchedRSS":[0-9]*'     | grep -o '[0-9]*$')
+          rss_ok=$(echo "$response_body"     | grep -o '"rssFeedsOk":[0-9]*'        | grep -o '[0-9]*$')
+          rss_failed=$(echo "$response_body" | grep -o '"rssFeedsFailed":[0-9]*'    | grep -o '[0-9]*$')
+          marketaux=$(echo "$response_body"  | grep -o '"fetchedMarketaux":[0-9]*'  | grep -o '[0-9]*$')
+          newsdata=$(echo "$response_body"   | grep -o '"fetchedNewsData":[0-9]*'   | grep -o '[0-9]*$')
+          gnews=$(echo "$response_body"      | grep -o '"fetchedGNews":[0-9]*'      | grep -o '[0-9]*$')
+
+          echo "─── Source ingestion ───────────────────────────────"
+          echo "  Finnhub API:  ${finnhub:-0} articles"
+          echo "  NewsAPI:      ${newsapi:-0} articles"
+          echo "  RSS feeds:    ${rss_articles:-0} articles (${rss_ok:-0} feeds OK, ${rss_failed:-0} failed)"
+          echo "  Marketaux:    ${marketaux:-0} articles"
+          echo "  NewsData.io:  ${newsdata:-0} articles"
+          echo "  GNews:        ${gnews:-0} articles"
+
+          # ── Pipeline stats ─────────────────────────────────────────────────
+          filtered=$(echo "$response_body"    | grep -o '"filtered":[0-9]*'           | grep -o '[0-9]*$')
+          deduped=$(echo "$response_body"     | grep -o '"deduplicated":[0-9]*'        | grep -o '[0-9]*$')
+          grouped=$(echo "$response_body"     | grep -o '"grouped":[0-9]*'             | grep -o '[0-9]*$')
+          suppressed=$(echo "$response_body"  | grep -o '"crossRunSuppressed":[0-9]*'  | grep -o '[0-9]*$')
+          synth=$(echo "$response_body"       | grep -o '"synthesisGroups":[0-9]*'     | grep -o '[0-9]*$')
+          posted=$(echo "$response_body"      | grep -o '"posted":[0-9]*'              | grep -o '[0-9]*$')
+          rejected=$(echo "$response_body"    | grep -o '"rejected":[0-9]*'            | grep -o '[0-9]*$')
+          published=$(echo "$response_body"   | grep -o '"publishDecision":"[^"]*"'    | grep -o '"[^"]*"$' | tr -d '"')
+
+          echo "─── Pipeline ───────────────────────────────────────"
+          echo "  After relevance filter: ${filtered:-0}"
+          echo "  After URL+headline dedup: ${deduped:-0}"
+          echo "  Topic groups formed: ${grouped:-0}"
+          echo "  Cross-run suppressed: ${suppressed:-0}"
+          echo "  Sent to synthesis: ${synth:-0}"
+          echo "  Published: ${posted:-0} | Rejected by QA/co-pub: ${rejected:-0}"
+          echo "  Publish decision: ${published:-unknown}"
+          echo "────────────────────────────────────────────────────"
           echo "News fetch completed successfully"

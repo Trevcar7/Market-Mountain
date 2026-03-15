@@ -499,20 +499,43 @@ export function filterByRelevance(articles: (FinnhubArticle | NewsAPIArticle)[])
 }
 
 /**
- * Remove duplicate articles by headline/title
+ * Remove duplicate articles by URL (exact) and headline/title (exact, case-insensitive).
+ *
+ * URL deduplication is critical when RSS feeds, Finnhub, and NewsAPI all surface
+ * the same article — they share the same canonical URL even when their titles
+ * differ slightly (e.g. truncation, CDATA encoding differences).
+ *
+ * Priority: URL match is checked first; headline match is a secondary fallback
+ * for cases where the same story appears under different URLs (e.g. AMP vs canonical).
  */
 export function deduplicateNews(articles: (FinnhubArticle | NewsAPIArticle)[]): (FinnhubArticle | NewsAPIArticle)[] {
-  const seen = new Set<string>();
+  const seenUrls = new Set<string>();
+  const seenHeadlines = new Set<string>();
+
   return articles.filter((article) => {
     const headline = isFinnhub(article)
       ? (article as FinnhubArticle).headline
       : (article as NewsAPIArticle).title;
 
-    if (!headline || seen.has(headline.toLowerCase())) {
-      return false;
+    const url = isFinnhub(article)
+      ? (article as FinnhubArticle).url
+      : (article as NewsAPIArticle).url;
+
+    // URL dedup — normalize by stripping query params and trailing slashes
+    if (url) {
+      let normalizedUrl = url.toLowerCase().split("?")[0].replace(/\/$/, "");
+      // Strip common AMP suffix so amp and canonical match
+      normalizedUrl = normalizedUrl.replace(/\/amp\/?$/, "");
+      if (seenUrls.has(normalizedUrl)) return false;
+      seenUrls.add(normalizedUrl);
     }
 
-    seen.add(headline.toLowerCase());
+    // Headline dedup — secondary guard for same story at different URLs
+    if (!headline) return false;
+    const normalizedHeadline = headline.toLowerCase().trim();
+    if (seenHeadlines.has(normalizedHeadline)) return false;
+    seenHeadlines.add(normalizedHeadline);
+
     return true;
   });
 }
@@ -639,22 +662,152 @@ function extractTopicKey(headline: string): string {
   const lower = headline.toLowerCase();
 
   // 1. Broad macro / market topics — checked first so company-specific news
-  //    about, e.g., the Fed still lands in the right bucket
+  //    about, e.g., the Fed still lands in the right bucket.
+  //
+  //    Synonym coverage is intentionally broad so RSS articles that use different
+  //    phrasing than API sources (e.g. "central bank" vs "Federal Reserve",
+  //    "consumer prices" vs "CPI", "payrolls" vs "jobs report") still land in
+  //    the same topic bucket and cluster with corroborating articles.
   const topicMappings: [string[], string][] = [
-    [["federal reserve", "fed ", "fomc", "powell", "jerome powell", "rate hike", "rate cut", "rate pause", "interest rate"], "federal_reserve"],
-    [["inflation", "cpi", "ppi", "consumer price index", "producer price", "core inflation"], "inflation"],
-    [["gdp", "gross domestic product", "economic growth", "economic output"], "gdp"],
-    [["jobs report", "nonfarm payroll", "unemployment rate", "employment report", "jobless claims"], "employment"],
-    [["tariff", "trade war", "trade policy", "import duty", "trade deal", "trade deficit"], "trade_policy"],
-    [["s&p 500", "nasdaq composite", "dow jones", "stock market", "market rally", "market selloff", "market decline", "market gains", "broad market", "equities rise", "equities fall"], "broad_market"],
-    [["bitcoin", "crypto", "ethereum", "digital asset", "blockchain", "defi", "nft"], "crypto"],
-    [["bankruptcy", "chapter 11", "debt restructuring", "debt default", "insolvency"], "bankruptcy"],
-    [["merger", "acquisition", "takeover", "buyout", "deal worth", "acquires", "buys out"], "merger_acquisition"],
-    [["treasury yield", "bond yield", "yield curve", "10-year", "2-year", "bond market"], "bond_market"],
-    [["oil price", "crude oil", "brent crude", "wti crude", "opec", "energy prices"], "energy"],
-    [["earnings", "quarterly results", "quarterly earnings", "revenue beat", "revenue miss", "eps beat", "eps miss", "profit beat", "profit miss"], "earnings"],
-    [["layoff", "layoffs", "job cuts", "workforce reduction", "headcount reduction"], "layoffs"],
-    [["ipo", "initial public offering", "goes public", "stock debut", "listing on"], "ipo"],
+    [
+      // Fed / monetary policy — many RSS outlets use "central bank" or "rate hold"
+      [
+        "federal reserve", "fed ", "fomc", "powell", "jerome powell",
+        "rate hike", "rate cut", "rate pause", "rate hold", "rates on hold",
+        "rates unchanged", "interest rate", "central bank", "monetary policy",
+        "policy rate", "benchmark rate", "fed funds", "tightening cycle",
+        "rate decision", "rate move", "rate rise", "rate increase", "rate decrease",
+      ],
+      "federal_reserve",
+    ],
+    [
+      // Inflation — Reuters/FT often say "consumer prices" without "CPI"
+      [
+        "inflation", "cpi", "ppi", "consumer price index", "producer price",
+        "core inflation", "consumer prices", "price growth", "price pressures",
+        "price surge", "price rise", "price increase", "price stability",
+        "disinflation", "deflation", "inflationary", "price level",
+        "cost of living", "purchasing power",
+      ],
+      "inflation",
+    ],
+    [
+      [
+        "gdp", "gross domestic product", "economic growth", "economic output",
+        "economic contraction", "economic expansion", "economic slowdown",
+        "growth rate", "quarterly growth", "annual growth",
+      ],
+      "gdp",
+    ],
+    [
+      // Employment — AP often says "payrolls" or "jobless" rather than "jobs report"
+      [
+        "jobs report", "nonfarm payroll", "nonfarm payrolls", "payrolls",
+        "unemployment rate", "employment report", "jobless claims",
+        "job market", "labor market", "labour market", "hiring slows",
+        "hiring picks up", "job growth", "job losses", "workers laid off",
+        "unemployment", "jobless rate",
+      ],
+      "employment",
+    ],
+    [
+      // Trade / tariffs — Reuters uses "import levies", FT uses "trade friction"
+      [
+        "tariff", "tariffs", "trade war", "trade policy", "import duty",
+        "import levies", "trade deal", "trade deficit", "trade surplus",
+        "trade friction", "trade tensions", "trade dispute", "trade barrier",
+        "customs duty", "section 301", "section 232",
+      ],
+      "trade_policy",
+    ],
+    [
+      [
+        "s&p 500", "nasdaq composite", "dow jones", "stock market",
+        "market rally", "market selloff", "market sell-off", "market decline",
+        "market gains", "broad market", "equities rise", "equities fall",
+        "equities climb", "stocks rise", "stocks fall", "stocks rally",
+        "wall street", "equity markets", "global markets",
+      ],
+      "broad_market",
+    ],
+    [
+      [
+        "bitcoin", "crypto", "ethereum", "digital asset", "blockchain",
+        "defi", "nft", "cryptocurrency", "digital currency", "btc",
+        "stablecoin", "altcoin", "crypto market",
+      ],
+      "crypto",
+    ],
+    [
+      [
+        "bankruptcy", "chapter 11", "chapter 7", "debt restructuring",
+        "debt default", "insolvency", "insolvent", "filing for bankruptcy",
+        "files for protection", "seeks protection",
+      ],
+      "bankruptcy",
+    ],
+    [
+      [
+        "merger", "acquisition", "takeover", "buyout", "deal worth",
+        "acquires", "buys out", "to acquire", "agreed to buy",
+        "deal agreed", "deal valued", "deal for", "m&a",
+      ],
+      "merger_acquisition",
+    ],
+    [
+      // Bonds — Bloomberg/FT say "gilts", "bunds", or just "yields"
+      [
+        "treasury yield", "bond yield", "yield curve", "10-year", "2-year",
+        "bond market", "t-bill", "treasury bonds", "gilts", "bunds",
+        "sovereign bond", "government bond", "fixed income", "yields rise",
+        "yields fall", "yields climb", "bond selloff",
+      ],
+      "bond_market",
+    ],
+    [
+      // Energy — Reuters often says "crude" or "petroleum" without "oil price"
+      [
+        "oil price", "oil prices", "crude oil", "brent crude", "wti crude",
+        "crude prices", "crude falls", "crude rises", "crude climbs",
+        "petroleum", "oil futures", "energy prices", "opec",
+        "natural gas", "lng ", "energy market",
+      ],
+      "energy",
+    ],
+    [
+      [
+        "earnings", "quarterly results", "quarterly earnings", "revenue beat",
+        "revenue miss", "eps beat", "eps miss", "profit beat", "profit miss",
+        "results beat", "results disappoint", "profit rise", "profit fall",
+        "net income", "operating income", "fiscal quarter",
+      ],
+      "earnings",
+    ],
+    [
+      [
+        "layoff", "layoffs", "job cuts", "workforce reduction",
+        "headcount reduction", "redundancies", "staff cuts",
+        "cutting jobs", "eliminating jobs", "downsizing",
+      ],
+      "layoffs",
+    ],
+    [
+      [
+        "ipo", "initial public offering", "goes public", "stock debut",
+        "listing on", "plans to list", "direct listing", "spac",
+      ],
+      "ipo",
+    ],
+    [
+      // Geopolitics — for RSS feeds in the geopolitics category
+      [
+        "sanctions", "geopolitical", "geopolitics", "military conflict",
+        "war risk", "russia ukraine", "middle east", "iran nuclear",
+        "taiwan strait", "south china sea", "nato", "armed forces",
+        "escalation", "ceasefire", "diplomatic tension",
+      ],
+      "geopolitics",
+    ],
   ];
 
   for (const [keywords, topicKey] of topicMappings) {
@@ -734,11 +887,31 @@ function inferCategory(article: FinnhubArticle | NewsAPIArticle): "macro" | "ear
 
   const lowerText = text.toLowerCase();
 
-  if (lowerText.includes("fed") || lowerText.includes("interest rate") || lowerText.includes("inflation"))
+  // Macro: Fed, rates, inflation, GDP, central bank
+  if (
+    lowerText.includes("fed") ||
+    lowerText.includes("interest rate") ||
+    lowerText.includes("inflation") ||
+    lowerText.includes("central bank") ||
+    lowerText.includes("gdp") ||
+    lowerText.includes("cpi") ||
+    lowerText.includes("monetary policy")
+  )
     return "macro";
+
   if (lowerText.includes("earnings") || lowerText.includes("quarter")) return "earnings";
   if (lowerText.includes("bitcoin") || lowerText.includes("crypto")) return "crypto";
-  if (lowerText.includes("sec") || lowerText.includes("regulatory")) return "policy";
+
+  // Policy: regulatory, trade, geopolitics, sanctions
+  if (
+    lowerText.includes("sec") ||
+    lowerText.includes("regulatory") ||
+    lowerText.includes("tariff") ||
+    lowerText.includes("sanction") ||
+    lowerText.includes("geopolit")
+  )
+    return "policy";
+
   if (
     lowerText.includes("market") ||
     lowerText.includes("stock") ||
