@@ -290,24 +290,7 @@ export default async function NewsStoryPage({ params }: Props) {
             <NewsKeyDataInline dataPoints={item.keyDataPoints} />
           )}
 
-          {/* Verified Claims — editorial transparency */}
-          {item.verifiedClaims && item.verifiedClaims.length > 0 && (
-            <div className="mt-8 p-5 rounded-lg bg-slate-50 border border-slate-200">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500 mb-3">
-                Verified Claims
-              </p>
-              <ul className="space-y-1.5">
-                {item.verifiedClaims.map((claim, i) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-700 text-sm leading-relaxed">
-                    <svg className="mt-1 flex-shrink-0 w-3.5 h-3.5 text-accent-500" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                      <path d="M11.5 3.5L5.5 10.5L2.5 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    {claim}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Verified Claims — kept in data for editorial QA, not shown to readers */}
 
           {/* Tickers */}
           {item.relatedTickers && item.relatedTickers.length > 0 && (
