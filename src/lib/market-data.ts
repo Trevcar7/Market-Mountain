@@ -90,6 +90,21 @@ export async function fetchFredLatest(
   return obs[0] ?? null;
 }
 
+/** Fetch latest + previous FRED observation to compute a change value. */
+export async function fetchFredWithChange(
+  seriesId: string
+): Promise<{ value: string; change: string } | null> {
+  const obs = await fetchFredSeries(seriesId, 2);
+  if (!obs[0]) return null;
+  const latest = parseFloat(obs[0].value);
+  const prev = obs[1] ? parseFloat(obs[1].value) : null;
+  if (isNaN(latest)) return null;
+  const changeStr = prev !== null && !isNaN(prev)
+    ? `${latest >= prev ? "+" : ""}${(latest - prev).toFixed(2)}`
+    : undefined;
+  return { value: obs[0].value, change: changeStr ?? "" };
+}
+
 /**
  * Build a chart-ready dataset from a FRED series.
  * Returns chronologically ordered { labels, values } or null.
@@ -853,18 +868,18 @@ export async function fetchContextualData(
       case "federal_reserve":
       case "fed_macro": {
         const [fedfunds, treasury10y, treasury2y, blsMacro] = await Promise.allSettled([
-          fetchFredLatest("FEDFUNDS"),
-          fetchFredLatest("DGS10"),
-          fetchFredLatest("DGS2"),
+          fetchFredWithChange("FEDFUNDS"),
+          fetchFredWithChange("DGS10"),
+          fetchFredWithChange("DGS2"),
           fetchBlsMacroSummary(),
         ]);
 
         if (fedfunds.status === "fulfilled" && fedfunds.value)
-          points.push({ label: "Fed Funds Rate", value: `${fedfunds.value.value}%`, source: "FRED" });
+          points.push({ label: "Fed Funds Rate", value: `${fedfunds.value.value}%`, change: fedfunds.value.change || undefined, source: "FRED" });
         if (treasury10y.status === "fulfilled" && treasury10y.value)
-          points.push({ label: "10-Year Treasury", value: `${treasury10y.value.value}%`, source: "FRED" });
+          points.push({ label: "10-Year Treasury", value: `${treasury10y.value.value}%`, change: treasury10y.value.change || undefined, source: "FRED" });
         if (treasury2y.status === "fulfilled" && treasury2y.value)
-          points.push({ label: "2-Year Treasury", value: `${treasury2y.value.value}%`, source: "FRED" });
+          points.push({ label: "2-Year Treasury", value: `${treasury2y.value.value}%`, change: treasury2y.value.change || undefined, source: "FRED" });
         if (blsMacro.status === "fulfilled" && blsMacro.value.cpi)
           points.push({ label: "CPI (BLS)", value: blsMacro.value.cpi.value, source: "BLS" });
         break;
@@ -933,20 +948,20 @@ export async function fetchContextualData(
       // ── Bond market / yield curve ───────────────────────────────────────
       case "bond_market": {
         const [t10y, t2y, t30y, fedfunds] = await Promise.allSettled([
-          fetchFredLatest("DGS10"),
-          fetchFredLatest("DGS2"),
-          fetchFredLatest("DGS30"),
-          fetchFredLatest("FEDFUNDS"),
+          fetchFredWithChange("DGS10"),
+          fetchFredWithChange("DGS2"),
+          fetchFredWithChange("DGS30"),
+          fetchFredWithChange("FEDFUNDS"),
         ]);
 
         if (t10y.status === "fulfilled" && t10y.value)
-          points.push({ label: "10-Year Yield", value: `${t10y.value.value}%`, source: "FRED" });
+          points.push({ label: "10-Year Yield", value: `${t10y.value.value}%`, change: t10y.value.change || undefined, source: "FRED" });
         if (t2y.status === "fulfilled" && t2y.value)
-          points.push({ label: "2-Year Yield", value: `${t2y.value.value}%`, source: "FRED" });
+          points.push({ label: "2-Year Yield", value: `${t2y.value.value}%`, change: t2y.value.change || undefined, source: "FRED" });
         if (t30y.status === "fulfilled" && t30y.value)
-          points.push({ label: "30-Year Yield", value: `${t30y.value.value}%`, source: "FRED" });
+          points.push({ label: "30-Year Yield", value: `${t30y.value.value}%`, change: t30y.value.change || undefined, source: "FRED" });
         if (fedfunds.status === "fulfilled" && fedfunds.value)
-          points.push({ label: "Fed Funds Rate", value: `${fedfunds.value.value}%`, source: "FRED" });
+          points.push({ label: "Fed Funds Rate", value: `${fedfunds.value.value}%`, change: fedfunds.value.change || undefined, source: "FRED" });
         break;
       }
 

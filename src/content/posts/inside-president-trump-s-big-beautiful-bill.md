@@ -7,6 +7,7 @@ excerpt: "On July 4th, 2025, President Trump signed the One Big Beautiful Bill A
 tags: ["Policy & Economics", "Macro"]
 disclaimer: false
 coverImage: "/images/big-beautiful-bill.png"
+coverImagePosition: "center 25%"
 ---
 
 ## Breaking Down the One Big Beautiful Bill Act

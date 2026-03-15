@@ -162,7 +162,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
           )}
         </div>
-        <div className="bg-white px-4 py-4 overflow-x-auto">
+        <div className="bg-white px-4 py-4">
           <svg
             viewBox={`0 0 ${W} ${H}`}
             className="w-full"
@@ -288,7 +288,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
           <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
         )}
       </div>
-      <div className="bg-white px-4 py-4 overflow-x-auto">
+      <div className="bg-white px-4 py-4">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }} aria-label={chart.title}>
           {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((f) => {

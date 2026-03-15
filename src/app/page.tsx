@@ -58,6 +58,9 @@ export default function HomePage() {
         <MacroBoard />
       </MarketDataProvider>
 
+      {/* Accent divider */}
+      <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
+
       {/* Morning Brief — link to today's curated briefing */}
       <section className="bg-navy-50 border-b border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between gap-4">

@@ -603,7 +603,7 @@ export default function MacroBoard() {
 
         {/* Data sources footer */}
         <div className="px-4 sm:px-6 lg:px-8 py-2.5 border-t border-white/[0.05]">
-          <p className="text-[10px] text-white/20 text-right tracking-wide">
+          <p className="text-[10px] text-white/20 text-right tracking-wide truncate">
             Data sources: Federal Reserve (FRED), Bureau of Labor Statistics, TwelveData, EIA
           </p>
         </div>

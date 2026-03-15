@@ -26,6 +26,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const dateParam = searchParams.get("date");
 
+  // Detect Vercel cron trigger — force-regenerate when called via cron
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  const isCronTrigger = cronSecret && authHeader === `Bearer ${cronSecret}`;
+
   const kv = getRedisClient();
   if (!kv) {
     return NextResponse.json({ error: "Storage unavailable" }, { status: 503 });
@@ -34,22 +39,24 @@ export async function GET(request: NextRequest) {
   const key = dateParam ? getDateKey(dateParam) : getTodayKey();
   const date = dateParam ?? new Date().toISOString().split("T")[0];
 
-  // Try to return cached briefing
-  try {
-    const cached = await kv.get<DailyBriefing>(key);
-    if (cached) {
-      return NextResponse.json(cached, {
-        headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
-        },
-      });
+  // Try to return cached briefing (skip cache on cron trigger to force regeneration)
+  if (!isCronTrigger) {
+    try {
+      const cached = await kv.get<DailyBriefing>(key);
+      if (cached) {
+        return NextResponse.json(cached, {
+          headers: {
+            "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
+          },
+        });
+      }
+    } catch {
+      // Fall through to generation
     }
-  } catch {
-    // Fall through to generation
   }
 
   // Generate lazily from today's stories
-  if (dateParam) {
+  if (dateParam && !isCronTrigger) {
     // Historical date with no briefing — not found
     return NextResponse.json({ error: "Briefing not found for this date" }, { status: 404 });
   }
@@ -195,7 +202,10 @@ Summary: ${s.story.split("\n")[0]}`
     )
     .join("\n\n");
 
-  const prompt = `You are generating a Daily Markets Briefing for Market Mountain, a financial blog.
+  const prompt = `You are generating a Daily Markets Briefing for Market Mountain, a financial publication.
+This briefing publishes at 8:00 AM Eastern each trading day.
+
+FOCUS: Only include the most impactful, market-driving news for the day. Lead with the story that will move markets most. Skip stories that are incremental updates or low-impact.
 
 Today's published stories:
 
@@ -204,12 +214,12 @@ ${storyContext}
 Generate a concise editorial briefing with this exact JSON structure. Return ONLY valid JSON — no markdown, no explanation:
 
 {
-  "leadSummary": "[2-3 sentence analytical summary of the lead story — what happened and why it matters]",
-  "topDevelopmentsSummaries": ["[1 sentence for story 2]", "[1 sentence for story 3]", "[1 sentence for story 4]"],
+  "leadSummary": "[2-3 sentence analytical summary of the lead story — what happened, why it moves markets, and the key number or data point investors need to know]",
+  "topDevelopmentsSummaries": ["[1 sentence for story 2 — focus on the market impact]", "[1 sentence for story 3]", "[1 sentence for story 4]"],
   "whatToWatch": [
-    {"event": "[event name]", "timing": "[when]", "significance": "[1 sentence why it matters]"},
-    {"event": "[event name]", "timing": "[when]", "significance": "[1 sentence why it matters]"},
-    {"event": "[event name]", "timing": "[when]", "significance": "[1 sentence why it matters]"}
+    {"event": "[specific catalyst — earnings, data release, policy event]", "timing": "[exact date or time if known, e.g. 'March 19 — 2:00 PM ET']", "significance": "[1 sentence: what outcome would move markets and in which direction]"},
+    {"event": "[event name]", "timing": "[when]", "significance": "[1 sentence why it matters for positioning]"},
+    {"event": "[event name]", "timing": "[when]", "significance": "[1 sentence why it matters for positioning]"}
   ]
 }`;
 

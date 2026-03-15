@@ -95,7 +95,7 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
             {cfg.waccValues.map((w) => (
               <th
                 key={w}
-                className="bg-slate-50 border-b border-r border-slate-200 px-4 py-2.5 text-center text-xs font-semibold text-slate-700 min-w-[72px]"
+                className="bg-slate-50 border-b border-r border-slate-200 px-2 sm:px-4 py-2 sm:py-2.5 text-center text-[11px] sm:text-xs font-semibold text-slate-700"
               >
                 {w}
               </th>
@@ -116,7 +116,7 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
                 </td>
               )}
               {/* LTGR percentage */}
-              <td className="bg-slate-50 border-b border-r border-slate-200 px-3 py-3.5 text-right text-xs font-semibold text-slate-700 whitespace-nowrap">
+              <td className="bg-slate-50 border-b border-r border-slate-200 px-2 sm:px-3 py-2.5 sm:py-3.5 text-right text-[11px] sm:text-xs font-semibold text-slate-700 whitespace-nowrap">
                 {cfg.ltgrValues[ri]}
               </td>
               {/* Heat map data cells */}
@@ -126,7 +126,7 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
                 return (
                   <td
                     key={ci}
-                    className="border-b border-r border-slate-200 py-3.5 px-4 text-center text-sm font-bold"
+                    className="border-b border-r border-slate-200 py-2.5 sm:py-3.5 px-2 sm:px-4 text-center text-xs sm:text-sm font-bold"
                     style={{
                       backgroundColor: heatColor(t),
                       color: "rgba(10,22,40,0.82)",

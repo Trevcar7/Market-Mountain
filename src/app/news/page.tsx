@@ -32,6 +32,9 @@ export default function NewsPage() {
         </div>
       </section>
 
+      {/* Accent divider */}
+      <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
+
       {/* News grid */}
       <section className="container mx-auto px-4 sm:px-6 max-w-6xl py-12 sm:py-16">
         <div className="mb-8">

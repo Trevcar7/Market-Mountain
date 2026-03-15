@@ -889,7 +889,41 @@ Rules:
 - Include 2–3 tags maximum
 - Tags must be complete words — never truncated or partially matched
 - ENERGY is preferred over COMMODITIES for oil/gas stories
-- Do not invent new tags outside this list`;
+- Do not invent new tags outside this list
+
+CLAIM PRECISION VALIDATION (Step 19a)
+Never state unsourced quantitative rules or sensitivity ratios as if they are universal financial laws.
+- BAD: "Every 25 basis point increase in the risk-free rate reduces the present value of healthcare cash flows by 2 to 3 percent."
+- GOOD: "Higher risk-free rates reduce the present value of longer-duration cash flows, and when yields rise alongside negative earnings revisions, the valuation impact compounds."
+- If you cite a specific sensitivity ratio (e.g., "every X bp move = Y% valuation impact"), it MUST come from a named source (analyst report, MARKET DATA, or quoted research). Otherwise, use directional language.
+- Quantitative claims require attribution. Unattributed precision undermines credibility.
+
+COMPANY AND SECTOR RELEVANCE (Step 19b)
+Every company, ticker, or entity mentioned in the story must be directly relevant to the thesis and sector.
+- Do NOT introduce companies from unrelated sectors as comparative examples. A managed care story should reference managed care peers (UNH, CNC, CI, ELV), not diversified financials (PRU, MET) unless the thesis specifically spans both sectors.
+- Before including a company example, verify: (1) Is this company in the same sector as the thesis? (2) Does its inclusion strengthen the analytical argument? (3) Would removing it weaken the story?
+- If a company fails these tests, replace it with a relevant peer or remove the reference entirely.
+- Cross-sector comparisons are permitted ONLY when the thesis is explicitly about cross-sector dynamics (e.g., "rate sensitivity across healthcare and financials").
+
+POLICY INTERPRETATION RULE (Step 19c)
+Do not assert monetary policy conclusions from rate levels alone.
+- BAD: "The Fed Funds Rate at 3.64% suggests that rate cuts are unlikely in the near term."
+- GOOD: "With the Fed Funds Rate at 3.64%, futures markets reflect limited expectations for near-term cuts."
+- Rate levels do not inherently prove policy direction. Reference market pricing (fed funds futures, CME FedWatch), official forward guidance, or analyst consensus when making policy claims.
+- Prefer "markets are pricing in", "futures imply", or "consensus expects" over asserting conclusions from rate levels.
+
+CHART-THESIS ALIGNMENT (Step 19d)
+Every chart must directly reinforce the article's central thesis.
+- Before including a chart, verify: Does this chart illustrate a key data trend that supports the thesis?
+- Do not include charts about tangentially related metrics. A managed care margin story should chart yield trends, MLR ratios, or HUM share price — not unrelated sector indices.
+- If no chart data directly supports the thesis, it is better to include no chart than an irrelevant one.
+
+THESIS CLARITY (Step 19e)
+The first paragraph must contain one clear thesis sentence that a reader can identify without ambiguity.
+- The thesis must be falsifiable — it makes a specific claim that could be wrong, not a vague observation.
+- BAD THESIS: "Rising rates are creating challenges for the healthcare sector."
+- GOOD THESIS: "Bernstein's target cut on Humana reflects a broader repricing of managed care valuations as the 4.27% 10-year yield compresses Medicare Advantage margins already under CMS Stars pressure."
+- Test: Can you summarize the article's argument in one sentence? That sentence should appear in paragraph one.`;
 }
 
 // ---------------------------------------------------------------------------

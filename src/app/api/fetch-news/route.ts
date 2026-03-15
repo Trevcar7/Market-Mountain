@@ -263,8 +263,13 @@ export async function GET(request: NextRequest) {
   const token = request.headers.get("x-fetch-news-token");
   const expectedToken = process.env.FETCH_NEWS_SECRET;
 
-  // No token → return health/env-var status only (safe, no secret values exposed)
-  if (!token || token !== expectedToken) {
+  // Also accept Vercel Cron authorization (Bearer CRON_SECRET)
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  const cronAuthed = cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+  // No valid token → return health/env-var status only (safe, no secret values exposed)
+  if (!cronAuthed && (!token || token !== expectedToken)) {
     const health = healthCheck();
     return NextResponse.json(
       {
