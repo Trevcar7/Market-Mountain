@@ -314,6 +314,10 @@ async function fetchGNewsQuery(
       if (v !== undefined) url.searchParams.set(k, v);
     }
 
+    // /search does not support the `country` param — only top-headlines does.
+    // Sending it to /search causes HTTP 400.
+    if (endpoint === "search") url.searchParams.delete("country");
+
     const res = await timedFetch(url.toString());
     if (!res.ok) {
       console.error(

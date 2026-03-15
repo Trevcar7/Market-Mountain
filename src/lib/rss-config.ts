@@ -435,12 +435,16 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     category: "macro",
     priority: 2,
   },
+  // BLS publishes one unified release feed (bls_latest.rss above).
+  // The sub-feeds below exist on some mirrors but 404 on the official site —
+  // disable until confirmed working.
   {
     name: "BLS CPI (Inflation)",
     source: "BLS",
     url: "https://www.bls.gov/feed/bls_cpi.rss",
     category: "macro",
     priority: 2,
+    disabled: true,
   },
   {
     name: "BLS Employment Situation (Payrolls)",
@@ -448,6 +452,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     url: "https://www.bls.gov/feed/bls_ces.rss",
     category: "macro",
     priority: 2,
+    disabled: true,
   },
 
   // IMF

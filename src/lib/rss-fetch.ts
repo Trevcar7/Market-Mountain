@@ -244,11 +244,12 @@ function parseItem(block: string): ParsedRssItem {
 
 /**
  * Fetch and parse a single RSS feed into FinnhubArticle-compatible objects.
- * Returns an empty array on any error (network, parse, timeout).
+ * Returns { articles, ok } — ok=false on network/HTTP failure so the
+ * outer loop can accurately track feedsFailed even though no exception is thrown.
  */
 async function fetchSingleFeed(
   config: RssSourceConfig
-): Promise<FinnhubArticle[]> {
+): Promise<{ articles: FinnhubArticle[]; ok: boolean }> {
   const label = `[rss-fetch] "${config.name}"`;
 
   let xml: string;
@@ -271,7 +272,7 @@ async function fetchSingleFeed(
 
     if (!res.ok) {
       console.warn(`${label} HTTP ${res.status} — skipping`);
-      return [];
+      return { articles: [], ok: false };
     }
 
     xml = await res.text();
@@ -283,7 +284,7 @@ async function fetchSingleFeed(
     } else {
       console.warn(`${label} Fetch failed: ${msg} — skipping`);
     }
-    return [];
+    return { articles: [], ok: false };
   }
 
   // Parse items
@@ -292,12 +293,12 @@ async function fetchSingleFeed(
     itemBlocks = splitItems(xml);
   } catch (err) {
     console.warn(`${label} XML parse error — skipping:`, err);
-    return [];
+    return { articles: [], ok: false };
   }
 
   if (itemBlocks.length === 0) {
     console.warn(`${label} No items found in feed`);
-    return [];
+    return { articles: [], ok: true }; // feed responded; just empty
   }
 
   const cutoffSec = Math.floor(Date.now() / 1000) - MAX_AGE_HOURS * 3600;
@@ -330,7 +331,7 @@ async function fetchSingleFeed(
   }
 
   console.log(`${label} Parsed ${results.length} items from ${itemBlocks.length} raw entries`);
-  return results;
+  return { articles: results, ok: true };
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -370,11 +371,13 @@ export async function fetchRSSFeeds(
     const config = feedList[i];
 
     if (result.status === "fulfilled") {
-      const items = result.value;
+      const { articles: items, ok } = result.value;
       all.push(...items);
-      byFeed.push({ name: config.name, items: items.length, ok: true });
-      succeeded++;
+      byFeed.push({ name: config.name, items: items.length, ok });
+      if (ok) succeeded++;
+      else failed++;
     } else {
+      // Should not happen (fetchSingleFeed never throws), but guard anyway
       byFeed.push({ name: config.name, items: 0, ok: false });
       failed++;
       console.warn(`[rss-fetch] "${config.name}" rejected:`, result.reason);
