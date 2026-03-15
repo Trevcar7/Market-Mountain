@@ -894,6 +894,30 @@ function scoreSourceCoherence(article: NewsItem): QATestResult {
     return { test: "Source Coherence", passed: false, score: 0, maxScore: 5, detail: "no sources listed" };
   }
 
+  // ── Cross-sector ticker detection ──
+  // Extract stock tickers from source titles (2-5 uppercase letters)
+  // and check if they appear in the article's relatedTickers or text.
+  // A source about "PRU" used in a managed care (HUM/UNH) article = contamination.
+  const articleTickers = new Set(
+    (article.relatedTickers ?? []).map((t) => t.toUpperCase())
+  );
+  const foreignTickerSources: string[] = [];
+  const TICKER_RE = /\b([A-Z]{2,5})\b/g;
+
+  for (const src of sources) {
+    const srcTitle = src.title ?? "";
+    const matches = [...srcTitle.matchAll(TICKER_RE)].map((m) => m[1]);
+    for (const ticker of matches) {
+      // Skip common English words that look like tickers
+      if (["THE","AND","FOR","ARE","BUT","NOT","ALL","CAN","WAS","HAS","ITS","CEO","GDP","CPI","IPO","ETF","SEC","FED","USA","FBI","FDA"].includes(ticker)) continue;
+      // If source title contains a ticker NOT in article's tickers AND not in article text, flag it
+      if (articleTickers.size > 0 && !articleTickers.has(ticker) && !articleText.includes(ticker.toLowerCase())) {
+        foreignTickerSources.push(`${src.source} (ticker ${ticker} not in article)`);
+        break;
+      }
+    }
+  }
+
   // For each source title, compute word overlap with article
   let coherentSources = 0;
   const incoherent: string[] = [];
@@ -902,7 +926,7 @@ function scoreSourceCoherence(article: NewsItem): QATestResult {
     const srcWords = (src.title ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 3 && !STOP.has(w));
     const overlap = srcWords.filter((w) => articleWords.has(w)).length;
     const ratio = srcWords.length > 0 ? overlap / srcWords.length : 0;
-    if (ratio >= 0.2) {
+    if (ratio >= 0.25) {
       coherentSources++;
     } else {
       incoherent.push(src.source);
@@ -914,8 +938,12 @@ function scoreSourceCoherence(article: NewsItem): QATestResult {
   let score: number;
   let detail: string | undefined;
 
-  if (coherenceRatio >= 0.8) {
+  if (coherenceRatio >= 0.8 && foreignTickerSources.length === 0) {
     score = 5;
+  } else if (foreignTickerSources.length > 0) {
+    // Cross-sector source contamination: hard penalty
+    score = 1;
+    detail = `cross-sector source contamination: ${foreignTickerSources.join("; ")}`;
   } else if (coherenceRatio >= 0.6) {
     score = 3;
     detail = `${incoherent.length} source(s) have low topical relevance: ${incoherent.join(", ")}`;
@@ -1041,7 +1069,49 @@ export function runEditorialQA(
   const maxPossible = tests.reduce((sum, t) => sum + t.maxScore, 0);
   // Normalize to 0–100 scale so thresholds stay meaningful regardless of test count
   const score = maxPossible > 0 ? Math.round((rawScore / maxPossible) * 100) : 0;
-  const passed = score >= QA_PASS_THRESHOLD;
+  let passed = score >= QA_PASS_THRESHOLD;
+
+  // ---------------------------------------------------------------------------
+  // Hard-reject floors — critical quality metrics that MUST meet minimum bars
+  // regardless of overall score. Prevents low-integrity articles from passing
+  // via high scores on softer tests (voice, title, completeness).
+  // ---------------------------------------------------------------------------
+  const hardRejectReasons: string[] = [];
+
+  if (!REBUILD_MODE) {
+    // Fact check: score < 50 is unreliable — hard reject
+    const fc = article.factCheckScore ?? 0;
+    if (fc < 50) {
+      hardRejectReasons.push(`factCheckScore=${fc} < 50 minimum`);
+    }
+
+    // Confidence: < 0.60 means insufficient source corroboration
+    const conf = article.confidenceScore ?? 0;
+    if (conf < 0.60) {
+      hardRejectReasons.push(`confidenceScore=${conf} < 0.60 minimum`);
+    }
+
+    // Source coherence: 0/5 means sources are topically unrelated to article
+    const coherenceTest = tests.find((t) => t.test === "Source Coherence");
+    if (coherenceTest && coherenceTest.score === 0) {
+      hardRejectReasons.push("source coherence score is 0 — sources unrelated to article content");
+    }
+
+    // Ticker integrity: if tickers are listed but NONE appear in article text, hard reject
+    const metadataTest = tests.find((t) => t.test === "Metadata Accuracy");
+    const tickers = article.relatedTickers ?? [];
+    if (tickers.length > 0 && metadataTest) {
+      const lower = `${article.title} ${article.story}`.toLowerCase();
+      const tickersInText = tickers.filter((t) => lower.includes(t.toLowerCase()) || lower.includes(t));
+      if (tickersInText.length === 0) {
+        hardRejectReasons.push(`none of relatedTickers [${tickers.join(",")}] appear in article text`);
+      }
+    }
+  }
+
+  if (hardRejectReasons.length > 0) {
+    passed = false;
+  }
 
   let rejectionReason: string | undefined;
   if (!passed) {
@@ -1052,7 +1122,12 @@ export function runEditorialQA(
           `${t.test} (${t.score}/${t.maxScore}${t.detail ? `: ${t.detail}` : ""})`
       )
       .join("; ");
-    rejectionReason = `QA score ${score}/100 < ${QA_PASS_THRESHOLD} minimum. Failed: ${failedTests}`;
+
+    if (hardRejectReasons.length > 0) {
+      rejectionReason = `HARD REJECT: ${hardRejectReasons.join("; ")}. QA score ${score}/100. Failed tests: ${failedTests}`;
+    } else {
+      rejectionReason = `QA score ${score}/100 < ${QA_PASS_THRESHOLD} minimum. Failed: ${failedTests}`;
+    }
   }
 
   return { score, passed, tests, rejectionReason };

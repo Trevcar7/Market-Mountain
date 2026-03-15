@@ -170,23 +170,28 @@ async function generateBriefing(
   const supporting = stories.slice(1, 5);
 
   // Collect key data points from top stories
-  const allKeyData = stories
+  const storyKeyData = stories
     .flatMap((s) => s.keyDataPoints ?? [])
     .filter((d, i, arr) => arr.findIndex((x) => x.label === d.label) === i)
     .slice(0, 5);
 
-  // Supplement with fresh macro data if available
-  let macroData = allKeyData;
-  if (macroData.length < 3) {
-    try {
-      const fresh = await fetchContextualData("federal_reserve");
-      const merged = [...macroData, ...fresh].filter(
-        (d, i, arr) => arr.findIndex((x) => x.label === d.label) === i
-      );
-      macroData = merged.slice(0, 5);
-    } catch {
-      // Fine — use what we have
-    }
+  // Always fetch fresh macro data with day-to-day changes (like the MacroBoard).
+  // Briefing key data should show current values + period-over-period change.
+  let macroData = storyKeyData;
+  try {
+    const [fedData, bondData] = await Promise.all([
+      fetchContextualData("federal_reserve"),
+      fetchContextualData("bond_market"),
+    ]);
+    const freshData = [...fedData, ...bondData];
+    // Merge: fresh data (with changes) takes priority, then story data fills gaps
+    const freshLabels = new Set(freshData.map((d) => d.label));
+    const storyOnly = storyKeyData.filter((d) => !freshLabels.has(d.label));
+    macroData = [...freshData, ...storyOnly]
+      .filter((d, i, arr) => arr.findIndex((x) => x.label === d.label) === i)
+      .slice(0, 6);
+  } catch {
+    // Fine — use story key data as fallback
   }
 
   // Use Claude to generate structured editorial summaries
