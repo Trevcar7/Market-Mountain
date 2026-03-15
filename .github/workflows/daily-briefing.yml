@@ -2,11 +2,11 @@ name: Daily Markets Briefing (8 AM ET)
 
 on:
   schedule:
-    # 8:00 AM Eastern Time
-    # EDT (UTC-4, applies Mar–Nov): 12:00 UTC
-    # EST (UTC-5, applies Nov–Mar): 13:00 UTC
-    # Running at 12:00 UTC covers EDT. GitHub cron has ~minutes variance.
-    - cron: '0 12 * * *'
+    # GitHub Actions cron is always UTC — no native timezone support.
+    # Fire at both 12:00 UTC (= 8 AM EDT, UTC-4) and 13:00 UTC (= 8 AM EST, UTC-5).
+    # The timezone gate below ensures the briefing API is only called once,
+    # at exactly 8:00 AM America/New_York, year-round — DST handled automatically.
+    - cron: '0 12,13 * * *'
 
   # Manual trigger — allows regenerating the briefing at any time
   workflow_dispatch:
@@ -17,14 +17,36 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      # ── Timezone gate ────────────────────────────────────────────────────────
+      # Resolve the current hour in America/New_York (handles DST automatically).
+      # Skip this run if it is not 8 AM ET; only proceed on the correct UTC offset.
+      # Manual workflow_dispatch runs bypass this check and always execute.
+      - name: Check Eastern Time (skip if not 8 AM ET)
+        id: tz_gate
+        run: |
+          ET_HOUR=$(TZ="America/New_York" date +%H)
+          echo "Current ET hour: $ET_HOUR"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger — bypassing time gate"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "$ET_HOUR" != "08" ]; then
+            echo "Not 8 AM ET (ET hour=$ET_HOUR) — skipping this cron fire"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "8 AM ET confirmed — proceeding with briefing generation"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Briefing generation ──────────────────────────────────────────────────
       - name: Generate Daily Markets Briefing
+        if: steps.tz_gate.outputs.skip != 'true'
         run: |
           SITE_URL="${{ secrets.SITE_URL }}"
           if [ -z "$SITE_URL" ]; then
             SITE_URL="https://marketmountainfinance.com"
           fi
 
-          TODAY=$(date -u +%Y-%m-%d)
+          TODAY=$(TZ="America/New_York" date +%Y-%m-%d)
           echo "Generating briefing for $TODAY at $SITE_URL/api/briefing"
 
           body=$(curl -s \
