@@ -897,13 +897,24 @@ From: ${article.source}`
         `\n\nCLAIM-TO-SOURCE RULE: Every numeric claim in your story must map to either a SOURCE above or a MARKET DATA bullet above. If you cannot trace a number to one of these, omit it or rewrite it as qualitative analysis.`
       : "";
 
+  // Detect thin sources and add supplementary instruction
+  const totalSourceChars = formattedArticles.reduce(
+    (sum, a) => sum + (a.summary?.length ?? 0), 0
+  );
+  const thinSourcesNote = totalSourceChars < 400
+    ? `\nIMPORTANT: The source summaries are brief. Use the MARKET DATA section and your knowledge of current financial markets to write a substantive analysis. Do NOT refuse to write — always produce a complete article in the required format. The SOURCES provide the event; the MARKET DATA provides the numbers; your analysis connects them.`
+    : "";
+
   return `Write one cohesive financial news story about "${group.topic}"
 
 SOURCES (synthesize all — do not simply summarize one):
 ${articleTexts}
 ${dataContext}
+${thinSourcesNote}
 
 Editorial angle: ${angle}
+
+CRITICAL: You MUST output your response starting with "HEADLINE:" followed by the headline. Do not add any preamble, commentary, or refusal before the HEADLINE line. Always produce the full structured output.
 
 Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, MARKET_IMPACT (1–3 asset bullets) first, then one blank line, then the 5-section story (500–800 words). Do NOT label the sections with headers.`;
 }
@@ -1099,8 +1110,26 @@ export async function synthesizeGroupedArticles(
 
       const formattedArticles = formatNewsForStorage(group.articles);
 
+      // ── Pre-synthesis content gate ─────────────────────────────────────
+      // Skip groups where articles have insufficient body content (headline-only).
+      // Claude refuses to write from just headlines, wasting API credits.
+      // Require at least 100 chars of combined summary text across all articles.
+      const totalSummaryChars = formattedArticles.reduce(
+        (sum, a) => sum + (a.summary?.length ?? 0), 0
+      );
+      if (totalSummaryChars < 100) {
+        stats.preRejected++;
+        stats.rejectedTopics.push(group.topic);
+        console.warn(
+          `[synthesis] Content-gate reject "${group.topic}" — ` +
+          `only ${totalSummaryChars} chars of summary across ${formattedArticles.length} articles ` +
+          `(need ≥100). Articles are headline-only; skipping to save API credits.`
+        );
+        continue;
+      }
+
       console.log(
-        `[synthesis] Processing: "${group.topic}" (${group.articles.length} sources, importance=${group.importance})`
+        `[synthesis] Processing: "${group.topic}" (${group.articles.length} sources, importance=${group.importance}, summaryChars=${totalSummaryChars})`
       );
 
       // Fetch contextual market data for evidence enrichment
@@ -1123,6 +1152,31 @@ export async function synthesizeGroupedArticles(
         stats.errors++;
         console.error(
           `[synthesis] Output too short for "${group.topic}" — length: ${synthesizedText?.length ?? 0}`
+        );
+        continue;
+      }
+
+      // ── Refusal detection ──────────────────────────────────────────────
+      // Claude sometimes refuses to write when source materials are too thin
+      // (headline-only articles with no body text). Detect common refusal
+      // patterns early and skip, rather than wasting QA/fact-check budget on
+      // what is essentially a non-article.
+      const firstLine = synthesizedText.split("\n")[0].trim().toLowerCase();
+      const REFUSAL_PATTERNS = [
+        /^i cannot/i,
+        /^i'm unable/i,
+        /^i apologize/i,
+        /^unfortunately,? i/i,
+        /^i don't have enough/i,
+        /^the source materials? (provided )?(contain|do not|don't|lack)/i,
+        /^i can't write/i,
+        /^there is insufficient/i,
+      ];
+      if (REFUSAL_PATTERNS.some((p) => p.test(synthesizedText.substring(0, 200)))) {
+        stats.errors++;
+        console.warn(
+          `[synthesis] Claude refused to write "${group.topic}" — ` +
+          `likely insufficient source content. First line: "${firstLine.substring(0, 100)}"`
         );
         continue;
       }
