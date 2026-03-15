@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { GroupedNews, NewsItem, KeyDataPoint, ChartDataset, MarketImpactItem } from "./news-types";
+import { GroupedNews, NewsItem, NewsSource, KeyDataPoint, ChartDataset, MarketImpactItem, FinnhubArticle, NewsAPIArticle } from "./news-types";
 import { analyzeTone, formatToneForPrompt, ToneProfile } from "./tone-analyzer";
 import {
   extractClaimsFromStory,
@@ -316,7 +316,46 @@ function computeConfidenceScore(
   if (factCheckScore >= 60) score += 0.20;
   else if (factCheckScore >= 40) score += 0.10;
 
-  return Math.round(Math.min(1.0, score) * 100) / 100;
+  // Source coherence penalty: if grouped articles have low headline overlap,
+  // penalize confidence because articles may be about different topics
+  if (group.articles.length >= 2) {
+    const headlines = group.articles.map((a) => {
+      const raw = a as Record<string, unknown>;
+      return String(raw.title ?? raw.headline ?? "").toLowerCase();
+    });
+    const coherence = computeGroupCoherence(headlines);
+    // If coherence < 0.15 (very low overlap), apply -0.15 penalty
+    // If coherence < 0.25, apply -0.10 penalty
+    if (coherence < 0.15) score -= 0.15;
+    else if (coherence < 0.25) score -= 0.10;
+  }
+
+  return Math.round(Math.min(1.0, Math.max(0, score)) * 100) / 100;
+}
+
+/**
+ * Compute average pairwise word overlap between headlines in a group.
+ * Returns 0–1 where 1 means all headlines share the same words.
+ */
+function computeGroupCoherence(headlines: string[]): number {
+  if (headlines.length < 2) return 1;
+  const STOP = new Set(["the","and","for","are","but","not","all","can","was","has","have","been","will","with","this","that","from","they","into","over","said","were","after","about","would","could","also","more","than","just","like","does","some","only"]);
+
+  const wordSets = headlines.map((h) =>
+    new Set(h.split(/\W+/).filter((w) => w.length > 3 && !STOP.has(w)))
+  );
+
+  let totalOverlap = 0;
+  let pairs = 0;
+  for (let i = 0; i < wordSets.length; i++) {
+    for (let j = i + 1; j < wordSets.length; j++) {
+      const intersection = [...wordSets[i]].filter((w) => wordSets[j].has(w)).length;
+      const union = new Set([...wordSets[i], ...wordSets[j]]).size;
+      totalOverlap += union > 0 ? intersection / union : 0;
+      pairs++;
+    }
+  }
+  return pairs > 0 ? totalOverlap / pairs : 0;
 }
 
 /**
@@ -912,9 +951,23 @@ ${articleTexts}
 ${dataContext}
 ${thinSourcesNote}
 
+SOURCE RELEVANCE: Some sources in the list above may not be directly related to the main story. Use ONLY sources that are relevant to the cohesive narrative. Do NOT force unrelated sources into the story — ignore them if they don't fit the topic.
+
 Editorial angle: ${angle}
 
 CRITICAL: You MUST output your response starting with "HEADLINE:" followed by the headline. Do not add any preamble, commentary, or refusal before the HEADLINE line. Always produce the full structured output.
+
+HEADLINE RULES:
+- The headline MUST name specific companies, people, or data points (e.g., "Bernstein Cuts Humana Target as Stars Deterioration Widens Managed Care Margins" NOT "Healthcare Analysts Cut Targets")
+- Avoid generic sector labels without specifics
+- 8–14 words, no filler words ("amid", "as", "despite" are OK as connectors but not as the main verb)
+- The headline should make a reader want to click — convey the "so what" not just the "what"
+
+MARKET_IMPACT RULES:
+- You MUST include MARKET_IMPACT with 1–3 specific asset bullets
+- Each bullet format: "• TICKER CHANGE DIRECTION" (e.g., "• HUM -3.2% down")
+- Use actual ticker symbols (HUM, PRU, AAPL, SPY, etc.) not generic labels like "OIL" or "MACRO"
+- Only list assets that appear in your story or MARKET DATA
 
 Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, MARKET_IMPACT (1–3 asset bullets) first, then one blank line, then the 5-section story (500–800 words). Do NOT label the sections with headers.`;
 }
@@ -1481,21 +1534,21 @@ export async function synthesizeGroupedArticles(
       // Collapse empty chartData to undefined — avoids storing [] in the article record
       if (chartData.length === 0) chartData = undefined;
 
+      // Infer category from synthesized content (more accurate than source-level inference)
+      const inferredCategory = inferCategoryFromContent(parsed.story, parsed.title, group.topic);
+
       const newsItem: NewsItem = {
         id: generateId(group.topic),
         title: parsed.title,
         story: parsed.story,
-        category: group.category,
+        category: inferredCategory,
         topicKey: group.topic,
         imageUrl,
         publishedAt: new Date().toISOString(),
         importance: group.importance,
         sentiment: inferSentiment(synthesizedText),
         relatedTickers: generateTags(group.topic, synthesizedText, group.category),
-        sourcesUsed: group.articles.map((article) => {
-          const fmt = formatNewsForStorage([article])[0];
-          return { title: fmt.title, url: fmt.url, source: fmt.source };
-        }),
+        sourcesUsed: filterRelevantSources(group.articles, parsed.story, parsed.title),
         factCheckScore: overallScore,
         verifiedClaims: claims.slice(0, 3),
         // Editorial enrichment
@@ -1637,14 +1690,139 @@ async function fetchUnsplashImage(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Filter source articles to only include those whose headline has meaningful
+ * overlap with the synthesized article content. Prevents listing irrelevant
+ * sources (e.g., a Hamas article cited for a healthcare story).
+ * Returns at least 1 source (falls back to the best-matching one).
+ */
+function filterRelevantSources(
+  articles: (FinnhubArticle | NewsAPIArticle)[],
+  story: string,
+  title: string
+): NewsSource[] {
+  const articleText = `${title} ${story}`.toLowerCase();
+
+  // Extract significant words from the synthesized article (4+ chars, no stopwords)
+  const STOP = new Set(["the","and","for","are","but","not","all","can","had","was","one","has","have","been","will","with","this","that","from","they","than","into","over","such","what","when","how","each","which","their","said","were","after","about","would","could","should","also","more","than","most","other","some","only","very","just","like","these","those","does","been"]);
+  const articleWords = new Set(
+    articleText.split(/\W+/).filter((w) => w.length > 3 && !STOP.has(w))
+  );
+
+  type ScoredSource = { source: NewsSource; score: number };
+  const scored: ScoredSource[] = articles.map((article) => {
+    const fmt = formatNewsForStorage([article])[0];
+    const srcHeadline = fmt.title.toLowerCase();
+    const srcWords = srcHeadline.split(/\W+/).filter((w) => w.length > 3 && !STOP.has(w));
+    // Count how many headline words appear in the synthesized article
+    const overlap = srcWords.filter((w) => articleWords.has(w)).length;
+    const score = srcWords.length > 0 ? overlap / srcWords.length : 0;
+    return {
+      source: { title: fmt.title, url: fmt.url, source: fmt.source },
+      score,
+    };
+  });
+
+  // Keep sources with ≥30% headline word overlap with synthesized article
+  const relevant = scored.filter((s) => s.score >= 0.3);
+
+  if (relevant.length > 0) {
+    return relevant.map((s) => s.source);
+  }
+
+  // Fallback: return the single best-matching source
+  scored.sort((a, b) => b.score - a.score);
+  return [scored[0].source];
+}
+
+/**
+ * Infer article category from the synthesized content and topic key.
+ * Uses the final article text (more accurate than source-level inference).
+ */
+function inferCategoryFromContent(
+  story: string,
+  title: string,
+  topicKey: string
+): "macro" | "earnings" | "markets" | "policy" | "crypto" | "other" {
+  // 1. Topic key directly maps to category (most reliable)
+  const topicCategoryMap: Record<string, "macro" | "earnings" | "markets" | "policy" | "crypto"> = {
+    federal_reserve: "macro", fed_macro: "macro", inflation: "macro",
+    gdp: "macro", employment: "macro", bond_market: "macro",
+    trade_policy: "policy", trade_policy_tariff: "policy", geopolitics: "policy",
+    broad_market: "markets", markets: "markets",
+    crypto: "crypto",
+    earnings: "earnings",
+  };
+  if (topicCategoryMap[topicKey]) return topicCategoryMap[topicKey];
+
+  // 2. Content-based inference from the actual synthesized text
+  const lower = `${title} ${story}`.toLowerCase();
+  const scores: Record<string, number> = { macro: 0, earnings: 0, markets: 0, policy: 0, crypto: 0 };
+
+  // Macro signals
+  if (/\b(?:fed(?:eral)?|fomc|interest\s+rate|inflation|cpi|gdp|treasury|yield|monetary\s+policy)\b/.test(lower)) scores.macro += 3;
+  if (/\b(?:economic|economy|recession|unemployment|labor\s+market|rate\s+cut|rate\s+hike)\b/.test(lower)) scores.macro += 2;
+
+  // Earnings signals
+  if (/\b(?:earnings|quarterly\s+results?|revenue|eps|profit|guidance|fiscal\s+quarter|analyst.{0,10}target)\b/.test(lower)) scores.earnings += 3;
+  if (/\b(?:price\s+target|downgrade|upgrade|overweight|underweight|outperform|buy\s+rat(?:e|ing))\b/.test(lower)) scores.earnings += 2;
+
+  // Markets signals
+  if (/\b(?:s&p\s+500|nasdaq|dow\s+jones|stock\s+market|equities|market\s+rally|selloff|sell-off)\b/.test(lower)) scores.markets += 3;
+  if (/\b(?:sector\s+rotation|valuation|multiple|bull|bear|correction)\b/.test(lower)) scores.markets += 2;
+
+  // Policy signals
+  if (/\b(?:tariff|sanction|regulat|legislation|bill|congress|sec\s|ftc|antitrust|geopolit)\b/.test(lower)) scores.policy += 3;
+
+  // Crypto signals
+  if (/\b(?:bitcoin|crypto|ethereum|blockchain|defi|stablecoin|altcoin|btc)\b/.test(lower)) scores.crypto += 3;
+
+  let best: "macro" | "earnings" | "markets" | "policy" | "crypto" | "other" = "other";
+  let bestScore = 0;
+  for (const [cat, score] of Object.entries(scores)) {
+    if (score > bestScore) {
+      best = cat as typeof best;
+      bestScore = score;
+    }
+  }
+  return bestScore >= 2 ? best : "other";
+}
+
 function inferSentiment(text: string): "positive" | "negative" | "neutral" {
   const lower = text.toLowerCase();
-  const positive = ["growth", "gain", "rise", "strength", "rally", "beat", "surpass", "record"];
-  const negative = ["fall", "decline", "loss", "risk", "weakness", "miss", "contraction", "recession"];
-  const pos = positive.filter((w) => lower.includes(w)).length;
-  const neg = negative.filter((w) => lower.includes(w)).length;
-  if (pos > neg) return "positive";
-  if (neg > pos) return "negative";
+
+  // Context-aware patterns: match phrases not just isolated words
+  // This prevents "record losses" from being counted as positive
+  const positivePatterns = [
+    /\b(?:strong|robust|solid)\s+(?:growth|earnings|revenue|results|performance)\b/,
+    /\b(?:beat|surpass|exceed|top)(?:s|ed|ing)?\s+(?:expectations?|estimates?|consensus|forecast)\b/,
+    /\brall(?:y|ied|ies|ying)\b/,
+    /\b(?:gains?|surge[ds]?|climb[sed]*|advance[ds]?|soar[sed]*)\b/,
+    /\brecord\s+(?:high|revenue|profit|earnings|growth)\b/,
+    /\b(?:upgrade[ds]?|raise[ds]?\s+(?:price\s+)?target)\b/,
+    /\b(?:bullish|optimis(?:m|tic)|upside|outperform)\b/,
+    /\bacceler(?:at(?:e[ds]?|ing|ion))\b/,
+  ];
+  const negativePatterns = [
+    /\b(?:cut[s]?\s+(?:price\s+)?target|downgrade[ds]?|lower[sed]*\s+(?:price\s+)?target)\b/,
+    /\b(?:decline[ds]?|fall[s]?|fell|drop(?:s|ped)?|slump[sed]*|plunge[ds]?|tumble[ds]?)\b/,
+    /\b(?:loss|losses)\b/,
+    /\b(?:weak(?:ness|ening|er)?|deteriorat(?:e[ds]?|ing|ion)|compress(?:es|ed|ing|ion)?)\b/,
+    /\b(?:recession|contraction|slowdown|decelerat(?:e[ds]?|ing|ion))\b/,
+    /\b(?:miss(?:es|ed)?)\s+(?:expectations?|estimates?|consensus|forecast)\b/,
+    /\b(?:bearish|pessimis(?:m|tic)|downside|underperform|headwind[s]?)\b/,
+    /\b(?:pressure[ds]?|risk[s]?|threat[s]?|concern[s]?|warning[s]?)\b/,
+    /\brecord\s+(?:low|loss|decline|drop)\b/,
+  ];
+
+  const posCount = positivePatterns.filter((p) => p.test(lower)).length;
+  const negCount = negativePatterns.filter((p) => p.test(lower)).length;
+
+  // Require meaningful margin to avoid noise
+  if (posCount >= negCount + 2) return "positive";
+  if (negCount >= posCount + 2) return "negative";
+  if (posCount > negCount) return "positive";
+  if (negCount > posCount) return "negative";
   return "neutral";
 }
 
@@ -1693,10 +1871,31 @@ const CATEGORY_TAGS: Record<string, string[]> = {
   other:    ["MACRO"],
 };
 
+/** Well-known company/ticker patterns to extract from article text */
+const TICKER_PATTERNS: [RegExp, string][] = [
+  [/\b(?:apple|aapl)\b/i, "AAPL"], [/\b(?:nvidia|nvda)\b/i, "NVDA"],
+  [/\b(?:microsoft|msft)\b/i, "MSFT"], [/\b(?:amazon|amzn)\b/i, "AMZN"],
+  [/\b(?:alphabet|googl|google)\b/i, "GOOGL"], [/\b(?:meta platforms|meta )\b/i, "META"],
+  [/\b(?:tesla|tsla)\b/i, "TSLA"], [/\b(?:jpmorgan|jpm)\b/i, "JPM"],
+  [/\b(?:goldman sachs)\b/i, "GS"], [/\b(?:morgan stanley)\b/i, "MS"],
+  [/\b(?:bank of america|bofa)\b/i, "BAC"], [/\b(?:wells fargo)\b/i, "WFC"],
+  [/\b(?:berkshire hathaway|berkshire)\b/i, "BRK.B"],
+  [/\b(?:unitedhealth|unh)\b/i, "UNH"], [/\bhumana\b/i, "HUM"],
+  [/\b(?:pfizer|pfe)\b/i, "PFE"], [/\b(?:eli lilly|lly)\b/i, "LLY"],
+  [/\b(?:johnson & johnson|j&j)\b/i, "JNJ"],
+  [/\b(?:boeing)\b/i, "BA"], [/\b(?:exxon|exxonmobil)\b/i, "XOM"],
+  [/\b(?:chevron|cvx)\b/i, "CVX"], [/\bprudential\b/i, "PRU"],
+  [/\b(?:first solar)\b/i, "FSLR"], [/\b(?:nextracker)\b/i, "NXT"],
+  [/\b(?:walmart|wmt)\b/i, "WMT"], [/\b(?:costco)\b/i, "COST"],
+  [/\b(?:netflix|nflx)\b/i, "NFLX"], [/\b(?:disney|dis)\b/i, "DIS"],
+  [/\b(?:salesforce|crm)\b/i, "CRM"], [/\b(?:palantir|pltr)\b/i, "PLTR"],
+  [/\b(?:amd|advanced micro)\b/i, "AMD"], [/\b(?:intel|intc)\b/i, "INTC"],
+  [/\bepam\b/i, "EPAM"], [/\b(?:sprouts farmers)\b/i, "SFM"],
+];
+
 /**
  * Generate 2–3 validated tags from controlled taxonomy.
- * Uses topic-based mapping first, then scans text for known asset identifiers.
- * Never produces truncated or malformed tags.
+ * Now also scans synthesized text for company tickers mentioned in the article.
  */
 function generateTags(
   topicKey: string,
@@ -1707,7 +1906,7 @@ function generateTags(
   const topicTags = TOPIC_TAGS[topicNorm] ?? [];
   const catTags = CATEGORY_TAGS[category] ?? ["MACRO"];
 
-  // Scan synthesized text for known asset identifiers using word boundaries
+  // 1. Scan for known asset identifiers
   const knownAssets = ["WTI", "CRUDE", "GOLD", "SPX", "DXY", "BTC", "ETH", "VIX"];
   const assetRegex = new RegExp(`\\b(${knownAssets.join("|")})\\b`, "g");
   const textAssets: string[] = [];
@@ -1716,12 +1915,22 @@ function generateTags(
     textAssets.push(m[1]);
   }
 
-  // Combine: topic tags first (most relevant), then text-found assets, then category fallback
+  // 2. Scan for company tickers mentioned in the synthesized text
+  const mentionedTickers: string[] = [];
+  for (const [pattern, ticker] of TICKER_PATTERNS) {
+    if (pattern.test(synthesizedText)) {
+      mentionedTickers.push(ticker);
+    }
+  }
+
+  // 3. Combine: company tickers first (most specific), then topic tags, then assets, then category
+  // If we found company tickers, prefer those over generic taxonomy tags
+  if (mentionedTickers.length > 0) {
+    return [...new Set(mentionedTickers)].slice(0, 3);
+  }
+
   const combined = [...new Set([...topicTags, ...textAssets, ...catTags])];
-
-  // Validate: only keep tags in the allowed taxonomy
   const valid = combined.filter((t) => ALLOWED_TAGS.has(t));
-
   return valid.slice(0, 3);
 }
 

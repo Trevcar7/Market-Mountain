@@ -645,11 +645,47 @@ export function groupRelatedArticles(articles: (FinnhubArticle | NewsAPIArticle)
     groups.get(topicKey)!.push(article);
   }
 
+  // ── Source coherence filter ─────────────────────────────────────────────
+  // For each group, verify that articles share at least one meaningful
+  // entity (company, indicator, sector keyword) beyond the topic key itself.
+  // This prevents unrelated articles from being grouped just because they
+  // share a generic word (e.g., "target" in both retail and geopolitical contexts).
+  for (const [topic, groupArticles] of groups) {
+    if (groupArticles.length <= 1) continue;
+    // Only apply coherence filtering on generic/fallback topics and company keys
+    // Broad macro topics (federal_reserve, inflation, etc.) are intentionally broad
+    const isBroadMacro = [
+      "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
+      "broad_market", "markets", "bond_market", "energy", "trade_policy",
+      "trade_policy_tariff", "crypto", "geopolitics", "earnings",
+      "merger_acquisition", "bankruptcy", "ipo", "layoffs",
+    ].includes(topic);
+    if (isBroadMacro) continue;
+
+    // For company/fallback groups: check pairwise headline similarity
+    // Remove articles that don't share meaningful keywords with the majority
+    const headlines = groupArticles.map((a) =>
+      (isFinnhub(a) ? ((a as FinnhubArticle).headline ?? "") : ((a as NewsAPIArticle).title ?? "")).toLowerCase()
+    );
+    const coreWords = extractMeaningfulWords(headlines[0]);
+
+    const coherent: typeof groupArticles = [groupArticles[0]];
+    for (let i = 1; i < groupArticles.length; i++) {
+      const words = extractMeaningfulWords(headlines[i]);
+      // Require at least 2 meaningful shared words (beyond stopwords)
+      const shared = coreWords.filter((w) => words.includes(w));
+      if (shared.length >= 2) {
+        coherent.push(groupArticles[i]);
+      }
+    }
+    groups.set(topic, coherent);
+  }
+
   // Convert to GroupedNews array
   const grouped: GroupedNews[] = Array.from(groups.entries()).map(
     ([topic, articles]) => ({
       topic,
-      category: inferCategory(articles[0]),
+      category: inferCategoryFromGroup(articles),
       articles,
       importance: scoreByImportance(articles),
     })
@@ -659,6 +695,47 @@ export function groupRelatedArticles(articles: (FinnhubArticle | NewsAPIArticle)
   grouped.sort((a, b) => b.importance - a.importance);
 
   return grouped;
+}
+
+/**
+ * Extract meaningful words (>3 chars, not stopwords) from a headline.
+ * Used for source coherence validation.
+ */
+function extractMeaningfulWords(headline: string): string[] {
+  const STOP_WORDS = new Set([
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
+    "her", "was", "one", "our", "out", "has", "have", "been", "will",
+    "with", "this", "that", "from", "they", "than", "into", "over",
+    "such", "what", "when", "why", "how", "each", "which", "their",
+    "said", "were", "after", "about", "would", "could", "should",
+    "amid", "amid", "says", "amid", "despite", "price", "target",
+    "stock", "shares", "market", "could", "would",
+  ]);
+  return headline
+    .split(/\W+/)
+    .filter((w) => w.length > 3 && !STOP_WORDS.has(w));
+}
+
+/**
+ * Infer category using majority vote across all articles in a group,
+ * not just the first article.
+ */
+function inferCategoryFromGroup(articles: (FinnhubArticle | NewsAPIArticle)[]): "macro" | "earnings" | "markets" | "policy" | "crypto" | "other" {
+  const counts: Record<string, number> = {};
+  for (const article of articles) {
+    const cat = inferCategory(article);
+    counts[cat] = (counts[cat] || 0) + 1;
+  }
+  // Return the most common category
+  let best = "other";
+  let bestCount = 0;
+  for (const [cat, count] of Object.entries(counts)) {
+    if (count > bestCount) {
+      best = cat;
+      bestCount = count;
+    }
+  }
+  return best as "macro" | "earnings" | "markets" | "policy" | "crypto" | "other";
 }
 
 /**
@@ -860,7 +937,7 @@ function extractTopicKey(headline: string): string {
     [["chevron", "cvx "], "co_chevron"],
     // Consumer / retail
     [["walmart", "wmt "], "co_walmart"],
-    [["target ", " tgt "], "co_target"],
+    [["target corp", "target stores", "target stock", "target earnings", "target revenue", " tgt ", "tgt stock", "target (tgt)", "target retail"], "co_target"],
     [["home depot", " hd "], "co_homedepot"],
     [["costco", "cost "], "co_costco"],
     // Entertainment / media

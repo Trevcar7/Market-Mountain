@@ -1122,6 +1122,39 @@ function computeYoyChange(
 }
 
 /**
+ * Compute a human-readable time range label from actual date labels.
+ * E.g., 90 daily observations from Nov 2025 – Mar 2026 → "Last 4 months"
+ * E.g., 12 monthly observations from Apr 2025 – Mar 2026 → "Last 12 months"
+ */
+function computeTimeRange(labels: string[]): string {
+  if (labels.length < 2) return "Recent";
+  const first = labels[0];
+  const last = labels[labels.length - 1];
+
+  // Parse YYYY-MM-DD or YYYY-MM dates
+  const parseDate = (s: string): Date | null => {
+    const m = s.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
+    if (!m) return null;
+    return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3] || "1"));
+  };
+
+  const d1 = parseDate(first);
+  const d2 = parseDate(last);
+  if (!d1 || !d2) return "Recent";
+
+  const diffMs = d2.getTime() - d1.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 14) return "Last 2 weeks";
+  if (diffDays <= 45) return "Last month";
+  if (diffDays <= 100) return "Last 3 months";
+  if (diffDays <= 200) return "Last 6 months";
+  if (diffDays <= 400) return "Last 12 months";
+  if (diffDays <= 800) return "Last 2 years";
+  return "Historical";
+}
+
+/**
  * Fetch a chart-ready time series for a given topic key.
  * Returns { config, labels, values } or null if data unavailable.
  * Tries EIA first for energy topics, BLS for labor/inflation, FRED for macro.
@@ -1134,15 +1167,17 @@ export async function fetchChartSeriesForTopic(
 
     case "federal_reserve":
     case "fed_macro": {
+      // FEDFUNDS is a monthly series — 12 observations = 12 months (correct)
       const series = await fetchFredChartSeries("FEDFUNDS", 12);
       if (!series) return null;
-      return { ...series, title: "Effective Federal Funds Rate", unit: "%", source: "FRED — St. Louis Fed", timeRange: "Last 12 months", type: "line" };
+      return { ...series, title: "Effective Federal Funds Rate", unit: "%", source: "FRED — St. Louis Fed", timeRange: computeTimeRange(series.labels), type: "line" };
     }
 
     case "bond_market": {
-      const series = await fetchFredChartSeries("DGS10", 12);
+      // DGS10 is a daily series — fetch 90 observations (~4 months of trading days)
+      const series = await fetchFredChartSeries("DGS10", 90);
       if (!series) return null;
-      return { ...series, title: "10-Year Treasury Yield", unit: "%", source: "FRED — St. Louis Fed", timeRange: "Last 12 months", type: "line" };
+      return { ...series, title: "10-Year Treasury Yield", unit: "%", source: "FRED — St. Louis Fed", timeRange: computeTimeRange(series.labels), type: "line" };
     }
 
     case "inflation": {
@@ -1219,26 +1254,25 @@ export async function fetchChartSeriesForTopic(
     case "broad_market":
     case "markets": {
       // S&P 500 index level — FRED daily series (SP500)
-      const series = await fetchFredChartSeries("SP500", 12);
+      // Fetch 90 observations (~4 months of trading days) for meaningful trend
+      const series = await fetchFredChartSeries("SP500", 90);
       if (!series) return null;
-      return { ...series, title: "S&P 500 Index", unit: "Points", source: "FRED — St. Louis Fed", timeRange: "Last 12 months", type: "line" };
+      return { ...series, title: "S&P 500 Index", unit: "Points", source: "FRED — St. Louis Fed", timeRange: computeTimeRange(series.labels), type: "line" };
     }
 
     case "currency":
     case "dxy": {
       // FRED DTWEXBGS = Nominal Broad U.S. Dollar Index (trade-weighted, Jan 2006 = 100)
       // NOTE: This is NOT the ICE DXY (6-currency basket, ~97-110 range).
-      // DTWEXBGS trades at a different level (~115-130). Label and source must reflect this.
-      // Do NOT use "DXY" or ICE DXY language for this chart.
-      // Using 3-month window for currency stories (FX moves faster than rates/macro)
-      const series = await fetchFredChartSeries("DTWEXBGS", 3);
+      // DTWEXBGS is a daily series — fetch 60 observations (~3 months of trading days)
+      const series = await fetchFredChartSeries("DTWEXBGS", 60);
       if (!series) return null;
       return {
         ...series,
-        title: "Nominal Broad U.S. Dollar Index (3-Month)",
+        title: "Nominal Broad U.S. Dollar Index",
         unit: "Index (Jan 2006=100)",
         source: "FRED — DTWEXBGS (Nominal Broad Dollar Index)",
-        timeRange: "Last 3 months",
+        timeRange: computeTimeRange(series.labels),
         type: "line",
       };
     }

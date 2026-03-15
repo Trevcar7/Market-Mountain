@@ -21,9 +21,31 @@ interface NewsInlineChartProps {
   chart: ChartDataset;
 }
 
-/** Format YYYY-MM-DD or "Mon YYYY" labels into short "Mar '25" form */
-function formatXLabel(label: string): string {
+/** Format YYYY-MM-DD or "Mon YYYY" labels into short readable form.
+ *  Uses `allLabels` context to decide format:
+ *  - If data spans <3 months: show "Mar 5" (month + day) to avoid duplicate "Mar '25" labels
+ *  - If data spans ≥3 months: show "Mar '25" (month + year)
+ */
+function formatXLabel(label: string, allLabels?: string[]): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
+    const [year, month, day] = label.split("-");
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const monthStr = MONTHS[parseInt(month, 10) - 1];
+
+    // Check if we should use day-level labels (short time span with many points)
+    if (allLabels && allLabels.length > 15) {
+      // Extract unique months across all labels
+      const uniqueMonths = new Set(allLabels.map((l) => l.substring(0, 7)));
+      if (uniqueMonths.size <= 3) {
+        // Short span: use "Mar 5" format
+        return `${monthStr} ${parseInt(day)}`;
+      }
+    }
+
+    return `${monthStr} '${year.slice(2)}`;
+  }
+  // Handle "YYYY-MM" format (e.g., EIA monthly data)
+  if (/^\d{4}-\d{2}$/.test(label)) {
     const [year, month] = label.split("-");
     const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return `${MONTHS[parseInt(month, 10) - 1]} '${year.slice(2)}`;
@@ -86,7 +108,9 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const TEXT = "#64748b";
   const REF_COLOR = "#94a3b8";
 
-  const labelStep = chart.labels.length > 8 ? Math.ceil(chart.labels.length / 6) : 1;
+  // Show max 7 labels, evenly spaced. For 90 daily points: step=15, ~6 labels + endpoints.
+  const maxLabels = 7;
+  const labelStep = chart.labels.length > maxLabels ? Math.ceil(chart.labels.length / maxLabels) : 1;
   const showLabel = (i: number) =>
     i === 0 || i === chart.labels.length - 1 || i % labelStep === 0;
 
@@ -192,7 +216,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
               const x = PADDING.left + i * xStep;
               return (
                 <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
-                  {formatXLabel(label)}
+                  {formatXLabel(label, chart.labels)}
                 </text>
               );
             })}
@@ -309,7 +333,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             const x = PADDING.left + i * barGap + barGap / 2;
             return (
               <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
-                {formatXLabel(label)}
+                {formatXLabel(label, chart.labels)}
               </text>
             );
           })}
