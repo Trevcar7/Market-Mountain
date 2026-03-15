@@ -581,7 +581,7 @@ async function handleNewsFetch() {
 
     // 11. Trigger briefing generation asynchronously (fire-and-forget, don't block response)
     if (stats.posted > 0) {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://market-mountain.com";
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
       const secret = process.env.FETCH_NEWS_SECRET ?? "";
       fetch(`${siteUrl}/api/briefing`, {
         method: "POST",

@@ -21,7 +21,7 @@ jobs:
         run: |
           SITE_URL="${{ secrets.SITE_URL }}"
           if [ -z "$SITE_URL" ]; then
-            SITE_URL="https://market-mountain.com"
+            SITE_URL="https://marketmountainfinance.com"
           fi
 
           echo "Triggering news fetch at $SITE_URL/api/fetch-news"
