@@ -23,6 +23,7 @@ import {
   fetchGNewsNews,
 } from "@/lib/news-apis";
 import { detectMarketRegime, applyRegimeBoosts } from "@/lib/market-regime";
+import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 
 export const maxDuration = 60; // Vercel Pro: up to 60s (synthesis takes 25-50s)
 export const runtime = "nodejs";
@@ -487,7 +488,12 @@ async function handleNewsFetch() {
     }
 
     // 4b. LOAD existing stories early — needed for cross-run topic dedup and daily cap
-    const { active: existingActive } = await loadNewsWithArchival(kv);
+    // Strip suppressed articles from the active set so they don't pollute the
+    // daily-cap counter, topic-dedup memory, or the merged publish batch.
+    const { active: existingActiveRaw } = await loadNewsWithArchival(kv);
+    const existingActive = existingActiveRaw.filter(
+      (s) => !SUPPRESSED_ARTICLE_IDS.has(s.id)
+    );
 
     // 4b.0. Load topics that recently failed synthesis (within SYNTHESIS_FAILURE_COOLDOWN_HOURS).
     //   These are suppressed in 4c alongside published-topic cooldowns so that the
