@@ -22,6 +22,7 @@ import {
   fetchNewsDataNews,
   fetchGNewsNews,
 } from "@/lib/news-apis";
+import { detectMarketRegime, applyRegimeBoosts } from "@/lib/market-regime";
 
 export const maxDuration = 60; // Vercel Pro: up to 60s (synthesis takes 25-50s)
 export const runtime = "nodejs";
@@ -706,6 +707,22 @@ async function handleNewsFetch() {
       return true;
     });
     stats.categoryCapDropped = catCapBefore - afterCategoryCap.length;
+
+    // 4d.5-pre. Market regime detection — boost importance for macro/earnings/geo signals.
+    // Applied before the diversification sort so boosted groups rise in priority naturally.
+    const regime = detectMarketRegime(
+      afterCategoryCap.map((g) => ({
+        topic: g.topic,
+        articles: g.articles as Array<unknown>,
+      }))
+    );
+    if (regime.activeSignals.length > 0) {
+      console.log(`[fetch-news] ${regime.description}`);
+      const boostedCount = applyRegimeBoosts(afterCategoryCap, regime, console.log);
+      if (boostedCount > 0) {
+        console.log(`[fetch-news] Regime boosts applied to ${boostedCount} group(s)`);
+      }
+    }
 
     // 4d.5. Diversification promotion — re-sort groups to promote category diversity.
     //

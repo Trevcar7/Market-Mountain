@@ -21,34 +21,17 @@ interface NewsInlineChartProps {
   chart: ChartDataset;
 }
 
-/** Format YYYY-MM-DD or "Mon YYYY" labels into short readable form.
- *  Uses `allLabels` context to decide format:
- *  - If data spans <3 months: show "Mar 5" (month + day) to avoid duplicate "Mar '25" labels
- *  - If data spans ≥3 months: show "Mar '25" (month + year)
- */
-function formatXLabel(label: string, allLabels?: string[]): string {
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/** Format a single label into a base display string (month + year). */
+function baseFormatLabel(label: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
-    const [year, month, day] = label.split("-");
-    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const monthStr = MONTHS[parseInt(month, 10) - 1];
-
-    // Check if we should use day-level labels (short time span with many points)
-    if (allLabels && allLabels.length > 15) {
-      // Extract unique months across all labels
-      const uniqueMonths = new Set(allLabels.map((l) => l.substring(0, 7)));
-      if (uniqueMonths.size <= 3) {
-        // Short span: use "Mar 5" format
-        return `${monthStr} ${parseInt(day)}`;
-      }
-    }
-
-    return `${monthStr} '${year.slice(2)}`;
+    const [year, month] = label.split("-");
+    return `${MONTHS_SHORT[parseInt(month, 10) - 1]} '${year.slice(2)}`;
   }
-  // Handle "YYYY-MM" format (e.g., EIA monthly data)
   if (/^\d{4}-\d{2}$/.test(label)) {
     const [year, month] = label.split("-");
-    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return `${MONTHS[parseInt(month, 10) - 1]} '${year.slice(2)}`;
+    return `${MONTHS_SHORT[parseInt(month, 10) - 1]} '${year.slice(2)}`;
   }
   const longMonthMatch = label.match(/^([A-Za-z]+)\s+(\d{4})$/);
   if (longMonthMatch) {
@@ -56,6 +39,43 @@ function formatXLabel(label: string, allLabels?: string[]): string {
   }
   return label;
 }
+
+/**
+ * Pre-compute deduplicated x-axis display labels for visible ticks.
+ *
+ * Problem: 90 daily DGS10 points spanning 4 months produce many dates in the
+ * same month, all formatting to "Mar '26" — creating 5+ identical tick labels.
+ *
+ * Fix: first occurrence of each "Mon 'YY" gets the full label; subsequent
+ * occurrences in the same month show just the day number (e.g., "15").
+ * Monthly-series repeats (YYYY-MM) are skipped entirely.
+ */
+function buildDisplayLabels(
+  labels: string[],
+  showLabel: (i: number) => boolean
+): Map<number, string> {
+  const seen = new Set<string>();
+  const result = new Map<number, string>();
+
+  for (let i = 0; i < labels.length; i++) {
+    if (!showLabel(i)) continue;
+
+    const base = baseFormatLabel(labels[i]);
+
+    if (!seen.has(base)) {
+      seen.add(base);
+      result.set(i, base);
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(labels[i])) {
+      // Daily series: show just the day number for repeated months
+      const day = parseInt(labels[i].split("-")[2], 10);
+      result.set(i, String(day));
+    }
+    // Monthly series with duplicate: omit label (don't add to map)
+  }
+
+  return result;
+}
+
 
 export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const W = 600;
@@ -210,16 +230,20 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
               </g>
             )}
 
-            {/* X axis labels */}
-            {chart.labels.map((label, i) => {
-              if (!showLabel(i)) return null;
-              const x = PADDING.left + i * xStep;
-              return (
-                <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
-                  {formatXLabel(label, chart.labels)}
-                </text>
-              );
-            })}
+            {/* X axis labels — deduplicated via buildDisplayLabels */}
+            {(() => {
+              const displayLabels = buildDisplayLabels(chart.labels, showLabel);
+              return chart.labels.map((label, i) => {
+                const txt = displayLabels.get(i);
+                if (txt === undefined) return null;
+                const x = PADDING.left + i * xStep;
+                return (
+                  <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
+                    {txt}
+                  </text>
+                );
+              });
+            })()}
 
             {/* Gradient area fill */}
             <path d={areaD} fill={`url(#${gradientId})`} />
@@ -327,16 +351,20 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             );
           })}
 
-          {/* X labels */}
-          {chart.labels.map((label, i) => {
-            if (!showLabel(i)) return null;
-            const x = PADDING.left + i * barGap + barGap / 2;
-            return (
-              <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
-                {formatXLabel(label, chart.labels)}
-              </text>
-            );
-          })}
+          {/* X labels — deduplicated via buildDisplayLabels */}
+          {(() => {
+            const displayLabels = buildDisplayLabels(chart.labels, showLabel);
+            return chart.labels.map((label, i) => {
+              const txt = displayLabels.get(i);
+              if (txt === undefined) return null;
+              const x = PADDING.left + i * barGap + barGap / 2;
+              return (
+                <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
+                  {txt}
+                </text>
+              );
+            });
+          })()}
         </svg>
       </div>
       {(chart.source || chart.caption) && (

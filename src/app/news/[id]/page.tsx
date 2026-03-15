@@ -333,7 +333,7 @@ export default async function NewsStoryPage({ params }: Props) {
             <p className="text-xs font-semibold tracking-widest uppercase text-text-light mb-3">
               Data Sources
             </p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <div className="flex flex-wrap gap-2">
               {uniqueSources.map((src) =>
                 src.url ? (
                   <a
@@ -341,12 +341,15 @@ export default async function NewsStoryPage({ params }: Props) {
                     href={src.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-accent-600 hover:text-accent-700 hover:underline transition-colors"
+                    className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-xs font-medium text-accent-700 hover:bg-slate-200 hover:text-accent-800 transition-colors break-words min-w-0 max-w-full"
                   >
                     {src.source}
                   </a>
                 ) : (
-                  <span key={src.source} className="text-sm text-text-muted">
+                  <span
+                    key={src.source}
+                    className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-xs font-medium text-slate-500 break-words min-w-0 max-w-full"
+                  >
                     {src.source}
                   </span>
                 )

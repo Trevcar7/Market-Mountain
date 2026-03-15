@@ -110,4 +110,23 @@ jobs:
           echo "  Published: ${posted:-0} | Rejected by QA/co-pub: ${rejected:-0}"
           echo "  Publish decision: ${published:-unknown}"
           echo "────────────────────────────────────────────────────"
+
+          # ── Post-publish validation ─────────────────────────────────────────
+          if [ "${published:-unknown}" = "published" ]; then
+            echo "Publish decision = published — verifying article count in KV..."
+            sleep 3  # brief delay for KV write to propagate
+
+            news_body=$(curl -s --max-time 15 "$SITE_URL/api/news")
+            article_count=$(echo "$news_body" | grep -o '"totalCount":[0-9]*' | grep -o '[0-9]*$')
+
+            if [ -z "$article_count" ] || [ "$article_count" -lt 1 ]; then
+              echo "::error::Post-publish validation FAILED — GET /api/news returned total=${article_count:-unknown}. Articles may not have persisted to KV."
+              exit 1
+            fi
+
+            echo "Post-publish validation PASSED — ${article_count} article(s) in feed."
+          elif [ "${published:-unknown}" = "insufficient" ]; then
+            echo "::warning::Publish decision = insufficient — not enough synthesized stories to publish this run. Check topic cooldowns and QA gate logs above."
+          fi
+
           echo "News fetch completed successfully"

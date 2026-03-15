@@ -92,6 +92,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Accent divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
+
       {/* Market News */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
         <div className="flex items-baseline justify-between mb-8 sm:mb-10">
@@ -131,6 +134,9 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* Accent divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
 
       {/* Latest Analysis — Trevor's original research posts */}
       <section className="bg-navy-50 border-t border-border">
