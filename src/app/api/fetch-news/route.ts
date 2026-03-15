@@ -216,6 +216,7 @@ async function handleNewsFetch() {
     storiesWithWhyMatters: 0,
     storiesWithKeyData: 0,
     rebuildMode: REBUILD_MODE,
+    rejectionDetails: [] as string[],  // Per-story rejection reasons for diagnostics
   };
 
   try {
@@ -421,6 +422,7 @@ async function handleNewsFetch() {
     stats.rejected = synthStats.rejected;
     stats.preRejected = synthStats.preRejected ?? 0;
     stats.errors = synthStats.errors;
+    stats.rejectionDetails = synthStats.rejectionDetails ?? [];
 
     console.log(
       `[fetch-news] Synthesis complete [${REBUILD_MODE ? "REBUILD" : "PRODUCTION"}]: ` +

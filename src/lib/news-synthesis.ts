@@ -917,10 +917,10 @@ export async function synthesizeGroupedArticles(
   existingArticles: NewsItem[] = []
 ): Promise<{
   stories: NewsItem[];
-  stats: { posted: number; rejected: number; errors: number; preRejected: number };
+  stats: { posted: number; rejected: number; errors: number; preRejected: number; rejectionDetails: string[] };
 }> {
   const stories: NewsItem[] = [];
-  const stats = { posted: 0, rejected: 0, errors: 0, preRejected: 0 };
+  const stats = { posted: 0, rejected: 0, errors: 0, preRejected: 0, rejectionDetails: [] as string[] };
 
   const toneProfile = await getToneProfile();
   const client = initAnthropicClient();
@@ -1031,7 +1031,9 @@ export async function synthesizeGroupedArticles(
       const FACT_CHECK_THRESHOLD = 55;
       if (shouldRejectStory(adjustedScore, FACT_CHECK_THRESHOLD)) {
         stats.rejected++;
-        console.warn(`[synthesis] Rejected "${group.topic}" — fact-check score ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`);
+        const reason = `"${group.topic}" fact-check ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`;
+        stats.rejectionDetails.push(reason);
+        console.warn(`[synthesis] Rejected ${reason}`);
         logRejection(group.topic, `Fact check score: ${adjustedScore}`, adjustedScore);
         continue;
       }
@@ -1041,10 +1043,9 @@ export async function synthesizeGroupedArticles(
       const confidenceScore = computeConfidenceScore(group, overallScore, groupHasTier1);
       if (confidenceScore < CONFIDENCE_THRESHOLD) {
         stats.rejected++;
-        console.warn(
-          `[synthesis] Rejected "${group.topic}" — confidence ${confidenceScore} < ${CONFIDENCE_THRESHOLD} ` +
-          `(tier1=${groupHasTier1}, sources=${group.articles.length}, factCheck=${overallScore})`
-        );
+        const reason = `"${group.topic}" confidence ${confidenceScore} < ${CONFIDENCE_THRESHOLD} (tier1=${groupHasTier1}, sources=${group.articles.length}, factCheck=${overallScore})`;
+        stats.rejectionDetails.push(reason);
+        console.warn(`[synthesis] Rejected — ${reason}`);
         logRejection(group.topic, `Confidence score: ${confidenceScore}`, adjustedScore);
         continue;
       }
@@ -1202,9 +1203,13 @@ export async function synthesizeGroupedArticles(
 
       if (!qaResult.passed) {
         stats.rejected++;
-        console.warn(
-          `[synthesis] QA gate rejected "${parsed.title}" — score=${qaResult.score}/${QA_PASS_THRESHOLD} minimum`
-        );
+        const failedTests = qaResult.tests
+          .filter((t) => !t.passed)
+          .map((t) => `${t.test}(${t.score}/${t.maxScore})`)
+          .join(", ");
+        const reason = `"${parsed.title}" QA ${qaResult.score}/${QA_PASS_THRESHOLD} — failed: ${failedTests}`;
+        stats.rejectionDetails.push(reason);
+        console.warn(`[synthesis] QA gate rejected — ${reason}`);
         // Return the image URL to the available pool since we're not publishing
         if (imageUrl) usedImageBaseUrls.delete(imageUrl.split("?")[0]);
         continue;
