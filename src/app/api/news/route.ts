@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { NewsCollection } from "@/lib/news-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
+import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
 
 /**
  * GET /api/news
  * Serves active news data from Vercel KV (Upstash Redis)
  */
 export async function GET() {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
-  if (!url || !token) {
+  if (!kv) {
     // DEV PREVIEW: return sample news to visualize design
     if (process.env.NODE_ENV === "development") {
       const now = Date.now();
@@ -43,7 +43,6 @@ export async function GET() {
   }
 
   try {
-    const kv = new Redis({ url, token });
     const newsData = await kv.get<NewsCollection>("news");
 
     if (!newsData) {
@@ -63,8 +62,6 @@ export async function GET() {
     }
 
     // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
-    // March 13, 2026 00:00:00 UTC = 1773360000000 ms
-    const MARCH_13_CUTOFF_MS = 1773360000000;
     const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
     const filteredNews = newsData.news
       .filter(

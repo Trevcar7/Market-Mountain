@@ -11,19 +11,8 @@
  * Generated signals are cached in Redis KV for 1 hour.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient, CLAUDE_MODEL } from "./anthropic-client";
 import { MarketSignal, SignalsCollection, NewsItem } from "./news-types";
-
-let anthropicClient: Anthropic | null = null;
-
-function getAnthropicClient(): Anthropic {
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is required");
-    anthropicClient = new Anthropic({ apiKey });
-  }
-  return anthropicClient;
-}
 
 // ---------------------------------------------------------------------------
 // Prompt
@@ -134,7 +123,7 @@ export async function generateMarketSignals(
     const userPrompt = buildSignalsPrompt(stories);
 
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: CLAUDE_MODEL,
       max_tokens: 600,
       temperature: 0.4, // Lower temp for more consistent structured output
       system: SIGNALS_SYSTEM_PROMPT,

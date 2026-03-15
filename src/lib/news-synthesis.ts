@@ -1,4 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient, CLAUDE_MODEL } from "./anthropic-client";
 import { GroupedNews, NewsItem, NewsSource, KeyDataPoint, ChartDataset, MarketImpactItem, FinnhubArticle, NewsAPIArticle } from "./news-types";
 import { analyzeTone, formatToneForPrompt, ToneProfile } from "./tone-analyzer";
 import {
@@ -12,7 +13,6 @@ import { formatNewsForStorage, hasQualitySource } from "./news";
 import { fetchContextualData, buildNewsChartData } from "./market-data";
 import { runEditorialQA, logQAResult, QA_PASS_THRESHOLD } from "./editorial-qa";
 
-let anthropic: Anthropic | null = null;
 let cachedToneProfile: ToneProfile | null = null;
 
 function sleep(ms: number) {
@@ -166,21 +166,6 @@ const CATEGORY_ANGLES: Record<string, string> = {
     "Find the second-order market implication beyond the headline event. Ask: what does this mean for equity positioning, sector allocation, or credit spreads? Ground the analysis in a specific number from the sources.",
 };
 
-// ---------------------------------------------------------------------------
-// Anthropic client
-// ---------------------------------------------------------------------------
-
-export function initAnthropicClient(): Anthropic {
-  if (!anthropic) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is required");
-    }
-    anthropic = new Anthropic({ apiKey });
-  }
-  return anthropic;
-}
-
 async function getToneProfile(): Promise<ToneProfile> {
   if (!cachedToneProfile) {
     cachedToneProfile = await analyzeTone();
@@ -210,7 +195,7 @@ async function callClaude(
   try {
     const response = await client.messages.create(
       {
-        model: "claude-haiku-4-5-20251001",
+        model: CLAUDE_MODEL,
         max_tokens: maxTokens,
         temperature: 0.7,
         system: systemPrompt,
@@ -1108,7 +1093,7 @@ export async function synthesizeGroupedArticles(
   const stats = { posted: 0, rejected: 0, errors: 0, preRejected: 0, rejectionDetails: [] as string[], rejectedTopics: [] as string[] };
 
   const toneProfile = await getToneProfile();
-  const client = initAnthropicClient();
+  const client = getAnthropicClient();
 
   // Per-run image cache — avoid duplicate Unsplash API calls for same topic
   const runImageCache = new Map<string, string>();

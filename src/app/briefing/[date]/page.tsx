@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { DailyBriefing } from "@/lib/news-types";
+import { categoryLabelsShort as categoryLabels, categoryColors } from "@/lib/category-config";
 
 interface Props {
   params: Promise<{ date: string }>;
@@ -26,36 +27,16 @@ async function getBriefing(date: string): Promise<DailyBriefing | null> {
   // Validate date format
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
 
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
+  const kv = getRedisClient();
+  if (!kv) return null;
 
   try {
-    const kv = new Redis({ url, token });
     const briefing = await kv.get<DailyBriefing>(`briefing-${date}`);
     return briefing ?? null;
   } catch {
     return null;
   }
 }
-
-const categoryLabels: Record<string, string> = {
-  macro: "Macro",
-  earnings: "Earnings",
-  markets: "Markets",
-  policy: "Policy",
-  crypto: "Crypto",
-  other: "News",
-};
-
-const categoryColors: Record<string, string> = {
-  macro: "bg-blue-100 text-blue-800",
-  earnings: "bg-purple-100 text-purple-800",
-  markets: "bg-amber-100 text-amber-800",
-  policy: "bg-teal-100 text-teal-800",
-  crypto: "bg-orange-100 text-orange-800",
-  other: "bg-slate-100 text-slate-700",
-};
 
 function formatLongDate(dateStr: string): string {
   return new Date(dateStr + "T12:00:00Z").toLocaleDateString("en-US", {
@@ -185,7 +166,7 @@ export default async function BriefingDatePage({ params }: Props) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
                           <span
-                            className={`text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded ${categoryColors[dev.category] ?? categoryColors.other}`}
+                            className={`text-[10px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded ${categoryColors[dev.category] ?? categoryColors.other}`}
                           >
                             {categoryLabels[dev.category] ?? "News"}
                           </span>
@@ -268,7 +249,7 @@ export default async function BriefingDatePage({ params }: Props) {
                         )}
                       </div>
                       {dp.source && (
-                        <p className="text-white/30 text-[9px] mt-0.5">{dp.source}</p>
+                        <p className="text-white/30 text-[10px] mt-0.5">{dp.source}</p>
                       )}
                     </div>
                   ))}

@@ -371,7 +371,7 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
         <IndicatorIcon label={item.displayLabel} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[9px] font-semibold tracking-[0.12em] uppercase text-white/35 mb-0.5 truncate">
+        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-white/35 mb-0.5 truncate">
           {item.displayLabel}
         </p>
         <div className="flex items-baseline gap-2 flex-wrap">
@@ -423,7 +423,7 @@ function Section({ title, type, items, loading, skeletonCount = 4, borderClass }
     <div className={borderClass}>
       <div className="flex items-center gap-2 px-5 sm:px-6 lg:px-5 xl:px-6 pt-3 pb-0.5">
         <SectionIcon type={type} />
-        <p className="text-[9px] font-bold tracking-[0.16em] uppercase text-white/40">
+        <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-white/40">
           {title}
         </p>
       </div>
@@ -603,7 +603,7 @@ export default function MacroBoard() {
 
         {/* Data sources footer */}
         <div className="px-4 sm:px-6 lg:px-8 py-2.5 border-t border-white/[0.05]">
-          <p className="text-[9px] text-white/20 text-right tracking-wide">
+          <p className="text-[10px] text-white/20 text-right tracking-wide">
             Data sources: Federal Reserve (FRED), Bureau of Labor Statistics, TwelveData, EIA
           </p>
         </div>

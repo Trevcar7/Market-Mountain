@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { MacroBoardData, MacroIndicator, RegimeDimensions } from "@/lib/news-types";
 import {
   fetchFredSeries,
@@ -19,10 +19,9 @@ const CACHE_SECONDS = 900; // 15-minute Redis TTL
  * Cached in Redis for 15 minutes; falls back to 200 with empty indicators.
  */
 export async function GET() {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
-  if (!url || !token) {
+  if (!kv) {
     // No Redis — generate live (no cache) or return minimal response
     const data = await buildMacroBoard();
     return NextResponse.json(data, {
@@ -31,7 +30,6 @@ export async function GET() {
   }
 
   try {
-    const kv = new Redis({ url, token });
 
     // Serve from cache if still valid
     const cached = await kv.get<MacroBoardData>(KV_KEY);

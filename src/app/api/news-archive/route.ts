@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { ArchivedNewsCollection } from "@/lib/news-types";
 
 /**
@@ -7,10 +7,9 @@ import { ArchivedNewsCollection } from "@/lib/news-types";
  * Serves archived news data (>30 days old) from Vercel KV (Upstash Redis)
  */
 export async function GET() {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
-  if (!url || !token) {
+  if (!kv) {
     return NextResponse.json(
       {
         lastUpdated: new Date().toISOString(),
@@ -26,7 +25,6 @@ export async function GET() {
   }
 
   try {
-    const kv = new Redis({ url, token });
     const archiveData = await kv.get<ArchivedNewsCollection>("news-archive");
 
     if (!archiveData) {
@@ -59,7 +57,7 @@ export async function GET() {
         archivedNews: [],
         meta: { totalCount: 0 },
       },
-      { status: 200 }
+      { status: 500 }
     );
   }
 }

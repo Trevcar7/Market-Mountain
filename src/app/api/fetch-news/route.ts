@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
+import type { Redis } from "@upstash/redis";
 import {
   fetchFinnhubNews,
   fetchNewsAPIMultiple,
@@ -205,15 +206,6 @@ const MAX_ARTICLES_PER_DAY = 5;                       // Editorial daily publish
 // Redis client
 // ---------------------------------------------------------------------------
 
-function getRedisClient(): Redis | null {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) {
-    console.warn("KV env vars not set — falling back to no-op storage");
-    return null;
-  }
-  return new Redis({ url, token });
-}
 
 // ---------------------------------------------------------------------------
 // Health check

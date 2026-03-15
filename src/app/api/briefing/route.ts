@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
-import Anthropic from "@anthropic-ai/sdk";
 import { NewsCollection, DailyBriefing, NewsItem } from "@/lib/news-types";
+import { getRedisClient } from "@/lib/redis";
+import type { Redis } from "@upstash/redis";
+import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic-client";
+import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
 import { fetchContextualData, fetchBriefingWhatToWatch } from "@/lib/market-data";
 
 export const maxDuration = 30;
 export const runtime = "nodejs";
-
-function getRedisClient(): Redis | null {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
-  return new Redis({ url, token });
-}
 
 function getTodayKey(): string {
   return `briefing-${new Date().toISOString().split("T")[0]}`;
@@ -126,8 +121,6 @@ async function generateBriefing(
   if (!anthropicKey) return null;
 
   // Load today's published stories
-  // March 13, 2026 00:00:00 UTC — exclude all March 12 content
-  const MARCH_13_CUTOFF_MS = 1773360000000;
   let stories: NewsItem[] = [];
   try {
     const newsData = await kv.get<NewsCollection>("news");
@@ -190,7 +183,7 @@ async function generateBriefing(
   }
 
   // Use Claude to generate structured editorial summaries
-  const client = new Anthropic({ apiKey: anthropicKey });
+  const client = getAnthropicClient();
 
   const storyContext = stories
     .map(
@@ -228,7 +221,7 @@ Generate a concise editorial briefing with this exact JSON structure. Return ONL
 
   try {
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: CLAUDE_MODEL,
       max_tokens: 800,
       temperature: 0.5,
       messages: [{ role: "user", content: prompt }],

@@ -148,8 +148,11 @@ export async function verifyClaims(claims: string[]): Promise<{
 }
 
 /**
- * Fallback fact-checking when API is unavailable
- * Uses heuristics to estimate claim validity
+ * Keyword-based plausibility scorer (NOT real fact-checking).
+ * Used as a fallback when the Google Fact Check API key is not configured.
+ * Assigns higher scores to claims containing financial terms ($, %, reported)
+ * and lower scores to claims with absolutist language (always, never, 100%).
+ * Treat the output as a rough writing-quality signal, not a truth assessment.
  */
 function heuristicFactCheck(claim: string): FactCheckResult {
   const lowerClaim = claim.toLowerCase();
@@ -201,7 +204,7 @@ function heuristicFactCheck(claim: string): FactCheckResult {
     claim,
     verified: confidence >= 65,
     confidence: Math.max(20, Math.min(95, confidence)),
-    explanation: `Heuristic check (no API result)`,
+    explanation: "Keyword plausibility score (no external verification)",
   };
 }
 

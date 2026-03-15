@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { MarketSparklinesData, SparklineSet } from "@/lib/news-types";
 import { fetchFredSeries } from "@/lib/market-data";
 
@@ -25,10 +25,9 @@ const MIN_POINTS    = 5;       // Minimum useful data points for a sparkline
  * TTL: 15-minute server-side Redis cache
  */
 export async function GET() {
-  const url   = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
-  if (!url || !token) {
+  if (!kv) {
     const data = await buildSparklines();
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=60" },
@@ -36,7 +35,6 @@ export async function GET() {
   }
 
   try {
-    const kv     = new Redis({ url, token });
     const cached = await kv.get<MarketSparklinesData>(KV_KEY);
     if (cached && new Date(cached.validUntil) > new Date()) {
       return NextResponse.json(cached, {

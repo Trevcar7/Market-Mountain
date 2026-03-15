@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { NewsCollection } from "@/lib/news-types";
 
 export const maxDuration = 30;
@@ -26,10 +26,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
-  if (!url || !token) {
+  if (!kv) {
     return NextResponse.json({ error: "KV not configured" }, { status: 500 });
   }
 
@@ -50,8 +49,6 @@ export async function POST(request: NextRequest) {
   if (removeIds.length === 0) {
     return NextResponse.json({ error: "removeIds is empty" }, { status: 400 });
   }
-
-  const kv = new Redis({ url, token });
 
   try {
     const newsData = await kv.get<NewsCollection>("news");
@@ -120,14 +117,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
-  if (!url || !token) {
+  if (!kv) {
     return NextResponse.json({ error: "KV not configured" }, { status: 500 });
   }
-
-  const kv = new Redis({ url, token });
 
   try {
     const newsData = await kv.get<NewsCollection>("news");

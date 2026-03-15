@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { SignalsCollection, NewsCollection } from "@/lib/news-types";
 import { generateMarketSignals } from "@/lib/signals";
 
@@ -14,10 +14,9 @@ const KV_KEY = "market-signals";
  * Serves cached KV data if still valid; regenerates when expired.
  */
 export async function GET() {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
-  if (!url || !token) {
+  if (!kv) {
     return NextResponse.json(
       { signals: [], generatedAt: null, validUntil: null, source: "No KV configured" },
       { status: 200 }
@@ -25,7 +24,6 @@ export async function GET() {
   }
 
   try {
-    const kv = new Redis({ url, token });
 
     // Check cache
     const cached = await kv.get<SignalsCollection>(KV_KEY);

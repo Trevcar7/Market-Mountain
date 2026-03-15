@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { NewsCollection, NewsItem, MarketImpactItem, ChartDataset } from "@/lib/news-types";
+import { categoryLabels, categoryGradients } from "@/lib/category-config";
+import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { BLOCKED_SOURCES } from "@/lib/news";
 import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
@@ -13,19 +15,14 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-// March 13, 2026 00:00:00 UTC — articles before this date are removed
-const MARCH_13_CUTOFF_MS = 1773360000000;
-
 async function getNewsItem(id: string): Promise<NewsItem | null> {
   // Return 404 immediately for suppressed articles
   if (SUPPRESSED_ARTICLE_IDS.has(id)) return null;
 
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
+  const kv = getRedisClient();
+  if (!kv) return null;
 
   try {
-    const kv = new Redis({ url, token });
     const data = await kv.get<NewsCollection>("news");
     const item = data?.news.find((n) => n.id === id) ?? null;
     // Block direct URL access to March 12 articles
@@ -53,24 +50,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
   };
 }
-
-const categoryGradients: Record<string, string> = {
-  macro: "from-blue-900 via-blue-950 to-navy-900",
-  earnings: "from-purple-900 via-purple-950 to-navy-900",
-  markets: "from-amber-900 via-amber-950 to-navy-900",
-  policy: "from-teal-900 via-teal-950 to-navy-900",
-  crypto: "from-orange-900 via-orange-950 to-navy-900",
-  other: "from-slate-800 via-slate-900 to-navy-900",
-};
-
-const categoryLabels: Record<string, string> = {
-  macro: "Macro Economics",
-  earnings: "Earnings",
-  markets: "Markets",
-  policy: "Policy & Economics",
-  crypto: "Crypto",
-  other: "Market News",
-};
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {

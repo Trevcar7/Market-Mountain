@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import Link from "next/link";
 import { DailyBriefing } from "@/lib/news-types";
+import { categoryLabelsShort as categoryLabels, categoryColors } from "@/lib/category-config";
 
 export const metadata: Metadata = {
   title: "Daily Markets Briefing | Market Mountain",
@@ -19,34 +20,14 @@ export const metadata: Metadata = {
 // Revalidate every 5 minutes so the briefing stays fresh without hammering generation
 export const revalidate = 300;
 
-const categoryLabels: Record<string, string> = {
-  macro: "Macro",
-  earnings: "Earnings",
-  markets: "Markets",
-  policy: "Policy",
-  crypto: "Crypto",
-  other: "News",
-};
-
-const categoryColors: Record<string, string> = {
-  macro: "bg-blue-100 text-blue-800",
-  earnings: "bg-purple-100 text-purple-800",
-  markets: "bg-amber-100 text-amber-800",
-  policy: "bg-teal-100 text-teal-800",
-  crypto: "bg-orange-100 text-orange-800",
-  other: "bg-slate-100 text-slate-700",
-};
-
 async function getBriefing(): Promise<DailyBriefing | null> {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
+  const kv = getRedisClient();
+  if (!kv) return null;
 
   const date = new Date().toISOString().split("T")[0];
   const key = `briefing-${date}`;
 
   try {
-    const kv = new Redis({ url, token });
     const briefing = await kv.get<DailyBriefing>(key);
     return briefing ?? null;
   } catch {
@@ -170,7 +151,7 @@ export default async function BriefingPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 mb-1.5">
                             <span
-                              className={`text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded ${categoryColors[dev.category] ?? categoryColors.other}`}
+                              className={`text-[10px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded ${categoryColors[dev.category] ?? categoryColors.other}`}
                             >
                               {categoryLabels[dev.category] ?? "News"}
                             </span>
@@ -256,7 +237,7 @@ export default async function BriefingPage() {
                           )}
                         </div>
                         {dp.source && (
-                          <p className="text-white/30 text-[9px] mt-0.5">{dp.source}</p>
+                          <p className="text-white/30 text-[10px] mt-0.5">{dp.source}</p>
                         )}
                       </div>
                     ))}

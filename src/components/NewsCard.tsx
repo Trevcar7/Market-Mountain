@@ -1,4 +1,5 @@
 import { NewsItem, MarketImpactItem } from "@/lib/news-types";
+import { categoryLabels, categoryGradients } from "@/lib/category-config";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -6,24 +7,6 @@ interface NewsCardProps {
   news: NewsItem;
   variant?: "default" | "featured";
 }
-
-const categoryGradients: Record<string, string> = {
-  macro: "from-blue-900 via-blue-950 to-navy-900",
-  earnings: "from-purple-900 via-purple-950 to-navy-900",
-  markets: "from-amber-900 via-amber-950 to-navy-900",
-  policy: "from-teal-900 via-teal-950 to-navy-900",
-  crypto: "from-orange-900 via-orange-950 to-navy-900",
-  other: "from-slate-800 via-slate-900 to-navy-900",
-};
-
-const categoryLabels: Record<string, string> = {
-  macro: "Macro Economics",
-  earnings: "Earnings",
-  markets: "Markets",
-  policy: "Policy & Economics",
-  crypto: "Crypto",
-  other: "Market News",
-};
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -116,7 +99,7 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
           {/* Why this matters — featured variant */}
           {news.whyThisMatters ? (
             <div className="mb-3 hidden sm:flex items-start gap-2">
-              <span className="shrink-0 text-[9px] font-bold tracking-widest uppercase text-accent-400 mt-0.5">
+              <span className="shrink-0 text-[10px] font-bold tracking-widest uppercase text-accent-400 mt-0.5">
                 Why it matters
               </span>
               <p className="text-white/65 text-xs leading-relaxed line-clamp-2">
@@ -188,7 +171,7 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
         {news.whyThisMatters && (
           <div className="mt-3 pt-3 border-t border-border/60">
             <div className="flex items-start gap-1.5">
-              <span className="shrink-0 text-[9px] font-bold tracking-widest uppercase text-accent-600 mt-0.5">
+              <span className="shrink-0 text-[10px] font-bold tracking-widest uppercase text-accent-600 mt-0.5">
                 Why it matters
               </span>
               <p className="text-text-muted text-xs leading-relaxed line-clamp-2">

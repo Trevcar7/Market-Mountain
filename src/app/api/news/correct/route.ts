@@ -33,7 +33,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { NewsCollection, NewsItem } from "@/lib/news-types";
 
 export const runtime = "nodejs";
@@ -71,13 +71,6 @@ interface CorrectionRequest {
   fieldUpdates?: Partial<Record<string, unknown>>;
   /** Human-readable reason — written to the console audit log. */
   reason?: string;
-}
-
-function getRedisClient(): Redis | null {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
-  return new Redis({ url, token });
 }
 
 export async function POST(request: NextRequest) {

@@ -153,7 +153,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
         {/* Chart header */}
         <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
           {chart.chartLabel && (
-            <p className="text-[9px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
+            <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
               {chart.chartLabel}
             </p>
           )}
@@ -279,7 +279,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
         {chart.chartLabel && (
-          <p className="text-[9px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
+          <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
             {chart.chartLabel}
           </p>
         )}
@@ -372,7 +372,7 @@ export function NewsKeyDataInline({ dataPoints }: NewsKeyDataInlineProps) {
       <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-white/10">
         {dataPoints.map((dp, i) => (
           <div key={i} className="px-4 py-3.5">
-            <p className="text-white/40 text-[9px] font-semibold tracking-wider uppercase mb-0.5">
+            <p className="text-white/40 text-[10px] font-semibold tracking-wider uppercase mb-0.5">
               {dp.label}
             </p>
             <div className="flex items-baseline gap-1.5">
@@ -383,7 +383,7 @@ export function NewsKeyDataInline({ dataPoints }: NewsKeyDataInlineProps) {
                 </span>
               )}
             </div>
-            {dp.source && <p className="text-white/25 text-[9px] mt-0.5">{dp.source}</p>}
+            {dp.source && <p className="text-white/25 text-[10px] mt-0.5">{dp.source}</p>}
           </div>
         ))}
       </div>

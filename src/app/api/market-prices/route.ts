@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedisClient } from "@/lib/redis";
 import { MarketSnapshotItem, MarketPricesData } from "@/lib/news-types";
 import { fetchFredSeries, fetchWtiCrudePrice } from "@/lib/market-data";
 
@@ -24,12 +24,11 @@ const CACHE_SECONDS = 60;
  * Returns sessionStatus + refreshIntervalMs for client smart polling.
  */
 export async function GET() {
-  const url   = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const kv = getRedisClient();
 
   const session = getMarketSession();
 
-  if (!url || !token) {
+  if (!kv) {
     const data = await buildPrices(session);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30" },
@@ -37,7 +36,6 @@ export async function GET() {
   }
 
   try {
-    const kv = new Redis({ url, token });
 
     const cached = await kv.get<MarketPricesData>(KV_KEY);
     if (cached && new Date(cached.validUntil) > new Date()) {
