@@ -840,6 +840,22 @@ function scoreUpdateLanguage(article: NewsItem): QATestResult {
     }
   }
 
+  // In REBUILD_MODE, skip the penalty entirely — we're bootstrapping the feed
+  // and don't want this gate blocking otherwise-valid articles. The prompt-level
+  // STANDALONE ARTICLE MANDATE and editorial self-critique still apply; the QA
+  // penalty is production-only enforcement.
+  if (REBUILD_MODE) {
+    return {
+      test: "Update Language",
+      passed: true,
+      score: 0,
+      maxScore: 0,
+      detail: matches.length > 0
+        ? `[REBUILD] ${matches.length} update-language phrase(s) detected but not penalised in rebuild mode`
+        : undefined,
+    };
+  }
+
   // Scoring: 0 matches = 0 penalty, 1 match = -3 penalty, 2+ = -7 penalty, 3+ = -10 penalty
   let penalty = 0;
   let detail: string | undefined;

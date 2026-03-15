@@ -1110,9 +1110,17 @@ export async function synthesizeGroupedArticles(
       const parsed = parseStructuredOutput(synthesizedText, group.topic);
 
       // Validate required fields
-      if (!parsed.title || parsed.title.length < 5) {
+      // Word-count check (not char-length) — catches fallback-to-topic-key cases.
+      // e.g. "iran war puts" is 14 chars (passes length<5) but only 3 words — a
+      // failed parse where the topic key was used as the title. Require ≥5 words.
+      const titleWords = parsed.title?.trim().split(/\s+/).filter(Boolean) ?? [];
+      if (!parsed.title || parsed.title.length < 5 || titleWords.length < 5) {
         stats.errors++;
-        console.error(`[synthesis] Failed to parse headline for "${group.topic}"`);
+        console.error(
+          `[synthesis] Failed to parse headline for "${group.topic}" — ` +
+          `got "${parsed.title}" (${titleWords.length} words). ` +
+          `Claude output likely missing HEADLINE: prefix.`
+        );
         continue;
       }
 
