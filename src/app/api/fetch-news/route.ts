@@ -40,6 +40,15 @@ const TOPIC_DEDUP_HOURS: Record<string, number> = {
 };
 const DEFAULT_DEDUP_HOURS = 8; // was 6
 
+/**
+ * How long (hours) to suppress a topic after a synthesis rejection.
+ * Prevents re-spending Anthropic API credits on groups that already failed
+ * fact-check, confidence, or QA in a recent run. Topics re-enter eligibility
+ * automatically once the cooldown expires, allowing changed news cycles to
+ * produce a different (potentially publishable) synthesis on retry.
+ */
+const SYNTHESIS_FAILURE_COOLDOWN_HOURS = 4;
+
 // Per-category cap per run — prevents 3 macro stories when only 1 event happened
 const PER_CATEGORY_CAP: Record<string, number> = {
   macro: 2,
@@ -303,6 +312,16 @@ async function handleNewsFetch() {
     // 4b. LOAD existing stories early — needed for cross-run topic dedup and daily cap
     const { active: existingActive } = await loadNewsWithArchival(kv);
 
+    // 4b.0. Load topics that recently failed synthesis (within SYNTHESIS_FAILURE_COOLDOWN_HOURS).
+    //   These are suppressed in 4c alongside published-topic cooldowns so that the
+    //   same already-known-failing groups don't consume Claude synthesis budget every run.
+    const recentSynthesisFailures = await loadSynthesisFailures(kv);
+    if (recentSynthesisFailures.size > 0) {
+      console.log(
+        `[fetch-news] Synthesis-failure cooldown active for: [${[...recentSynthesisFailures].join(", ")}]`
+      );
+    }
+
     // 4b.1. Daily publishing cap — count stories already published today (UTC date)
     const todayUTC = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
     const storiesPublishedToday = existingActive.filter((s) =>
@@ -334,6 +353,13 @@ async function handleNewsFetch() {
     const afterCrossRunDedup = qualifiedGroups.filter((g) => {
       if (recentTopics.has(g.topic)) {
         console.log(`[fetch-news] Cross-run suppressed: "${g.topic}" (covered within cooldown window)`);
+        return false;
+      }
+      if (recentSynthesisFailures.has(g.topic)) {
+        console.log(
+          `[fetch-news] Synthesis-failure suppressed: "${g.topic}" ` +
+          `(failed synthesis within ${SYNTHESIS_FAILURE_COOLDOWN_HOURS}h — skipping to save API credits)`
+        );
         return false;
       }
       return true;
@@ -433,6 +459,30 @@ async function handleNewsFetch() {
       `synthesisGroups=${stats.synthesisGroups}, preRejected=${stats.preRejected}, ` +
       `posted=${synthStats.posted}, rejected=${synthStats.rejected}, errors=${synthStats.errors}`
     );
+
+    // 5a-pre. Write synthesis-failure cooldowns to Redis
+    // Any topic that failed fact-check, confidence, or QA in this run is recorded
+    // so the next run's cross-run dedup (step 4c) can skip it before calling Claude.
+    const rejectedTopicKeys = synthStats.rejectedTopics ?? [];
+    if (rejectedTopicKeys.length > 0) {
+      try {
+        const failures: Record<string, string> = {};
+        const now = new Date().toISOString();
+        for (const topic of rejectedTopicKeys) {
+          failures[topic] = now;
+        }
+        await kv.hset("news-synthesis-failures", failures);
+        // TTL = 2× the cooldown window so timestamps have room to age out naturally
+        await kv.expire("news-synthesis-failures", SYNTHESIS_FAILURE_COOLDOWN_HOURS * 2 * 60 * 60);
+        console.log(
+          `[fetch-news] Synthesis-failure cooldown set for: [${rejectedTopicKeys.join(", ")}] ` +
+          `(suppressed for ${SYNTHESIS_FAILURE_COOLDOWN_HOURS}h)`
+        );
+      } catch (err) {
+        // Non-fatal: worst case next run re-attempts synthesis on these topics
+        console.warn("[fetch-news] Failed to write synthesis failures to Redis:", err);
+      }
+    }
 
     // 5b. Co-publication validation
     // Runs when ≥1 story is ready to publish. Checks the incoming batch against
@@ -788,6 +838,36 @@ function mergeNewsWithDedup(stories: NewsItem[]): NewsItem[] {
   }
 
   return merged;
+}
+
+/**
+ * Load the set of topic keys that failed synthesis (fact-check / confidence / QA)
+ * within the past SYNTHESIS_FAILURE_COOLDOWN_HOURS. Used to suppress re-synthesis
+ * of groups that are already known to fail, saving Anthropic API credits.
+ *
+ * Stored in Redis as `news-synthesis-failures` hash: topicKey → ISO timestamp.
+ */
+async function loadSynthesisFailures(
+  kv: Redis,
+  cooldownHours: number = SYNTHESIS_FAILURE_COOLDOWN_HOURS
+): Promise<Set<string>> {
+  const failures = new Set<string>();
+  try {
+    const data = await kv.hgetall("news-synthesis-failures") as Record<string, string> | null;
+    if (!data) return failures;
+    const windowMs = cooldownHours * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const [topic, timestamp] of Object.entries(data)) {
+      const age = now - new Date(timestamp).getTime();
+      if (age < windowMs) {
+        failures.add(topic);
+      }
+    }
+  } catch (err) {
+    // Non-fatal: worst case we re-attempt synthesis on an already-known-failing group
+    console.warn("[fetch-news] Failed to load synthesis failures from Redis:", err);
+  }
+  return failures;
 }
 
 /**

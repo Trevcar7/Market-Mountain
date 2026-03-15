@@ -240,14 +240,14 @@ interface ParsedArticle {
 
 /**
  * Rebuild mode — mirrors editorial-qa.ts setting.
- * Lowers confidence threshold from 0.70 to 0.58 so that Tier1 single-source
- * articles that are 12-48h old (e.g. NewsAPI delay) can pass on merit.
+ * Lowers confidence threshold from 0.70 to 0.48 so that Tier1 multi-source
+ * articles delayed by NewsAPI's free-tier (~24-48h) can still publish on merit.
  */
 const REBUILD_MODE = process.env.REBUILD_MODE === "true";
 
 /**
  * Minimum editorial confidence score required to publish (0–1).
- * Production: 0.70 | Rebuild: 0.58
+ * Production: 0.70 | Rebuild: 0.48
  *
  * Confidence breakdown:
  *   0.30  Tier 1 source present (Reuters, Bloomberg, CNBC, etc.)
@@ -255,9 +255,21 @@ const REBUILD_MODE = process.env.REBUILD_MODE === "true";
  *   0.20  Story is < 12h old (0.10 for 12-24h)
  *   0.20  Fact-check score ≥ 60
  *
- * Rebuild 0.58 allows: Tier1 + 1 source + 12-24h old + ok factcheck = 0.60 ≥ 0.58
+ * Why 0.48 in Rebuild:
+ *   NewsAPI free-tier delivers articles 24–48h after publication, so recency is
+ *   permanently 0 for every NewsAPI story. The heuristic fact-checker (no Google
+ *   Fact Check API key) returns 20–32 for company/event claims, never reaching 60.
+ *   Together these permanently cap confidence at 0.50 for Tier1 + 2-source stories
+ *   regardless of quality. Setting 0.48 lets Tier1 + 2-source through while still
+ *   blocking anything with no tier-1 source or no corroboration.
+ *
+ *   Minimum achievable scores:
+ *     No tier1, 1 source   → 0.00 (blocked) ✓
+ *     Tier1, 1 source      → 0.30 (blocked) ✓
+ *     No tier1, 2+ sources → 0.20 (blocked) ✓
+ *     Tier1 + 2 sources    → 0.50 (passes)  ✓
  */
-const CONFIDENCE_THRESHOLD = REBUILD_MODE ? 0.58 : 0.70;
+const CONFIDENCE_THRESHOLD = REBUILD_MODE ? 0.48 : 0.70;
 
 /** In rebuild mode, cap published articles per run at 2 to avoid bulk-publishing weak content. */
 const REBUILD_MAX_ARTICLES = 2;
@@ -917,10 +929,10 @@ export async function synthesizeGroupedArticles(
   existingArticles: NewsItem[] = []
 ): Promise<{
   stories: NewsItem[];
-  stats: { posted: number; rejected: number; errors: number; preRejected: number; rejectionDetails: string[] };
+  stats: { posted: number; rejected: number; errors: number; preRejected: number; rejectionDetails: string[]; rejectedTopics: string[] };
 }> {
   const stories: NewsItem[] = [];
-  const stats = { posted: 0, rejected: 0, errors: 0, preRejected: 0, rejectionDetails: [] as string[] };
+  const stats = { posted: 0, rejected: 0, errors: 0, preRejected: 0, rejectionDetails: [] as string[], rejectedTopics: [] as string[] };
 
   const toneProfile = await getToneProfile();
   const client = initAnthropicClient();
@@ -973,6 +985,7 @@ export async function synthesizeGroupedArticles(
       const worthiness = checkStoryWorthiness(group);
       if (!worthiness.worthy) {
         stats.preRejected++;
+        stats.rejectedTopics.push(group.topic);
         console.warn(
           `[synthesis] Pre-synthesis reject "${group.topic}": ${worthiness.reason}`
         );
@@ -1037,6 +1050,7 @@ export async function synthesizeGroupedArticles(
         stats.rejected++;
         const reason = `"${group.topic}" fact-check ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`;
         stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
         console.warn(`[synthesis] Rejected ${reason}`);
         logRejection(group.topic, `Fact check score: ${adjustedScore}`, adjustedScore);
         continue;
@@ -1049,6 +1063,7 @@ export async function synthesizeGroupedArticles(
         stats.rejected++;
         const reason = `"${group.topic}" confidence ${confidenceScore} < ${CONFIDENCE_THRESHOLD} (tier1=${groupHasTier1}, sources=${group.articles.length}, factCheck=${overallScore})`;
         stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
         console.warn(`[synthesis] Rejected — ${reason}`);
         logRejection(group.topic, `Confidence score: ${confidenceScore}`, adjustedScore);
         continue;
@@ -1213,6 +1228,7 @@ export async function synthesizeGroupedArticles(
           .join(", ");
         const reason = `"${parsed.title}" QA ${qaResult.score}/${QA_PASS_THRESHOLD} — failed: ${failedTests}`;
         stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
         console.warn(`[synthesis] QA gate rejected — ${reason}`);
         // Return the image URL to the available pool since we're not publishing
         if (imageUrl) usedImageBaseUrls.delete(imageUrl.split("?")[0]);
