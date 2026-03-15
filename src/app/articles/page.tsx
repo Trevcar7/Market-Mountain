@@ -25,8 +25,7 @@ export default function ArticlesPage() {
           All Articles
         </h1>
         <p className="text-text-muted text-base max-w-xl">
-          Equity research, market commentary, and macroeconomic analysis.{" "}
-          <span className="font-bold text-accent-600">{articles.length} {articles.length === 1 ? "piece" : "pieces"}</span> published.
+          Equity research, market commentary, and macroeconomic analysis.
         </p>
       </div>
 

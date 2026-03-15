@@ -429,48 +429,49 @@ async function handleNewsFetch() {
     );
 
     // 5b. Publish Decision Layer
-    // Rebuild: require ≥2 quality stories. Production: require ≥3.
-    // Gate only applies when existingActive is empty (feed bootstrap scenario).
+    // Bootstrap (empty feed): require ≥MIN_STORIES_TO_PUBLISH for a quality initial batch.
+    // Ongoing (feed has content): publish with ≥1 new story — the 3-story gate is only
+    //   meaningful for first-run quality; subsequent hourly runs often produce 1-2 stories
+    //   due to cross-run topic dedup windows, so blocking them prevents any updates.
     const qualityStories = stories.filter(
       (s) => s.whyThisMatters && s.whyThisMatters.length > 10
     );
     stats.storiesWithWhyMatters = qualityStories.length;
     stats.storiesWithKeyData = stories.filter((s) => (s.keyDataPoints?.length ?? 0) > 0).length;
 
-    // Section 13 Publish Decision Layer:
-    // Normal run: publish if stories.length >= MIN_STORIES_TO_PUBLISH.
-    // Bootstrap exception: if feed is completely empty, allow ≥1 quality story to prevent
-    //   permanent deadlock. This removes the need for REBUILD_MODE in a fresh deployment.
     const feedIsEmpty = existingActive.length === 0;
-    const bootstrapAllowed = feedIsEmpty && stories.length >= 1;
-    const meetsThreshold = stories.length >= MIN_STORIES_TO_PUBLISH;
+    // Bootstrap: need MIN_STORIES_TO_PUBLISH. Ongoing: any new story is publishable.
+    const meetsThreshold = feedIsEmpty
+      ? stories.length >= MIN_STORIES_TO_PUBLISH
+      : stories.length >= 1;
 
-    if (!meetsThreshold && !bootstrapAllowed) {
+    if (!meetsThreshold) {
       stats.publishDecision = "insufficient";
       stats.executionMs = Date.now() - startTime;
       console.warn(
         `[fetch-news] Publish decision: INSUFFICIENT — ${stories.length} new stories ` +
-        `(need ${MIN_STORIES_TO_PUBLISH} in ${REBUILD_MODE ? "rebuild" : "production"} mode, ` +
-        `feed has ${existingActive.length} articles). ` +
-        (REBUILD_MODE
-          ? "Rebuild mode is ON but still couldn't reach threshold. Check [synthesis] logs above."
-          : "Set REBUILD_MODE=true in Vercel env to lower thresholds.")
+        (feedIsEmpty
+          ? `(bootstrap requires ${MIN_STORIES_TO_PUBLISH} for a quality initial feed, ` +
+            `${REBUILD_MODE ? "rebuild" : "production"} mode). ` +
+            (!REBUILD_MODE ? "Set REBUILD_MODE=true in Vercel env to lower thresholds." : "Check [synthesis] logs above.")
+          : `(ongoing run; need ≥1 synthesized story to publish).`)
       );
       return NextResponse.json({
         success: true,
         message:
-          `Only ${stories.length} new stories synthesized — publish threshold not met (need ${MIN_STORIES_TO_PUBLISH}). ` +
-          `Existing feed preserved. ` +
-          (!REBUILD_MODE ? "Hint: set REBUILD_MODE=true to lower thresholds." : ""),
+          feedIsEmpty
+            ? `Only ${stories.length} new stories synthesized — bootstrap threshold not met (need ${MIN_STORIES_TO_PUBLISH}). ` +
+              (!REBUILD_MODE ? "Hint: set REBUILD_MODE=true to lower thresholds." : "")
+            : `No new stories synthesized this run — existing feed preserved.`,
         stats,
         health: health.warnings,
       });
     }
     stats.publishDecision = "published";
-    if (bootstrapAllowed && !meetsThreshold) {
+    if (feedIsEmpty) {
       console.log(
         `[fetch-news] Publish decision: BOOTSTRAP PUBLISH — ${stories.length} story(ies) ` +
-        `(feed was empty; bootstrap exception allows ≥1 quality story in production)`
+        `(feed was empty; bootstrap threshold met)`
       );
     }
     console.log(
@@ -580,7 +581,7 @@ async function handleNewsFetch() {
 
     // 11. Trigger briefing generation asynchronously (fire-and-forget, don't block response)
     if (stats.posted > 0) {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://market-mountain.com";
       const secret = process.env.FETCH_NEWS_SECRET ?? "";
       fetch(`${siteUrl}/api/briefing`, {
         method: "POST",
