@@ -1,0 +1,89 @@
+name: Apply Story Corrections (one-time)
+
+# One-time editorial correction workflow.
+# Triggered manually via workflow_dispatch.
+# Fixes factual conflicts found between two stories published on 2026-03-14/15:
+#   - Story "Iran Tensions Lift Oil Prices..." says WTI at "$92 per barrel"
+#     but the co-published story and EIA data show WTI at ~$98.7 (near $100).
+#   - The headline CPI chart title in the same story is clarified from
+#     "CPI Inflation Rate (Year-over-Year)" to "Headline CPI (Year-over-Year)"
+#     to distinguish it from the Core PCE figure (2.8%) cited in the article body.
+#
+# This workflow is safe to run multiple times — the correction endpoint is
+# idempotent: if the target string is no longer present, it reports 0 changes.
+# Delete this workflow file after confirming the corrections have been applied.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  correct-stories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Apply oil-price correction to inflation story
+        run: |
+          SITE_URL="${{ secrets.SITE_URL }}"
+          if [ -z "$SITE_URL" ]; then
+            SITE_URL="https://marketmountainfinance.com"
+          fi
+
+          echo "Applying oil-price correction to story news-1773539624109-964..."
+
+          body=$(curl -s \
+            --max-time 30 \
+            -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.FETCH_NEWS_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "id": "news-1773539624109-964",
+              "replacements": [
+                {
+                  "field": "story",
+                  "from": "WTI crude toward $92 per barrel, a level not sustained since late 2024",
+                  "to": "WTI crude near $99 per barrel, approaching the $100 threshold not sustained since late 2024"
+                },
+                {
+                  "field": "chartData.title",
+                  "from": "CPI Inflation Rate (Year-over-Year)",
+                  "to": "Headline CPI (Year-over-Year)"
+                }
+              ],
+              "reason": "Fix factual conflict: oil price $92 inconsistent with co-published story showing EIA data at $98.7; clarify chart title distinguishes headline CPI from core PCE"
+            }' \
+            "$SITE_URL/api/news/correct")
+
+          http_code=$(echo "$body" | tail -n1)
+          response_body=$(echo "$body" | head -n -1)
+
+          echo "Response status: $http_code"
+          echo "Response body: $response_body"
+
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Correction API returned HTTP $http_code"
+            exit 1
+          fi
+
+          echo "Oil-price correction applied successfully"
+
+      - name: Verify corrections applied
+        run: |
+          SITE_URL="${{ secrets.SITE_URL }}"
+          if [ -z "$SITE_URL" ]; then
+            SITE_URL="https://marketmountainfinance.com"
+          fi
+
+          echo "Verifying corrections..."
+
+          # Fetch news and check the corrected story no longer contains $92
+          news=$(curl -s --max-time 15 "$SITE_URL/api/news")
+
+          if echo "$news" | grep -q '"WTI crude toward \$92 per barrel"'; then
+            echo "::warning::Old oil price string still found — correction may not have saved"
+          elif echo "$news" | grep -q 'near \$99 per barrel'; then
+            echo "Correction verified: updated oil price found in feed"
+          else
+            echo "Correction applied (old string no longer in feed)"
+          fi
