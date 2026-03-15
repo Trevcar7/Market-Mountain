@@ -260,7 +260,7 @@ async function fetchSingleFeed(
       signal: controller.signal,
       headers: {
         // Identify ourselves as a legitimate news aggregator bot
-        "User-Agent": "Market-Mountain-NewsBot/1.0 (+https://market-mountain.com)",
+        "User-Agent": "MarketMountain-NewsBot/1.0 (+https://marketmountainfinance.com)",
         "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
       },
       // Disable Next.js fetch caching so we always get fresh content

@@ -202,6 +202,22 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     priority: 1,
   },
 
+  // Bloomberg — additional topic feeds (beyond Markets + Economics above)
+  {
+    name: "Bloomberg Technology",
+    source: "Bloomberg",
+    url: "https://feeds.bloomberg.com/technology/news.rss",
+    category: "business",
+    priority: 1,
+  },
+  {
+    name: "Bloomberg Politics",
+    source: "Bloomberg",
+    url: "https://feeds.bloomberg.com/politics/news.rss",
+    category: "policy",
+    priority: 1,
+  },
+
   // ─── Geopolitics feeds — market-moving global events ─────────────────────
   // Geopolitical events (sanctions, conflicts, trade disputes) directly affect
   // energy prices, FX, and risk sentiment. These feeds surface such signals early.
@@ -253,12 +269,71 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     priority: 2,
   },
 
+  // Fortune
+  {
+    name: "Fortune Business",
+    source: "Fortune",
+    url: "https://fortune.com/feed/fortune-feed/",
+    category: "business",
+    priority: 2,
+  },
+
   // Forbes
   {
     name: "Forbes Business",
     source: "Forbes",
     url: "https://www.forbes.com/feeds/forbesglobalmarkets.rss",
     category: "business",
+    priority: 2,
+  },
+  {
+    name: "Forbes Money",
+    source: "Forbes",
+    url: "https://www.forbes.com/money/feed/",
+    category: "markets",
+    priority: 2,
+  },
+
+  // Business Insider
+  {
+    name: "Business Insider Markets",
+    source: "Business Insider",
+    url: "https://markets.businessinsider.com/rss/news",
+    category: "markets",
+    priority: 2,
+  },
+  {
+    name: "Business Insider Finance",
+    source: "Business Insider",
+    url: "https://www.businessinsider.com/rss",
+    category: "business",
+    priority: 2,
+  },
+
+  // Benzinga — real-time market news, earnings, analyst upgrades
+  {
+    name: "Benzinga News",
+    source: "Benzinga",
+    url: "https://www.benzinga.com/feed",
+    category: "markets",
+    priority: 2,
+  },
+
+  // Morningstar — investment analysis and market news
+  {
+    name: "Morningstar Market News",
+    source: "Morningstar",
+    url: "https://news.morningstar.com/rss/topStories.xml",
+    category: "markets",
+    priority: 2,
+  },
+
+  // The Street — stock analysis and financial news
+  {
+    name: "The Street Markets",
+    source: "The Street",
+    url: "https://www.thestreet.com/rss/index.xml",
+    category: "markets",
     priority: 2,
   },
 
@@ -277,6 +352,52 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     source: "Investopedia",
     url: "https://www.investopedia.com/feedbuilder/feed/getfeed?feedName=rss_headline",
     category: "markets",
+    priority: 2,
+  },
+
+  // Investing.com — global markets, economy, earnings, commodities
+  {
+    name: "Investing.com Stock Market News",
+    source: "Investing.com",
+    url: "https://www.investing.com/rss/news_25.rss",
+    category: "markets",
+    priority: 2,
+  },
+  {
+    name: "Investing.com Economy & Business",
+    source: "Investing.com",
+    url: "https://www.investing.com/rss/news_14.rss",
+    category: "macro",
+    priority: 2,
+  },
+  {
+    name: "Investing.com Earnings",
+    source: "Investing.com",
+    url: "https://www.investing.com/rss/news_1062.rss",
+    category: "markets",
+    priority: 2,
+  },
+  {
+    name: "Investing.com Analyst Ratings",
+    source: "Investing.com",
+    url: "https://www.investing.com/rss/news_1061.rss",
+    category: "markets",
+    priority: 2,
+  },
+  {
+    name: "Investing.com Commodities",
+    source: "Investing.com",
+    url: "https://www.investing.com/rss/news_11.rss",
+    category: "energy",
+    priority: 2,
+  },
+
+  // OilPrice.com — dedicated energy news
+  {
+    name: "OilPrice Energy News",
+    source: "OilPrice.com",
+    url: "https://oilprice.com/rss/main",
+    category: "energy",
     priority: 2,
   },
 
@@ -305,6 +426,30 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     priority: 2,
   },
 
+  // BLS (Bureau of Labor Statistics) — official jobs/inflation data releases
+  // These feeds capture market-moving economic reports (CPI, payrolls, etc.)
+  {
+    name: "BLS All Economic News Releases",
+    source: "BLS",
+    url: "https://www.bls.gov/feed/bls_latest.rss",
+    category: "macro",
+    priority: 2,
+  },
+  {
+    name: "BLS CPI (Inflation)",
+    source: "BLS",
+    url: "https://www.bls.gov/feed/bls_cpi.rss",
+    category: "macro",
+    priority: 2,
+  },
+  {
+    name: "BLS Employment Situation (Payrolls)",
+    source: "BLS",
+    url: "https://www.bls.gov/feed/bls_ces.rss",
+    category: "macro",
+    priority: 2,
+  },
+
   // IMF
   {
     name: "IMF News",
@@ -320,6 +465,24 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     source: "Treasury",
     url: "https://home.treasury.gov/system/files/206/treasury-press-releases.rss",
     category: "policy",
+    priority: 2,
+  },
+
+  // CFTC (Commodity Futures Trading Commission) — regulatory/derivatives/commodities
+  {
+    name: "CFTC Press Releases",
+    source: "CFTC",
+    url: "https://www.cftc.gov/rss/pressreleases.xml",
+    category: "policy",
+    priority: 2,
+  },
+
+  // Foreign Policy — geopolitical analysis with direct market implications
+  {
+    name: "Foreign Policy",
+    source: "Foreign Policy",
+    url: "https://foreignpolicy.com/feed/",
+    category: "geopolitics",
     priority: 2,
   },
 

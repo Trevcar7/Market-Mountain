@@ -256,11 +256,16 @@ export const TIER_2_SOURCES = [
   "morningstar",
   "seeking alpha",       // SA editorial (not community articles)
   "investopedia",
+  "investing.com",
   "the street",
   "thestreet",
   "fortune",
   "forbes",
   "business insider",
+  "benzinga",
+  "cftc",               // Commodity Futures Trading Commission
+  "foreign policy",     // geopolitical analysis
+  "oilprice",           // energy-focused
   // Crypto-specific quality outlets
   "coindesk",
   "the block",
@@ -323,6 +328,7 @@ const TRUSTED_FINANCIAL_SOURCES = [
   "seeking alpha",
   "benzinga",
   "investopedia",
+  "investing.com",
   "the street",
   "thestreet",
   "zacks",
@@ -330,6 +336,9 @@ const TRUSTED_FINANCIAL_SOURCES = [
   "fortune",
   "forbes",
   "yahoo finance",
+  "foreign policy",
+  "oilprice",
+  "cftc",
   // Wire services (legitimate primary-source distribution)
   "business wire",
   "businesswire",
