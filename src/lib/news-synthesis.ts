@@ -334,6 +334,36 @@ function computeConfidenceScore(
  *
  *   [story paragraphs]
  */
+/**
+ * Normalize a raw line from Claude's output so that section headers are
+ * recognized regardless of casing, markdown formatting, or minor variations.
+ *
+ * Handles common Claude output quirks:
+ *   - "**HEADLINE:**" → "HEADLINE:"
+ *   - "## HEADLINE:" → "HEADLINE:"
+ *   - "Headline:" or "headline:" → "HEADLINE:"
+ *   - "TITLE:" → "HEADLINE:" (common alias)
+ *   - Leading markdown fences (```) are stripped
+ */
+function normalizeHeaderLine(trimmed: string): string {
+  // Strip markdown bold/italic wrappers: **HEADLINE:** → HEADLINE:
+  let s = trimmed.replace(/^\*{1,3}|\*{1,3}$/g, "").trim();
+  // Strip markdown heading prefixes: ## HEADLINE: → HEADLINE:
+  s = s.replace(/^#{1,4}\s*/, "").trim();
+  // Strip code fences
+  if (s.startsWith("```")) return "";
+  // Uppercase everything before the first colon for header matching
+  const colonIdx = s.indexOf(":");
+  if (colonIdx > 0 && colonIdx < 20) {
+    const label = s.substring(0, colonIdx).toUpperCase().trim();
+    const rest = s.substring(colonIdx + 1);
+    // Map common aliases
+    if (label === "TITLE") return `HEADLINE:${rest}`;
+    return `${label}:${rest}`;
+  }
+  return s;
+}
+
 function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticle {
   const result: ParsedArticle = {
     title: fallbackTitle,
@@ -344,6 +374,10 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
     keyTakeaways: [],
     marketImpact: [],
   };
+
+  // Log first 300 chars of raw output for debugging parse failures
+  const preview = raw.substring(0, 300).replace(/\n/g, "\\n");
+  console.log(`[parse] Raw output preview (${raw.length} chars): "${preview}"`);
 
   const lines = raw.split("\n");
   const storyLines: string[] = [];
@@ -357,44 +391,50 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
 
   for (const line of lines) {
     const trimmed = line.trim();
+    // Normalize for header detection (case-insensitive, strips markdown)
+    const normalized = normalizeHeaderLine(trimmed);
 
     // Named section headers — always processed first
-    if (trimmed.startsWith("HEADLINE:")) {
+    if (normalized.startsWith("HEADLINE:")) {
       inKeyTakeaways = false;
-      result.title = trimmed.replace("HEADLINE:", "").trim();
+      inMarketImpact = false;
+      result.title = normalized.replace("HEADLINE:", "").trim();
       continue;
     }
-    if (trimmed.startsWith("KEY_TAKEAWAYS:")) {
+    if (normalized.startsWith("KEY_TAKEAWAYS:")) {
       inKeyTakeaways = true;
+      inMarketImpact = false;
       // Handle inline bullet on same line: "KEY_TAKEAWAYS: • First point"
-      const remainder = trimmed.replace("KEY_TAKEAWAYS:", "").trim();
+      const remainder = normalized.replace("KEY_TAKEAWAYS:", "").trim();
       if (remainder) {
         const bullet = remainder.replace(/^[•\-\*]\s*/, "").trim();
         if (bullet) result.keyTakeaways.push(bullet);
       }
       continue;
     }
-    if (trimmed.startsWith("WHY_MATTERS:")) {
-      inKeyTakeaways = false;
-      result.whyThisMatters = trimmed.replace("WHY_MATTERS:", "").trim();
-      continue;
-    }
-    if (trimmed.startsWith("SECOND_ORDER:")) {
-      inKeyTakeaways = false;
-      result.secondOrderImplication = trimmed.replace("SECOND_ORDER:", "").trim();
-      continue;
-    }
-    if (trimmed.startsWith("WHAT_WATCH:")) {
+    if (normalized.startsWith("WHY_MATTERS:")) {
       inKeyTakeaways = false;
       inMarketImpact = false;
-      result.whatToWatchNext = trimmed.replace("WHAT_WATCH:", "").trim();
+      result.whyThisMatters = normalized.replace("WHY_MATTERS:", "").trim();
       continue;
     }
-    if (trimmed.startsWith("MARKET_IMPACT:")) {
+    if (normalized.startsWith("SECOND_ORDER:")) {
+      inKeyTakeaways = false;
+      inMarketImpact = false;
+      result.secondOrderImplication = normalized.replace("SECOND_ORDER:", "").trim();
+      continue;
+    }
+    if (normalized.startsWith("WHAT_WATCH:")) {
+      inKeyTakeaways = false;
+      inMarketImpact = false;
+      result.whatToWatchNext = normalized.replace("WHAT_WATCH:", "").trim();
+      continue;
+    }
+    if (normalized.startsWith("MARKET_IMPACT:")) {
       inKeyTakeaways = false;
       inMarketImpact = true;
       // Handle inline: "MARKET_IMPACT: OIL +4.1% up, S&P -1.2% down"
-      const remainder = trimmed.replace("MARKET_IMPACT:", "").trim();
+      const remainder = normalized.replace("MARKET_IMPACT:", "").trim();
       if (remainder) {
         parseMarketImpactLine(remainder, result.marketImpact);
       }
@@ -437,7 +477,7 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
 
     // Story body — any non-header non-empty line
     if (trimmed.length > 0) {
-      const isHeader = HEADER_PREFIXES.some((p) => trimmed.startsWith(p));
+      const isHeader = HEADER_PREFIXES.some((p) => normalized.startsWith(p));
       if (!isHeader) {
         storyLines.push(trimmed);
         inStory = true;
@@ -447,26 +487,55 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
 
   result.story = storyLines.join("\n\n");
 
-  // Fallbacks if parsing missed sections
-  if (!result.title || result.title.length < 5) {
-    const firstSentence = raw.split(/[.!?]/)[0].trim();
-    result.title =
-      firstSentence.length > 10 && firstSentence.length < 150
-        ? firstSentence
-        : fallbackTitle;
+  // ── Fallback title extraction ──────────────────────────────────────────
+  // If no HEADLINE: section was found (title === fallbackTitle), try to
+  // extract a reasonable title from the first substantive line of the output.
+  // Claude sometimes omits the HEADLINE: prefix but writes a title-like
+  // first line (short, no period, capitalized).
+  if (result.title === fallbackTitle || !result.title || result.title.length < 5) {
+    // Strategy 1: first non-empty line that looks like a title (5-18 words, no period)
+    for (const line of lines) {
+      const t = line.trim()
+        .replace(/^\*{1,3}/, "").replace(/\*{1,3}$/, "") // strip bold
+        .replace(/^#{1,4}\s*/, "")                         // strip heading markers
+        .trim();
+      if (!t || t.startsWith("```")) continue;
+      // Skip lines that are clearly section headers we already processed
+      const n = normalizeHeaderLine(t);
+      if (HEADER_PREFIXES.some((p) => n.startsWith(p))) continue;
+      // Skip bullet points
+      if (/^[•\-\*]/.test(t)) continue;
+      const words = t.split(/\s+/).filter(Boolean);
+      // Title-like: 5-18 words, doesn't end with a period (prose), not too long
+      if (words.length >= 5 && words.length <= 18 && !t.endsWith(".") && t.length < 200) {
+        result.title = t;
+        console.log(`[parse] Fallback title extracted from first line: "${t}"`);
+        break;
+      }
+    }
+
+    // Strategy 2: first sentence (existing logic)
+    if (result.title === fallbackTitle || !result.title || result.title.length < 5) {
+      const firstSentence = raw.split(/[.!?]/)[0].trim();
+      if (firstSentence.length > 10 && firstSentence.length < 150) {
+        const words = firstSentence.split(/\s+/).filter(Boolean);
+        if (words.length >= 5) {
+          result.title = firstSentence;
+          console.log(`[parse] Fallback title from first sentence: "${firstSentence}"`);
+        }
+      }
+    }
   }
 
   if (!result.story || result.story.length < 100) {
-    const bodyLines = lines.filter(
-      (l) =>
-        !l.startsWith("HEADLINE:") &&
-        !l.startsWith("KEY_TAKEAWAYS:") &&
-        !l.startsWith("WHY_MATTERS:") &&
-        !l.startsWith("SECOND_ORDER:") &&
-        !l.startsWith("WHAT_WATCH:") &&
-        !l.startsWith("MARKET_IMPACT:") &&
-        !l.trim().startsWith("•")
-    );
+    const bodyLines = lines.filter((l) => {
+      const n = normalizeHeaderLine(l.trim());
+      return (
+        !HEADER_PREFIXES.some((p) => n.startsWith(p)) &&
+        !l.trim().startsWith("•") &&
+        !l.trim().startsWith("```")
+      );
+    });
     result.story = bodyLines.join("\n").trim();
   }
 

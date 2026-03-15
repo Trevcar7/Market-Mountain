@@ -166,13 +166,22 @@ function computeHeadlineSimilarity(headline1: string, headline2: string): number
 }
 
 /**
+ * Rebuild mode — set REBUILD_MODE=true in Vercel env vars to bootstrap an empty feed.
+ * Requirements: ≥2 quality stories (not 3), publish cap = 2, detailed rejection logging.
+ * Remove REBUILD_MODE once the feed has ≥3 published articles.
+ */
+const REBUILD_MODE = process.env.REBUILD_MODE === "true";
+
+/**
  * How long (hours) to suppress a topic after a synthesis rejection.
  * Prevents re-spending Anthropic API credits on groups that already failed
  * fact-check, confidence, or QA in a recent run. Topics re-enter eligibility
  * automatically once the cooldown expires, allowing changed news cycles to
  * produce a different (potentially publishable) synthesis on retry.
+ *
+ * Production: 4h | Rebuild: 1h (allows quicker retries after deploying fixes)
  */
-const SYNTHESIS_FAILURE_COOLDOWN_HOURS = 4;
+const SYNTHESIS_FAILURE_COOLDOWN_HOURS = REBUILD_MODE ? 1 : 4;
 
 // Per-category cap per run — prevents 3 macro stories when only 1 event happened
 const PER_CATEGORY_CAP: Record<string, number> = {
@@ -188,12 +197,6 @@ const MIN_IMPORTANCE = 8;               // Multi-source groups must meet this fl
 const MIN_IMPORTANCE_SINGLE_SOURCE = 6; // Single-source fallback has a lower floor
 const MAX_GROUPS_PER_RUN = 3;           // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
 const MAX_GROUPS_FALLBACK = 2;          // Fewer groups when running in single-source fallback mode
-/**
- * Rebuild mode — set REBUILD_MODE=true in Vercel env vars to bootstrap an empty feed.
- * Requirements: ≥2 quality stories (not 3), publish cap = 2, detailed rejection logging.
- * Remove REBUILD_MODE once the feed has ≥3 published articles.
- */
-const REBUILD_MODE = process.env.REBUILD_MODE === "true";
 
 const MIN_STORIES_TO_PUBLISH = REBUILD_MODE ? 2 : 3; // Publish Decision Layer threshold
 const MAX_ARTICLES_PER_DAY = 5;                       // Editorial daily publishing cap
