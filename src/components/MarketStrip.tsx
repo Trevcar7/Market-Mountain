@@ -75,12 +75,12 @@ export default function MarketStrip() {
 
   return (
     <div
-      className="w-full bg-white border-b border-border overflow-hidden"
+      className="w-full bg-white border-b border-border sm:overflow-hidden"
       aria-label="Live market prices"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center">
-          {/* Left: Markets label — natural width */}
+          {/* Left: Markets label — natural width, stays fixed while chips scroll on mobile */}
           <div className="shrink-0 flex items-center gap-1.5 px-2 py-2 border-r border-border/60">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
             <span className="text-[10px] font-bold tracking-widest uppercase text-text-light whitespace-nowrap">
@@ -88,16 +88,15 @@ export default function MarketStrip() {
             </span>
           </div>
 
-          {/* Center: chips at natural widths, centered in the remaining flex space */}
-          <div className="flex-1 flex items-center justify-center">
+          {/* Center: scrollable on mobile, centered on sm+ */}
+          <div className="flex-1 flex items-center overflow-x-auto scrollbar-none px-3 sm:px-0 sm:justify-center sm:overflow-visible">
             {snapshot.items.map((item) => (
               <SnapshotChip key={item.label} item={item} />
             ))}
           </div>
 
-          {/* Right: always exactly as wide as the left label (invisible mirror sets width).
-              Timestamp is absolutely overlaid at xl+ so it never affects layout width. */}
-          <div className="shrink-0 relative flex items-center gap-1.5 px-2 py-2">
+          {/* Right: invisible mirror to keep chips centered on sm+. Hidden on mobile. */}
+          <div className="hidden sm:flex shrink-0 relative items-center gap-1.5 px-2 py-2">
             <span className="w-1.5 h-1.5 rounded-full opacity-0" aria-hidden="true" />
             <span className="text-[10px] font-bold tracking-widest uppercase opacity-0 whitespace-nowrap" aria-hidden="true">
               Markets

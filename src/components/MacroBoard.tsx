@@ -442,7 +442,7 @@ function Section({ title, type, items, loading, skeletonCount = 4, borderClass }
 function SignalTagRow({ tags }: { tags: SignalTag[] }) {
   if (tags.length === 0) return null;
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-2 flex flex-wrap gap-2">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-2 flex flex-wrap gap-2 justify-center sm:justify-start">
       {tags.map((tag) => (
         <span
           key={tag.label}

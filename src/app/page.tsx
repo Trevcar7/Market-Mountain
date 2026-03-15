@@ -60,14 +60,18 @@ export default function HomePage() {
         <MacroBoard />
       </MarketDataProvider>
 
-      {/* What's Moving Markets — top 3 AI-derived signal drivers (connects to MacroBoard) */}
-      <WhatsMoving />
+      {/* What's Moving Markets — hidden on mobile, visible sm+ */}
+      <div className="hidden sm:block">
+        <WhatsMoving />
+      </div>
 
-      {/* Market Signal Bar — directional signals */}
-      <SignalBar />
+      {/* Market Signal Bar — hidden on mobile, visible sm+ */}
+      <div className="hidden sm:block">
+        <SignalBar />
+      </div>
 
-      {/* Accent divider */}
-      <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
+      {/* Accent divider — hidden on mobile alongside the sections above */}
+      <div className="hidden sm:block h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       {/* Morning Brief — link to today's curated briefing */}
       <section className="bg-navy-50 border-b border-border">
