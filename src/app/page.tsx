@@ -4,9 +4,7 @@ import Logo from "@/components/Logo";
 import Link from "next/link";
 import NewsSection from "@/components/NewsSection";
 import MacroBoard from "@/components/MacroBoard";
-import SignalBar from "@/components/SignalBar";
 import MarketStrip from "@/components/MarketStrip";
-import WhatsMoving from "@/components/WhatsMoving";
 import { MarketDataProvider } from "@/contexts/MarketDataContext";
 
 export default function HomePage() {
@@ -59,19 +57,6 @@ export default function HomePage() {
         {/* Macro Board — live indicators + regime classification */}
         <MacroBoard />
       </MarketDataProvider>
-
-      {/* What's Moving Markets — hidden on mobile, visible sm+ */}
-      <div className="hidden sm:block">
-        <WhatsMoving />
-      </div>
-
-      {/* Market Signal Bar — hidden on mobile, visible sm+ */}
-      <div className="hidden sm:block">
-        <SignalBar />
-      </div>
-
-      {/* Accent divider — hidden on mobile alongside the sections above */}
-      <div className="hidden sm:block h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       {/* Morning Brief — link to today's curated briefing */}
       <section className="bg-navy-50 border-b border-border">
