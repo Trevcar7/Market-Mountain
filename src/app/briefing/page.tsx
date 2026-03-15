@@ -292,30 +292,74 @@ export default async function BriefingPage() {
 
 function NoBriefingState() {
   return (
-    <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-20 text-center">
-      <div className="max-w-md mx-auto">
-        <p className="text-4xl mb-4" role="img" aria-label="chart">
-          📊
-        </p>
-        <h2
-          className="text-xl font-bold text-navy-900 mb-3"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-        >
-          Briefing not yet available
-        </h2>
-        <p className="text-text-muted text-sm mb-6">
-          Today&apos;s briefing will be available once the morning market coverage
-          is ready. Check back shortly, or browse the full news feed.
-        </p>
-        <Link
-          href="/news"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium transition-colors"
-        >
-          Browse Market News
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </Link>
+    <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-16 sm:py-24">
+      {/* Main empty state card */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        {/* Top accent bar */}
+        <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
+
+        <div className="px-8 sm:px-12 py-12 sm:py-16 text-center">
+          {/* Icon */}
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-navy-50 mb-6">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <rect x="3" y="18" width="5" height="9" rx="1" fill="currentColor" className="text-navy-300" />
+              <rect x="11" y="12" width="5" height="15" rx="1" fill="currentColor" className="text-navy-500" />
+              <rect x="19" y="6" width="5" height="21" rx="1" fill="currentColor" className="text-accent-500" />
+              <path d="M4 5l7 6 6-4 8-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-navy-300" />
+            </svg>
+          </div>
+
+          <h2
+            className="text-2xl sm:text-3xl font-bold text-navy-900 mb-3"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          >
+            Today&apos;s briefing is on its way
+          </h2>
+          <p className="text-text-muted text-base leading-relaxed mb-2 max-w-md mx-auto">
+            The daily markets briefing publishes each morning once coverage is ready.
+            Check back shortly for the lead story, key data, and what to watch.
+          </p>
+          <p className="text-text-light text-sm mb-10">
+            In the meantime, browse the full news feed below.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/news"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-navy-900 hover:bg-navy-800 text-white text-sm font-semibold transition-colors"
+            >
+              Browse Market News
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+            <Link
+              href="/articles"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-border hover:border-navy-300 text-text-muted hover:text-navy-900 text-sm font-medium transition-colors"
+            >
+              Read research articles
+            </Link>
+          </div>
+        </div>
+
+        {/* What to expect section */}
+        <div className="border-t border-border bg-navy-50 px-8 sm:px-12 py-8">
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-text-light mb-5 text-center">
+            What&apos;s in the daily briefing
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-2xl mx-auto">
+            {[
+              { label: "Lead Story", desc: "The most market-moving event of the day with analysis" },
+              { label: "Key Data", desc: "Essential figures — yields, indices, macro indicators" },
+              { label: "What to Watch", desc: "Forward-looking events and signals to monitor" },
+            ].map((item) => (
+              <div key={item.label} className="text-center">
+                <p className="text-xs font-semibold text-navy-900 mb-1">{item.label}</p>
+                <p className="text-xs text-text-muted leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -40,6 +40,8 @@ export default function Footer() {
               </p>
               {[
                 { href: "/", label: "Home" },
+                { href: "/news", label: "News" },
+                { href: "/briefing", label: "Briefing" },
                 { href: "/articles", label: "Articles" },
                 { href: "/about", label: "About" },
               ].map((link) => (
@@ -61,7 +63,7 @@ export default function Footer() {
                 <Link
                   key={article.slug}
                   href={`/post/${article.slug}`}
-                  className="text-sm hover:text-accent-400 transition-colors line-clamp-1 max-w-[200px]"
+                  className="text-sm hover:text-accent-400 transition-colors line-clamp-1"
                 >
                   {article.title}
                 </Link>

@@ -53,7 +53,10 @@ export default function Navbar() {
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1" aria-label="Main navigation">
             {navLinks.map((link) => {
-              const active = pathname === link.href;
+              const active =
+                pathname === link.href ||
+                (link.href === "/articles" && pathname.startsWith("/post/")) ||
+                (link.href === "/news" && pathname.startsWith("/news/"));
               return (
                 <Link
                   key={link.href}
@@ -120,7 +123,10 @@ export default function Navbar() {
       >
         <nav className="px-4 py-3 flex flex-col gap-1" aria-label="Mobile navigation">
           {navLinks.map((link) => {
-            const active = pathname === link.href;
+            const active =
+              pathname === link.href ||
+              (link.href === "/articles" && pathname.startsWith("/post/")) ||
+              (link.href === "/news" && pathname.startsWith("/news/"));
             return (
               <Link
                 key={link.href}

@@ -24,7 +24,7 @@ export default function NewsPage() {
             <h1 className="font-playfair text-4xl sm:text-5xl font-bold mb-4">
               Market News
             </h1>
-            <p className="text-lg text-gray-300">
+            <p className="text-lg text-white/60">
               Curated daily market coverage — macroeconomic updates, Fed policy,
               earnings, and market-moving events that matter.
             </p>
