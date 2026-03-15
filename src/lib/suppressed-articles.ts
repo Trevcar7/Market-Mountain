@@ -13,6 +13,7 @@
  *   - Superseded by a better-sourced article on the same topic
  *   - Wrong/misleading image (e.g., wind turbine on an oil price story)
  *   - QA score < 85 on post-publish review
+ *   - Off-topic category (e.g., crypto story with wrong image/framing)
  *
  * How to suppress additional articles:
  *   1. Add their ID to this set
@@ -37,5 +38,25 @@ export const SUPPRESSED_ARTICLE_IDS = new Set<string>([
   "news-1773359607257-428",   // "Iran tensions lift oil prices, forcing emerging markets to pause rate cuts" (dup #2)
   "news-1773359603846-1909",  // "Cramer Warns Against Panic Selling as Iran Tensions Roil Markets" (low quality — commentator opinion)
   "news-1773359599784-964",   // "Global inflation remains contained as geopolitical tensions threaten oil prices" (dup #3 — wrong topic framing)
+
+  // ── March 15, 2026 — Iran/oil duplicate batch (geopolitics + inflation) ─
+  // The canonical Iran/oil story is news-1773590264851-650 (energy topicKey).
+  // These two are duplicate angles on the same ongoing event and are suppressed
+  // in favor of the single primary "energy" article. The pipeline now uses
+  // entity-based event matching (see fetch-news/route.ts) to prevent this
+  // pattern in future runs.
+
+  "news-1773590281732-1186",  // "Middle East Conflict Threatens Oil Export Routes, Forcing Rate Repricing" (geopolitics dup — same event)
+  "news-1773539624109-964",   // "Iran Tensions Lift Oil Prices, Stoking Inflation Fears Before Fed Rate Decisions" (inflation dup — same event)
+
+  // ── March 15, 2026 — Bitcoin article (deleted per editorial decision) ────
+  // Bitcoin story published alongside the Iran/oil articles. Deleted because:
+  //   1. Crypto price moves driven by geopolitical tension are lower-signal
+  //   2. The article added little original analysis beyond the price level
+  //   3. The feed already covered the underlying macro event (Iran/oil/inflation)
+  // Future crypto articles must pass the standard QA gate and have a distinct
+  // non-geopolitical catalyst (ETF flows, network metrics, regulatory action).
+
+  "news-1773575410020-673",   // "Bitcoin Surges Past $73,000 Amid Geopolitical Tension and Institutional Inflows"
 
 ]);

@@ -43,8 +43,94 @@ const TOPIC_DEDUP_HOURS: Record<string, number> = {
   earnings:        4,   // unchanged — company stories refresh faster
   merger_acquisition: 12, // was 8
   bankruptcy:      24,  // was 12
+  // Geopolitics: 24h window — geopolitical events (Middle East, Russia, China tensions)
+  // tend to produce a burst of overlapping articles; suppress to 1 synthesis per day.
+  geopolitics:     24,
 };
 const DEFAULT_DEDUP_HOURS = 8; // was 6
+
+// ---------------------------------------------------------------------------
+// Entity-based event matching — prevents duplicate articles on the same
+// ongoing story when different topic keys surface the same real-world event.
+//
+// Example: "energy" + "geopolitics" + "inflation" all spawned for the same
+// Iran tensions → oil spike event. Standard topic dedup can't catch this
+// because they have different topic keys. Entity matching does.
+//
+// Ongoing event window: how far back to look for entity-matching articles.
+// Stories covering Iran, oil, AND Middle East in the same 72h window are
+// treated as the same ongoing story and suppressed (only the first wins).
+// ---------------------------------------------------------------------------
+const ONGOING_EVENT_WINDOW_HOURS = 72;
+const ENTITY_OVERLAP_THRESHOLD = 0.55; // 55% shared entities = same ongoing story
+
+/**
+ * Extract a normalized set of key entities from a collection of text strings.
+ * Covers geopolitical actors, commodities, financial instruments, and major
+ * companies. Designed for fast overlap detection without external dependencies.
+ */
+function extractEventEntities(texts: string[]): Set<string> {
+  const combined = texts.join(" ").toLowerCase();
+  const entities = new Set<string>();
+
+  // Geopolitical actors that commonly drive correlated market stories
+  const GEO_ACTORS = [
+    "iran", "russia", "china", "ukraine", "israel", "taiwan",
+    "opec", "saudi", "middle east", "persian gulf", "red sea",
+    "nato", "europe", "eu", "japan", "korea",
+  ];
+  for (const actor of GEO_ACTORS) {
+    if (combined.includes(actor)) entities.add(actor);
+  }
+
+  // Commodities — price moves in these often create correlated macro articles
+  const COMMODITIES = [
+    "oil", "crude", "wti", "brent", "natural gas", "lng",
+    "gold", "silver", "copper", "wheat", "corn",
+  ];
+  for (const c of COMMODITIES) {
+    if (combined.includes(c)) entities.add(c);
+  }
+
+  // Crypto assets — prevent "bitcoin" articles from spawning across topic keys
+  const CRYPTO_ASSETS = ["bitcoin", "btc", "ethereum", "eth", "crypto", "blockchain"];
+  for (const c of CRYPTO_ASSETS) {
+    if (combined.includes(c)) entities.add(c);
+  }
+
+  // Macro events — central bank actions, regulatory moves, economic data
+  const MACRO_EVENTS = [
+    "federal reserve", "fed", "rate cut", "rate hike", "interest rate",
+    "inflation", "cpi", "pce", "gdp", "unemployment", "jobs",
+    "tariff", "sanction", "treasury", "yield",
+  ];
+  for (const e of MACRO_EVENTS) {
+    if (combined.includes(e)) entities.add(e);
+  }
+
+  // Major companies (add only if explicitly named — avoids false positives)
+  const MAJOR_COS = [
+    "nvidia", "apple", "microsoft", "tesla", "amazon",
+    "alphabet", "meta", "jpmorgan", "berkshire", "goldman",
+    "boeing", "exxon", "chevron", "shell",
+  ];
+  for (const co of MAJOR_COS) {
+    if (new RegExp(`\\b${co}\\b`).test(combined)) entities.add(co);
+  }
+
+  return entities;
+}
+
+/**
+ * Compute entity overlap as a Jaccard-style coefficient (0–1).
+ * Returns the ratio of shared entities to the smaller set size,
+ * so a small group matching all its entities to a large group scores 1.0.
+ */
+function computeEntityOverlap(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  const intersection = [...a].filter((e) => b.has(e)).length;
+  return intersection / Math.min(a.size, b.size);
+}
 
 /**
  * How long (hours) to suppress a topic after a synthesis rejection.
@@ -232,6 +318,7 @@ async function handleNewsFetch() {
     deduplicated: 0,
     grouped: 0,
     crossRunSuppressed: 0,
+    entityMatchSuppressed: 0,  // Groups suppressed because they match an ongoing story
     tierCheckDropped: 0,
     categoryCapDropped: 0,
     importanceDropped: 0,
@@ -447,10 +534,103 @@ async function handleNewsFetch() {
       });
     }
 
+    // 4c.7. Entity-based event matching — "ongoing story" deduplication.
+    //
+    // Problem: different topic keys can surface the same real-world event.
+    // Example: Iran tensions → oil spike spawns "energy" + "geopolitics" +
+    // "inflation" articles all in the same run or within hours of each other.
+    // Standard topic-key cross-run dedup misses this because the keys differ.
+    //
+    // Solution: extract key entities (countries, commodities, companies) from
+    // each group's article titles and compare them against entities in articles
+    // already published within ONGOING_EVENT_WINDOW_HOURS. If entity overlap
+    // exceeds ENTITY_OVERLAP_THRESHOLD, the group is "same ongoing story" and
+    // is suppressed. Only the first (highest-ranked) group for a given entity
+    // cluster gets synthesized.
+    //
+    // Decision rule (update vs. new):
+    //   ≥ ENTITY_OVERLAP_THRESHOLD match within ONGOING_EVENT_WINDOW_HOURS → SUPPRESS
+    //     (the existing article already covers this story; a new article would be a
+    //     near-duplicate rather than a genuine update)
+    //   New entity cluster OR event window expired → SYNTHESIZE as new article
+    //
+    // Future enhancement: when an exact entity match is found and the existing article
+    // is more than 24h old, update its body in-place instead of suppressing entirely.
+    // That "living article" update path is a planned extension to this system.
+    const windowMs = ONGOING_EVENT_WINDOW_HOURS * 60 * 60 * 1000;
+    const recentPublishedArticles = existingActive.filter(
+      (s) => Date.now() - new Date(s.publishedAt).getTime() < windowMs
+    );
+
+    // Pre-compute entity signatures for existing recent articles
+    const existingEntitySigs = recentPublishedArticles.map((article) => ({
+      title: article.title,
+      topicKey: article.topicKey ?? "",
+      entities: extractEventEntities([article.title, article.topicKey ?? ""]),
+    }));
+
+    const entityMatchBefore = afterTierCheck.length;
+    // Track which entity clusters have already been claimed by a group in this run
+    // (prevents TWO new groups in the same run from publishing on the same cluster)
+    const claimedEntityClusters: Set<string>[] = [];
+
+    const afterEntityMatch = afterTierCheck.filter((g) => {
+      const groupTitles = g.articles.map((a) => {
+        const raw = a as Record<string, unknown>;
+        return String(raw.headline ?? raw.title ?? "");
+      });
+      const groupEntities = extractEventEntities([g.topic, ...groupTitles]);
+
+      // Need at least 2 entities to do meaningful matching (1-entity groups are
+      // too broad — "oil" alone would match everything in an oil-driven run)
+      if (groupEntities.size < 2) return true;
+
+      // Check against published articles in the ongoing-event window
+      for (const sig of existingEntitySigs) {
+        if (sig.entities.size < 2) continue;
+        const overlap = computeEntityOverlap(groupEntities, sig.entities);
+        if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+          console.log(
+            `[fetch-news] Entity-match suppress: "${g.topic}" ` +
+            `(${Math.round(overlap * 100)}% entity overlap with published ` +
+            `"${sig.title.slice(0, 60)}" [${sig.topicKey}] — same ongoing story)`
+          );
+          return false;
+        }
+      }
+
+      // Check against other groups already accepted in this run
+      for (const claimedEntities of claimedEntityClusters) {
+        if (claimedEntities.size < 2) continue;
+        const overlap = computeEntityOverlap(groupEntities, claimedEntities);
+        if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+          console.log(
+            `[fetch-news] Entity-match suppress: "${g.topic}" ` +
+            `(${Math.round(overlap * 100)}% entity overlap with another group in this run — ` +
+            `same ongoing story, only first group synthesized)`
+          );
+          return false;
+        }
+      }
+
+      // This group's entity cluster is novel — claim it and allow synthesis
+      claimedEntityClusters.push(groupEntities);
+      return true;
+    });
+
+    stats.entityMatchSuppressed = entityMatchBefore - afterEntityMatch.length;
+
+    if (stats.entityMatchSuppressed > 0) {
+      console.log(
+        `[fetch-news] Entity-match: ${stats.entityMatchSuppressed} group(s) suppressed ` +
+        `(same ongoing story as a recently published article)`
+      );
+    }
+
     // 4d. Per-category cap
     const categoryCount: Record<string, number> = {};
-    const catCapBefore = afterTierCheck.length;
-    const afterCategoryCap = afterTierCheck.filter((g) => {
+    const catCapBefore = afterEntityMatch.length;
+    const afterCategoryCap = afterEntityMatch.filter((g) => {
       const cat = g.category;
       categoryCount[cat] = (categoryCount[cat] ?? 0) + 1;
       const cap = PER_CATEGORY_CAP[cat] ?? 2;
@@ -483,6 +663,7 @@ async function handleNewsFetch() {
     console.log(
       `[fetch-news] Pipeline stage counts — ` +
       `grouped=${stats.grouped}, crossRunSuppressed=${stats.crossRunSuppressed}, ` +
+      `entityMatchSuppressed=${stats.entityMatchSuppressed}, ` +
       `tierDropped=${stats.tierCheckDropped}, catCapDropped=${stats.categoryCapDropped}, ` +
       `importanceDropped=${stats.importanceDropped}, toSynthesize=${stats.synthesisGroups}`
     );
@@ -490,6 +671,7 @@ async function handleNewsFetch() {
       `[fetch-news] Final groups to synthesize: ${groupsToSynthesize.length} ` +
       `(mode=${usingFallback ? "single-source-fallback" : "multi-source"}, ` +
       `cap=${groupCap}, cross-run suppressed=${stats.crossRunSuppressed}, ` +
+      `entity-match suppressed=${stats.entityMatchSuppressed}, ` +
       `rebuild=${REBUILD_MODE})`
     );
 

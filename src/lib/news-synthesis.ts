@@ -1087,22 +1087,54 @@ export async function synthesizeGroupedArticles(
       }
 
       // ── Image resolution (Editorial Match Rule) ───────────────────────────
-      // Step 1: Detect if the article is specifically about oil/energy
-      //   regardless of how it was categorized (e.g., oil surge → broad_market).
-      //   Oil stories must use oil infrastructure imagery, never generic NYSE or
-      //   renewable energy visuals (wind turbines, solar panels).
+      // Step 1: Detect the story's true subject regardless of topic categorization.
+      //
+      //   Rule A — Oil/Energy: Oil stories must use oil infrastructure imagery,
+      //   never generic NYSE floors or renewable energy visuals (wind turbines,
+      //   solar panels). Applies even when the article is categorized as
+      //   "broad_market", "geopolitics", "macro", etc.
+      //
+      //   Rule B — Crypto: Crypto stories must use crypto/blockchain imagery,
+      //   never city skylines (GDP fallback) or trading floors. A geopolitics
+      //   article that is really about Bitcoin price action needs a Bitcoin image.
+      //
       const articleTitles = group.articles.map((a) => {
         const raw = a as Record<string, unknown>;
         return String(raw.title ?? raw.headline ?? "");
       }).join(" ");
+
+      const topicAndTitles = group.topic + " " + articleTitles;
+
+      // Rule A: mis-categorized oil/energy story
       const isOilStory =
         group.topic !== "energy" &&
-        /\boil\b|crude\b|WTI\b|brent\b|OPEC\b|petroleum\b|refiner/i.test(
-          group.topic + " " + articleTitles
+        /\boil\b|crude\b|WTI\b|brent\b|OPEC\b|petroleum\b|refin(er|ery)\b/i.test(
+          topicAndTitles
         );
 
-      // Step 2: Pick Unsplash query — override with energy for mis-categorized oil stories
-      const imageTopicOverride = isOilStory ? "energy" : group.topic;
+      // Rule B: mis-categorized crypto story — catch "bitcoin", "BTC", "ethereum",
+      //   "ETH", "crypto", "blockchain", "DeFi", "stablecoin" in geopolitics/
+      //   macro/broad_market articles. City skyline images (GDP/macro fallback)
+      //   must never appear on crypto stories.
+      const isCryptoStory =
+        group.topic !== "crypto" &&
+        /\bbitcoin\b|\bBTC\b|\bethereum\b|\bETH\b|\bcrypt(?:o|ocurrency)\b|\bblockchain\b|\bDeFi\b|\bstablecoin\b|\bNFT\b/i.test(
+          topicAndTitles
+        );
+
+      // Step 2: Pick Unsplash query — override for mis-categorized stories.
+      //   Oil story beats crypto story (energy is primary driver if both match).
+      const imageTopicOverride = isOilStory ? "energy" : isCryptoStory ? "crypto" : group.topic;
+
+      if (isOilStory) {
+        console.log(
+          `[synthesis] Image override: "${group.topic}" → "energy" (oil keywords detected in titles)`
+        );
+      } else if (isCryptoStory) {
+        console.log(
+          `[synthesis] Image override: "${group.topic}" → "crypto" (crypto keywords detected in titles)`
+        );
+      }
       let unsplashUrl = await fetchUnsplashImage(imageTopicOverride, runImageCache);
 
       // Step 3: If Unsplash result is already in the feed, fetch a different image
