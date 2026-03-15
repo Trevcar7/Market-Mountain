@@ -93,8 +93,7 @@ export default function HomePage() {
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
         <div className="flex items-baseline justify-between mb-8 sm:mb-10">
           <h2
-            className="text-2xl sm:text-3xl font-bold text-navy-900"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            className="text-2xl sm:text-3xl font-bold text-navy-900 font-playfair"
           >
             Market News
           </h2>
@@ -135,8 +134,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
         <div className="flex items-baseline justify-between mb-8 sm:mb-10">
           <h2
-            className="text-2xl sm:text-3xl font-bold text-navy-900"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            className="text-2xl sm:text-3xl font-bold text-navy-900 font-playfair"
           >
             Latest Analysis
           </h2>
@@ -196,8 +194,7 @@ export default function HomePage() {
               About the Author
             </p>
             <h2
-              className="text-2xl font-bold text-navy-900 mb-3"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              className="text-2xl font-bold text-navy-900 mb-3 font-playfair"
             >
               Trevor Carnovsky
             </h2>

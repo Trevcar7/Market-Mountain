@@ -42,8 +42,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
           )}
 
           <h2
-            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-3 group-hover:text-accent-300 transition-colors duration-200"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-3 group-hover:text-accent-300 transition-colors duration-200 font-playfair"
           >
             {article.title}
           </h2>
@@ -89,7 +88,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
         <div className="w-[3px] sm:w-full sm:h-[3px] flex-shrink-0 bg-gradient-to-b sm:bg-gradient-to-r from-accent-700 via-accent-500 to-accent-400" />
       )}
 
-      <div className="flex flex-col flex-1 p-4 sm:p-5 sm:p-6">
+      <div className="flex flex-col flex-1 p-4 sm:p-6">
         {tag && (
           <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-700 bg-accent-100 px-2 py-0.5 rounded mb-2.5 w-fit">
             {tag}
@@ -97,8 +96,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
         )}
 
         <h3
-          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-2 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-2 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3 font-playfair"
         >
           {article.title}
         </h3>

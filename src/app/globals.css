@@ -22,7 +22,7 @@
 
   /* Accent green palette */
   --color-accent-700: #15803D;
-  --color-accent-600: #15803D;
+  --color-accent-600: #16A34A;
   --color-accent-500: #22C55E;
   --color-accent-400: #4ADE80;
   --color-accent-300: #86EFAC;
@@ -107,7 +107,7 @@ body {
 }
 
 .prose {
-  font-variant-numeric: oldstyle-nums;
+  font-variant-numeric: lining-nums;
 }
 
 :focus-visible {

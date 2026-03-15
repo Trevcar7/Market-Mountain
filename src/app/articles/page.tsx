@@ -10,6 +10,8 @@ export const metadata: Metadata = {
 
 export default function ArticlesPage() {
   const articles = getAllArticles();
+  const featured = articles[0];
+  const rest = articles.slice(1);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
@@ -19,8 +21,7 @@ export default function ArticlesPage() {
           Research & Analysis
         </p>
         <h1
-          className="text-3xl sm:text-4xl font-bold text-navy-900 mb-3"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          className="text-3xl sm:text-4xl font-bold text-navy-900 mb-3 font-playfair"
         >
           All Articles
         </h1>
@@ -34,11 +35,23 @@ export default function ArticlesPage() {
           No articles published yet — check back soon.
         </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {articles.map((article) => (
-            <ArticleCard key={article.slug} article={article} />
-          ))}
-        </div>
+        <>
+          {/* Featured card */}
+          {featured && (
+            <div className="mb-6 sm:mb-8">
+              <ArticleCard article={featured} featured />
+            </div>
+          )}
+
+          {/* Article grid */}
+          {rest.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+              {rest.map((article) => (
+                <ArticleCard key={article.slug} article={article} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

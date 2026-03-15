@@ -223,8 +223,7 @@ export default async function NewsStoryPage({ params }: Props) {
 
           {/* Title */}
           <h1
-            className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-[1.15] tracking-tight mb-6"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-[1.15] tracking-tight mb-6 font-playfair"
           >
             {item.title}
           </h1>

@@ -100,8 +100,7 @@ export default async function BriefingDatePage({ params }: Props) {
             Daily Markets Briefing
           </p>
           <h1
-            className="font-bold text-4xl sm:text-5xl leading-tight mb-4"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            className="font-bold text-4xl sm:text-5xl leading-tight mb-4 font-playfair"
           >
             {formatLongDate(briefing.date)}
           </h1>
@@ -135,8 +134,7 @@ export default async function BriefingDatePage({ params }: Props) {
           >
             <div className="p-7 sm:p-10">
               <h2
-                className="text-2xl sm:text-[1.9rem] font-bold text-white leading-tight mb-4 group-hover:text-accent-300 transition-colors duration-200"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                className="text-2xl sm:text-[1.9rem] font-bold text-white leading-tight mb-4 group-hover:text-accent-300 transition-colors duration-200 font-playfair"
               >
                 {briefing.leadStory.title}
               </h2>
@@ -193,8 +191,7 @@ export default async function BriefingDatePage({ params }: Props) {
                           </span>
                         </div>
                         <h3
-                          className="text-navy-900 font-semibold text-[0.95rem] leading-snug mb-1.5 group-hover:text-navy-600 transition-colors"
-                          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                          className="text-navy-900 font-semibold text-[0.95rem] leading-snug mb-1.5 group-hover:text-navy-600 transition-colors font-playfair"
                         >
                           {dev.headline}
                         </h3>

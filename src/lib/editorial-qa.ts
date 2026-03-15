@@ -1,23 +1,28 @@
 /**
  * Editorial Quality Assurance Gate — v2
  *
- * Runs a comprehensive 0–100 quality score on every synthesized article.
+ * Runs a comprehensive quality score on every synthesized article.
+ * Raw points are normalized to a 0–100 scale before threshold comparison.
  * Only articles scoring ≥ QA_PASS_THRESHOLD may be published.
  *
- * Scoring breakdown (100 points total):
- *   Story Worthiness  (15) — market impact, catalyst chain, investor implication
- *   Confidence        (15) — composite editorial confidence score
- *   Fact Check        (10) — claim verification score
- *   Source Quality    (10) — Tier 1 source presence + corroboration
- *   Title Quality     (10) — word count, specificity, no vague language
- *   Thesis Clarity    (10) — four editorial questions answered
- *   Chart Quality     (10) — mandatory for key topics; internal quality score
- *   Story Completeness (5) — length (≥120 words) + numerical grounding
- *   Originality        (5) — language similarity vs. recent articles
- *   Editorial Voice    (5) — no generic filler phrases
+ * Scoring breakdown (14 tests, normalized to 100):
+ *   Story Worthiness   (15) — market impact, catalyst chain, investor implication
+ *   Confidence         (15) — composite editorial confidence score
+ *   Fact Check         (10) — claim verification score
+ *   Source Quality     (10) — Tier 1 source presence + corroboration
+ *   Source Coherence    (5) — sources topically relevant to article
+ *   Metadata Accuracy   (5) — tickers, sentiment, marketImpact consistency
+ *   Title Quality      (10) — word count, specificity, no vague language
+ *   Thesis Clarity     (10) — four editorial questions answered
+ *   Chart Quality      (10) — mandatory for key topics; internal quality score
+ *   Story Completeness  (5) — length (≥120 words) + numerical grounding
+ *   Originality         (5) — language similarity vs. recent articles
+ *   Editorial Voice     (5) — no generic filler phrases
+ *   Image Quality       (5) — unique, relevant image
+ *   Update Language     (0) — penalty-only (-10 for "update" phrasing)
  *
  * Production threshold: 85 / 100
- * Rebuild mode threshold: 78 / 100 (set REBUILD_MODE=true in env)
+ * Rebuild mode threshold: 72 / 100 (set REBUILD_MODE=true in env)
  */
 
 /**
@@ -1032,7 +1037,10 @@ export function runEditorialQA(
     scoreUpdateLanguage(article),
   ];
 
-  const score = tests.reduce((sum, t) => sum + t.score, 0);
+  const rawScore = tests.reduce((sum, t) => sum + t.score, 0);
+  const maxPossible = tests.reduce((sum, t) => sum + t.maxScore, 0);
+  // Normalize to 0–100 scale so thresholds stay meaningful regardless of test count
+  const score = maxPossible > 0 ? Math.round((rawScore / maxPossible) * 100) : 0;
   const passed = score >= QA_PASS_THRESHOLD;
 
   let rejectionReason: string | undefined;

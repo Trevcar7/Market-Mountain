@@ -101,8 +101,7 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
           </span>
 
           <h2
-            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-2 group-hover:text-accent-300 transition-colors duration-200"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-2 group-hover:text-accent-300 transition-colors duration-200 font-playfair"
           >
             {news.title}
           </h2>
@@ -169,8 +168,7 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
         </span>
 
         <h3
-          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-1.5 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-1.5 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3 font-playfair"
         >
           {news.title}
         </h3>

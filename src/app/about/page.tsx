@@ -27,8 +27,7 @@ export default function AboutPage() {
             />
           </div>
           <h1
-            className="text-3xl sm:text-4xl font-bold text-navy-900"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            className="text-3xl sm:text-4xl font-bold text-navy-900 font-playfair"
           >
             Trevor Carnovsky
           </h1>

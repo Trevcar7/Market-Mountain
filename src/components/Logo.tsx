@@ -53,9 +53,8 @@ export default function Logo({
 
       {showText && (
         <span
-          className={`${text} font-bold leading-none`}
+          className={`${text} font-bold leading-none font-playfair`}
           style={{
-            fontFamily: "'Playfair Display', Georgia, serif",
             color: mountainColor,
             letterSpacing: "-0.03em",
           }}
