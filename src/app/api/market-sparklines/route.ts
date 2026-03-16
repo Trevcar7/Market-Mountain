@@ -112,15 +112,26 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
     return { sparklines: [], generatedAt: now.toISOString(), validUntil: validUntil.toISOString() };
   }
 
-  // Fetch all symbols in parallel — each fails independently
-  const results = await Promise.allSettled(
-    SPARKLINE_SYMBOLS.map(({ symbol, label }) =>
-      fetchIntradaySeries(twKey, symbol, label)
-    )
+  // Fetch in two batches to stay under TwelveData's 8-credits/minute rate limit.
+  // Batch 1: 3 symbols, Batch 2: 3 symbols (with brief pause between).
+  const batch1Symbols = SPARKLINE_SYMBOLS.slice(0, 3);
+  const batch2Symbols = SPARKLINE_SYMBOLS.slice(3);
+
+  const batch1 = await Promise.allSettled(
+    batch1Symbols.map(({ symbol, label }) => fetchIntradaySeries(twKey, symbol, label))
+  );
+
+  // Brief pause so batch 2 falls into the next rate-limit minute window
+  if (batch2Symbols.length > 0) {
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+
+  const batch2 = await Promise.allSettled(
+    batch2Symbols.map(({ symbol, label }) => fetchIntradaySeries(twKey, symbol, label))
   );
 
   const sparklines: SparklineSet[] = [];
-  for (const result of results) {
+  for (const result of [...batch1, ...batch2]) {
     if (result.status === "fulfilled" && result.value) {
       sparklines.push(result.value);
     }

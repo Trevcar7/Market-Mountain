@@ -6,20 +6,19 @@ import { fetchFredSeries, fetchWtiCrudePrice } from "@/lib/market-data";
 export const runtime = "nodejs";
 
 const KV_KEY = "market-snapshot";
-const CACHE_SECONDS = 5 * 60; // 5 minutes — real-time data refreshes every 5 min
+const CACHE_SECONDS = 5 * 60; // 5 minutes
 
 /**
  * GET /api/market-snapshot
  * Returns six core market indicators for the homepage strip + MacroBoard:
  *   S&P 500, VIX, 10Y Yield, WTI Oil, Broad U.S. Dollar Index, BTC
  *
- * Source priority (per-indicator, real-time first, graceful-degrade):
- *   S&P 500 → FMP ^GSPC (real-time) → TwelveData SPX → FRED SP500 (daily)
- *   VIX     → FMP ^VIX (real-time)  → TwelveData VIX → FRED VIXCLS (daily)
- *   10Y     → FRED DGS10 (daily — yields don't need intraday)
- *   WTI Oil → TwelveData WTI/USD → EIA → FRED DCOILWTICO
- *   DXY     → TwelveData DXY → FRED DTWEXBGS
- *   BTC     → TwelveData BTC/USD → FMP BTCUSD
+ * Data source strategy:
+ *   FRED provides daily-close baselines for all instruments.
+ *   TwelveData ETF proxies (SPY, USO, UUP) provide real-time % change
+ *   which is applied to the FRED baseline to compute approximate current values.
+ *   BTC/USD is fetched directly from TwelveData (crypto, real-time on free tier).
+ *   VIX and 10Y Yield use FRED only (no accurate free-tier real-time proxy).
  *
  * TTL: 5-min server-side Redis cache
  */
@@ -55,15 +54,13 @@ export async function GET() {
 }
 
 // ---------------------------------------------------------------------------
-// Snapshot builder — real-time sources first, FRED daily as fallback
+// Snapshot builder
 // ---------------------------------------------------------------------------
 
 async function buildSnapshot(): Promise<MarketSnapshotData> {
-  const now      = new Date();
+  const now        = new Date();
   const validUntil = new Date(now.getTime() + CACHE_SECONDS * 1000);
-
-  const twKey  = process.env.TWELVEDATA_API_KEY;
-  const fmpKey = process.env.FMP_API_KEY;
+  const twKey      = process.env.TWELVEDATA_API_KEY;
 
   // ── Phase 1: FRED baselines (daily close) — always available ───────────
   const [sp500Res, vixRes, tenYearRes, wtiEiaRes, wtiCoRes, dxFredRes] = await Promise.allSettled([
@@ -111,7 +108,7 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  // 10Y Treasury Yield — change in basis points (FRED is fine for yields)
+  // 10Y Treasury Yield — change in basis points
   const tenObs = tenYearRes.status === "fulfilled" ? tenYearRes.value : [];
   if (tenObs.length >= 1) {
     const latest = parseFloat(tenObs[0].value);
@@ -173,31 +170,84 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
   }
 
   // ── Phase 2: TwelveData real-time override ─────────────────────────────
-  // Each call is isolated — one failure never blocks another.
-  // These override FRED baselines with fresher data when available.
+  // ETF proxies provide real-time % change on the free tier.
+  // We apply that % change to the FRED baseline to get approximate current values.
+  // BTC/USD is fetched directly (crypto pairs are real-time on free tier).
   if (twKey) {
-    const tdResults = await Promise.allSettled([
-      fetchTwelveDataQuote(twKey, "SPX",     "S&P 500",               (p) => Math.round(p).toLocaleString(), "percent"),
-      fetchTwelveDataQuote(twKey, "VIX",     "VIX",                   (p) => p.toFixed(2),                   "points"),
-      fetchTwelveDataQuote(twKey, "WTI/USD", "WTI Oil",               (p) => `$${p.toFixed(2)}`,             "percent"),
-      fetchTwelveDataQuote(twKey, "DXY",     "Broad U.S. Dollar Index",(p) => p.toFixed(2),                  "percent"),
-      fetchTwelveDataQuote(twKey, "BTC/USD", "BTC",                   (p) => `$${Math.round(p).toLocaleString()}`, "percent"),
+    // Batch 1: SPY (S&P proxy) + BTC/USD (direct) + USO (WTI proxy) — 3 credits
+    const [spyRes, btcRes, usoRes] = await Promise.allSettled([
+      fetchTwelveDataQuote(twKey, "SPY"),
+      fetchTwelveDataQuote(twKey, "BTC/USD"),
+      fetchTwelveDataQuote(twKey, "USO"),
     ]);
 
-    for (const result of tdResults) {
-      if (result.status === "fulfilled" && result.value) {
-        itemMap.set(result.value.label, result.value);
+    // S&P 500: apply SPY % change to FRED baseline
+    if (spyRes.status === "fulfilled" && spyRes.value) {
+      const spy = spyRes.value;
+      const fredBase = parseFredValue(itemMap.get("S&P 500")?.value);
+      if (!isNaN(fredBase) && fredBase > 0) {
+        const approx = Math.round(fredBase * (1 + spy.pctChange / 100));
+        itemMap.set("S&P 500", {
+          label:     "S&P 500",
+          value:     approx.toLocaleString(),
+          change:    `${spy.pctChange >= 0 ? "+" : ""}${spy.pctChange.toFixed(2)}%`,
+          direction: spy.pctChange > 0.01 ? "up" : spy.pctChange < -0.01 ? "down" : "flat",
+          source:    "TwelveData",
+        });
       }
     }
-  }
 
-  // ── Phase 3: FMP supplementary (most accurate for US indices) ──────────
-  // FMP provides real-time data for ^GSPC and ^VIX — overrides TwelveData
-  // (which may be 15-min delayed for US indices on free tier).
-  if (fmpKey) {
-    const needBtc = !itemMap.has("BTC");
-    const fmpItems = await fetchFmpSnapshot(fmpKey, needBtc);
-    for (const item of fmpItems) itemMap.set(item.label, item);
+    // BTC: direct value from TwelveData
+    if (btcRes.status === "fulfilled" && btcRes.value) {
+      const btc = btcRes.value;
+      itemMap.set("BTC", {
+        label:     "BTC",
+        value:     `$${Math.round(btc.price).toLocaleString()}`,
+        change:    `${btc.pctChange >= 0 ? "+" : ""}${btc.pctChange.toFixed(2)}%`,
+        direction: btc.pctChange > 0.005 ? "up" : btc.pctChange < -0.005 ? "down" : "flat",
+        source:    "TwelveData",
+      });
+    }
+
+    // WTI Oil: apply USO % change to FRED baseline
+    if (usoRes.status === "fulfilled" && usoRes.value) {
+      const uso = usoRes.value;
+      const fredBase = parseFredValue(itemMap.get("WTI Oil")?.value);
+      if (!isNaN(fredBase) && fredBase > 0) {
+        const approx = fredBase * (1 + uso.pctChange / 100);
+        itemMap.set("WTI Oil", {
+          label:     "WTI Oil",
+          value:     `$${approx.toFixed(2)}`,
+          change:    `${uso.pctChange >= 0 ? "+" : ""}${uso.pctChange.toFixed(2)}%`,
+          direction: uso.pctChange > 0.005 ? "up" : uso.pctChange < -0.005 ? "down" : "flat",
+          source:    "TwelveData",
+        });
+      }
+    }
+
+    // Brief pause to avoid TwelveData 8-credits/minute rate limit
+    await new Promise((r) => setTimeout(r, 1500));
+
+    // Batch 2: UUP (DXY proxy) — 1 credit
+    const [uupRes] = await Promise.allSettled([
+      fetchTwelveDataQuote(twKey, "UUP"),
+    ]);
+
+    // Dollar Index: apply UUP % change to FRED baseline
+    if (uupRes.status === "fulfilled" && uupRes.value) {
+      const uup = uupRes.value;
+      const fredBase = parseFredValue(itemMap.get("Broad U.S. Dollar Index")?.value);
+      if (!isNaN(fredBase) && fredBase > 0) {
+        const approx = fredBase * (1 + uup.pctChange / 100);
+        itemMap.set("Broad U.S. Dollar Index", {
+          label:     "Broad U.S. Dollar Index",
+          value:     approx.toFixed(2),
+          change:    `${uup.pctChange >= 0 ? "+" : ""}${uup.pctChange.toFixed(2)}%`,
+          direction: uup.pctChange > 0.005 ? "up" : uup.pctChange < -0.005 ? "down" : "flat",
+          source:    "TwelveData",
+        });
+      }
+    }
   }
 
   // ── Output in display order ────────────────────────────────────────────
@@ -212,13 +262,19 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
 }
 
 // ---------------------------------------------------------------------------
-// TwelveData — single-symbol quote with flexible change format
+// TwelveData — raw quote fetch (returns price + pctChange for hybrid use)
 // ---------------------------------------------------------------------------
+
+interface TwelveDataRaw {
+  price:     number;
+  pctChange: number;
+  absChange: number;
+}
 
 interface TwelveDataQuoteResponse {
   close?:          string;
   previous_close?: string;
-  change?:         string;       // absolute change from previous close
+  change?:         string;
   percent_change?: string | null;
   code?:           number;
   message?:        string;
@@ -227,23 +283,20 @@ interface TwelveDataQuoteResponse {
 async function fetchTwelveDataQuote(
   apiKey: string,
   symbol: string,
-  label: string,
-  formatValue: (price: number) => string,
-  changeMode: "percent" | "points" = "percent",
-): Promise<MarketSnapshotItem | null> {
+): Promise<TwelveDataRaw | null> {
   try {
     const res = await fetch(
       `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`,
       { signal: AbortSignal.timeout(8000), cache: "no-store" }
     );
     if (!res.ok) {
-      console.warn(`[market-snapshot/TwelveData] ${symbol}: HTTP ${res.status}`);
+      console.warn(`[market-snapshot/TD] ${symbol}: HTTP ${res.status}`);
       return null;
     }
 
     const raw = (await res.json()) as TwelveDataQuoteResponse;
     if (raw.code) {
-      console.warn(`[market-snapshot/TwelveData] ${symbol}: ${raw.message}`);
+      console.warn(`[market-snapshot/TD] ${symbol}: ${raw.message}`);
       return null;
     }
     if (!raw.close) return null;
@@ -251,123 +304,34 @@ async function fetchTwelveDataQuote(
     const price = parseFloat(raw.close);
     if (isNaN(price)) return null;
 
-    let changeStr: string;
-    let direction: "up" | "down" | "flat";
-
-    if (changeMode === "points") {
-      // VIX: show absolute change in points (e.g., "+1.23")
-      const pts = parseFloat(raw.change ?? "0");
-      const safePoints = isNaN(pts) ? 0 : pts;
-      changeStr = Math.abs(safePoints) < 0.005 ? "—" : `${safePoints >= 0 ? "+" : ""}${safePoints.toFixed(2)}`;
-      direction = safePoints > 0.005 ? "up" : safePoints < -0.005 ? "down" : "flat";
-    } else {
-      // Percent change (default)
-      let pct = raw.percent_change != null ? parseFloat(raw.percent_change) : NaN;
-
-      // Fallback: compute from change/previous_close when percent_change is null/zero
-      if (isNaN(pct) || Math.abs(pct) < 0.005) {
-        const chg  = raw.change         != null ? parseFloat(raw.change)         : NaN;
-        const prev = raw.previous_close != null ? parseFloat(raw.previous_close) : NaN;
-        const computed = (!isNaN(chg) && !isNaN(prev) && prev > 0) ? (chg / prev) * 100 : NaN;
-        if (!isNaN(computed) && Math.abs(computed) >= 0.005) pct = computed;
-      }
-      if (isNaN(pct)) pct = 0;
-
-      changeStr = `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
-      direction = pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat";
+    // Compute percent change with fallback
+    let pct = raw.percent_change != null ? parseFloat(raw.percent_change) : NaN;
+    if (isNaN(pct) || Math.abs(pct) < 0.005) {
+      const chg  = raw.change         != null ? parseFloat(raw.change)         : NaN;
+      const prev = raw.previous_close != null ? parseFloat(raw.previous_close) : NaN;
+      const computed = (!isNaN(chg) && !isNaN(prev) && prev > 0) ? (chg / prev) * 100 : NaN;
+      if (!isNaN(computed) && Math.abs(computed) >= 0.005) pct = computed;
     }
+    if (isNaN(pct)) pct = 0;
 
-    return {
-      label,
-      value:     formatValue(price),
-      change:    changeStr,
-      direction,
-      source:    "TwelveData",
-    };
+    const absChange = raw.change != null ? parseFloat(raw.change) : 0;
+
+    return { price, pctChange: pct, absChange: isNaN(absChange) ? 0 : absChange };
   } catch (err) {
-    console.error(`[market-snapshot/TwelveData] ${symbol} error:`, err);
+    console.error(`[market-snapshot/TD] ${symbol} error:`, err);
     return null;
   }
 }
 
 // ---------------------------------------------------------------------------
-// FMP — supplementary real-time for S&P 500 + VIX (overrides TwelveData)
+// Helpers
 // ---------------------------------------------------------------------------
 
-interface FmpQuote {
-  symbol:            string;
-  price:             number;
-  changesPercentage: number;
-  change?:           number;
+/** Parse a formatted value like "6,632" or "$94.65" back to a number */
+function parseFredValue(formatted: string | undefined): number {
+  if (!formatted) return NaN;
+  return parseFloat(formatted.replace(/[$,]/g, ""));
 }
-
-async function fetchFmpSnapshot(
-  apiKey: string,
-  needBtc: boolean,
-): Promise<MarketSnapshotItem[]> {
-  const symbols = ["%5EGSPC", "%5EVIX"];
-  if (needBtc) symbols.push("BTCUSD");
-
-  try {
-    const res = await fetch(
-      `https://financialmodelingprep.com/api/v3/quote/${symbols.join(",")}?apikey=${apiKey}`,
-      { signal: AbortSignal.timeout(8000), cache: "no-store" }
-    );
-    if (!res.ok) {
-      console.warn(`[market-snapshot/FMP] HTTP ${res.status}`);
-      return [];
-    }
-
-    const quotes = (await res.json()) as FmpQuote[];
-    if (!Array.isArray(quotes)) {
-      console.warn("[market-snapshot/FMP] unexpected response format");
-      return [];
-    }
-
-    const result: MarketSnapshotItem[] = [];
-
-    for (const q of quotes) {
-      const pct = q.changesPercentage ?? 0;
-      const dir = (pct > 0 ? "up" : pct < 0 ? "down" : "flat") as "up" | "down" | "flat";
-
-      if (q.symbol === "^GSPC") {
-        result.push({
-          label:     "S&P 500",
-          value:     Math.round(q.price).toLocaleString(),
-          change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: dir,
-          source:    "FMP",
-        });
-      } else if (q.symbol === "^VIX") {
-        const pts = q.change ?? 0;
-        result.push({
-          label:     "VIX",
-          value:     q.price.toFixed(2),
-          change:    Math.abs(pts) < 0.005 ? "—" : `${pts >= 0 ? "+" : ""}${pts.toFixed(2)}`,
-          direction: (pts > 0.005 ? "up" : pts < -0.005 ? "down" : "flat") as "up" | "down" | "flat",
-          source:    "FMP",
-        });
-      } else if (q.symbol === "BTCUSD") {
-        result.push({
-          label:     "BTC",
-          value:     `$${Math.round(q.price).toLocaleString()}`,
-          change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: dir,
-          source:    "FMP",
-        });
-      }
-    }
-
-    return result;
-  } catch (err) {
-    console.warn("[market-snapshot/FMP] fetch error:", err);
-    return [];
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Empty fallback
-// ---------------------------------------------------------------------------
 
 function emptySnapshot(): MarketSnapshotData {
   return {
