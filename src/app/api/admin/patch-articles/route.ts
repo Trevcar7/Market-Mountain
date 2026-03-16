@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const collection = await kv.get<NewsCollection>("market-mountain-news");
+    const collection = await kv.get<NewsCollection>("news");
     if (!collection || !collection.news || collection.news.length === 0) {
       return NextResponse.json({ message: "No articles to patch", patched: 0 });
     }
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
     if (patchLog.length > 0) {
       collection.news = patchedNews;
       collection.lastUpdated = new Date().toISOString();
-      await kv.set("market-mountain-news", collection);
+      await kv.set("news", collection);
     }
 
     return NextResponse.json({
