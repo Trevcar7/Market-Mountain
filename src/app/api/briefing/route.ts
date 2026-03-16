@@ -4,7 +4,7 @@ import { getRedisClient } from "@/lib/redis";
 import type { Redis } from "@upstash/redis";
 import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic-client";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
-import { fetchContextualData, fetchBriefingWhatToWatch } from "@/lib/market-data";
+import { fetchBriefingMacroPanel, fetchBriefingWhatToWatch } from "@/lib/market-data";
 
 export const maxDuration = 30;
 export const runtime = "nodejs";
@@ -169,27 +169,19 @@ async function generateBriefing(
   const leadStory = stories[0];
   const supporting = stories.slice(1, 5);
 
-  // Collect key data points from top stories
-  const storyKeyData = stories
+  // Fetch curated macro panel: 6 institutional-grade indicators
+  // (Fed Funds, 10Y Treasury, 2s-10s Spread, CPI YoY, WTI Crude, Dollar Index)
+  // This replaces the old approach of two overlapping fetchContextualData calls
+  // that produced duplicate yields and a useless raw CPI index level.
+  let macroData = stories
     .flatMap((s) => s.keyDataPoints ?? [])
     .filter((d, i, arr) => arr.findIndex((x) => x.label === d.label) === i)
-    .slice(0, 5);
-
-  // Always fetch fresh macro data with day-to-day changes (like the MacroBoard).
-  // Briefing key data should show current values + period-over-period change.
-  let macroData = storyKeyData;
+    .slice(0, 6);
   try {
-    const [fedData, bondData] = await Promise.all([
-      fetchContextualData("federal_reserve"),
-      fetchContextualData("bond_market"),
-    ]);
-    const freshData = [...fedData, ...bondData];
-    // Merge: fresh data (with changes) takes priority, then story data fills gaps
-    const freshLabels = new Set(freshData.map((d) => d.label));
-    const storyOnly = storyKeyData.filter((d) => !freshLabels.has(d.label));
-    macroData = [...freshData, ...storyOnly]
-      .filter((d, i, arr) => arr.findIndex((x) => x.label === d.label) === i)
-      .slice(0, 6);
+    const freshPanel = await fetchBriefingMacroPanel();
+    if (freshPanel.length > 0) {
+      macroData = freshPanel;
+    }
   } catch {
     // Fine — use story key data as fallback
   }

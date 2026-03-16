@@ -1093,6 +1093,133 @@ export async function fetchContextualData(
 }
 
 // ---------------------------------------------------------------------------
+// SECTION 7b — Morning Brief Macro Panel
+// ---------------------------------------------------------------------------
+//
+// Dedicated function for the Morning Brief "Key Data" sidebar.
+// Returns exactly 6 institutional-grade macro indicators:
+//   1. Fed Funds Rate     — policy anchor
+//   2. 10-Year Treasury   — duration benchmark (change in bps)
+//   3. 2s–10s Spread      — yield curve shape / recession signal
+//   4. CPI YoY %          — the inflation figure markets actually track
+//   5. WTI Crude Oil      — energy / inflation expectations proxy
+//   6. Dollar Index (DXY) — global risk / carry trade signal
+//
+// This replaces the old approach of calling fetchContextualData("federal_reserve")
+// + fetchContextualData("bond_market") which produced duplicate yields and a
+// useless raw CPI index level.
+// ---------------------------------------------------------------------------
+
+export async function fetchBriefingMacroPanel(): Promise<KeyDataPoint[]> {
+  const points: KeyDataPoint[] = [];
+
+  try {
+    // Fetch all data sources in parallel for speed
+    const [
+      fedfunds,
+      treasury10y,
+      spread2s10s,
+      cpiData,
+      energy,
+      dxy,
+    ] = await Promise.allSettled([
+      fetchFredWithChange("FEDFUNDS"),
+      fetchFredWithChange("DGS10"),
+      fetchFredWithChange("T10Y2Y"),          // 10Y minus 2Y spread (FRED series)
+      fetchBlsMultipleSeries([BLS_SERIES.CPI_ALL], 2),  // 2 years for YoY calc
+      fetchEnergySummary(),
+      fetchFredWithChange("DTWEXBGS"),        // Trade-weighted Dollar Index
+    ]);
+
+    // 1. Fed Funds Rate — omit "+0.00" noise (rate changes are discrete events)
+    if (fedfunds.status === "fulfilled" && fedfunds.value) {
+      const change = fedfunds.value.change;
+      const showChange = change && change !== "+0.00" && change !== "0.00";
+      points.push({
+        label: "Fed Funds Rate",
+        value: `${fedfunds.value.value}%`,
+        change: showChange ? change : undefined,
+        source: "FRED",
+      });
+    }
+
+    // 2. 10-Year Treasury — format change as basis points (e.g., "+6 bps")
+    if (treasury10y.status === "fulfilled" && treasury10y.value) {
+      const rawChange = parseFloat(treasury10y.value.change || "0");
+      const bpsChange = !isNaN(rawChange) && rawChange !== 0
+        ? `${rawChange > 0 ? "+" : ""}${Math.round(rawChange * 100)} bps`
+        : undefined;
+      points.push({
+        label: "10-Year Treasury",
+        value: `${treasury10y.value.value}%`,
+        change: bpsChange,
+        source: "FRED",
+      });
+    }
+
+    // 3. 2s–10s Spread — yield curve inversion/steepening signal
+    if (spread2s10s.status === "fulfilled" && spread2s10s.value) {
+      const val = parseFloat(spread2s10s.value.value);
+      const rawChange = parseFloat(spread2s10s.value.change || "0");
+      const bpsChange = !isNaN(rawChange) && rawChange !== 0
+        ? `${rawChange > 0 ? "+" : ""}${Math.round(rawChange * 100)} bps`
+        : undefined;
+      points.push({
+        label: "2s–10s Spread",
+        value: `${val >= 0 ? "+" : ""}${spread2s10s.value.value}%`,
+        change: bpsChange,
+        source: "FRED",
+      });
+    }
+
+    // 4. CPI YoY % — compute from 2 years of BLS data
+    if (cpiData.status === "fulfilled") {
+      const cpiPoints = cpiData.value[BLS_SERIES.CPI_ALL];
+      if (cpiPoints && cpiPoints.length >= 13) {
+        // BLS returns newest first — index 0 is latest, index 12 is 12 months ago
+        const latest = parseFloat(cpiPoints[0].value);
+        const yearAgo = parseFloat(cpiPoints[12].value);
+        if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+          const yoy = ((latest - yearAgo) / yearAgo * 100);
+          points.push({
+            label: "CPI YoY",
+            value: `${yoy.toFixed(1)}%`,
+            source: "BLS",
+          });
+        }
+      }
+    }
+
+    // 5. WTI Crude Oil
+    if (energy.status === "fulfilled" && energy.value.wti) {
+      points.push({
+        label: "WTI Crude",
+        value: `$${energy.value.wti.value.toFixed(2)}/bbl`,
+        source: "EIA",
+      });
+    }
+
+    // 6. Dollar Index (DTWEXBGS — Nominal Broad Trade-Weighted)
+    if (dxy.status === "fulfilled" && dxy.value) {
+      const rawChange = parseFloat(dxy.value.change || "0");
+      const changeStr = !isNaN(rawChange) && rawChange !== 0
+        ? `${rawChange > 0 ? "+" : ""}${rawChange.toFixed(2)}`
+        : undefined;
+      points.push({
+        label: "Dollar Index",
+        value: dxy.value.value,
+        change: changeStr,
+        source: "FRED",
+      });
+    }
+  } catch (err) {
+    logWarn("briefing-macro", `fetchBriefingMacroPanel failed: ${String(err)}`);
+  }
+
+  return points;
+}
+
+// ---------------------------------------------------------------------------
 // SECTION 8 — Chart series factory for synthesis pipeline
 // ---------------------------------------------------------------------------
 //
