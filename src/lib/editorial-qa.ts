@@ -505,20 +505,37 @@ const SPECIFICITY_PATTERNS = [
   /\b\d{4}\b/,
 ];
 
+/**
+ * Banned headline words — per geopolitical restraint rule (Step 16f) and
+ * editorial language standards (Step 14). These words in headlines risk
+ * sensationalism and editorial liability. Only allowed if directly quoting
+ * an official source (which headlines never do).
+ */
+const HEADLINE_BANNED_WORDS = [
+  /\bwar\b/i,
+  /\bcrisis\b/i,
+  /\bcollapse[sd]?\b/i,
+  /\bcatastroph/i,
+  /\bunprecedented\b/i,
+  /\bgame.?changer\b/i,
+  /\bparadigm\s+shift\b/i,
+  /\bparabolic\b/i,
+];
+
 function scoreTitle(title: string): QATestResult {
   const words = title.trim().split(/\s+/).filter(Boolean);
   const wordCount = words.length;
   let score = 0;
   const details: string[] = [];
 
-  // 4 pts for ideal 8–12 word range; 2 pts for acceptable 6–15
-  if (wordCount >= 8 && wordCount <= 12) {
-    score += 4;
-  } else if (wordCount >= 6 && wordCount <= 15) {
-    score += 2;
-    details.push(`title has ${wordCount} words (ideal: 8–12)`);
+  // 3 pts for ideal 8–14 word range; 1 pt for acceptable 6–16
+  if (wordCount >= 8 && wordCount <= 14) {
+    score += 3;
+  } else if (wordCount >= 6 && wordCount <= 16) {
+    score += 1;
+    details.push(`title has ${wordCount} words (ideal: 8–14)`);
   } else {
-    details.push(`title word count ${wordCount} outside acceptable range (8–12)`);
+    details.push(`title word count ${wordCount} outside acceptable range (8–14)`);
   }
 
   // 3 pts: specificity — number, ticker, or named entity
@@ -529,17 +546,25 @@ function scoreTitle(title: string): QATestResult {
     details.push("title lacks specific number or named entity");
   }
 
-  // 3 pts: no vague language
+  // 2 pts: no vague language
   const vagueMatch = VAGUE_TITLE_PATTERNS.find((p) => p.test(title));
   if (!vagueMatch) {
-    score += 3;
+    score += 2;
   } else {
     details.push(`title contains vague language matching "${vagueMatch.source}"`);
   }
 
+  // 2 pts: no banned words (war, crisis, collapse, catastrophe, etc.)
+  const bannedMatch = HEADLINE_BANNED_WORDS.find((p) => p.test(title));
+  if (!bannedMatch) {
+    score += 2;
+  } else {
+    details.push(`title contains banned word "${title.match(bannedMatch)?.[0]}" — use measured language per editorial standards`);
+  }
+
   return {
     test: "Title Quality",
-    passed: score >= 7,
+    passed: score >= 6,
     score,
     maxScore: 10,
     detail: details.length > 0 ? details.join("; ") : undefined,
@@ -1222,13 +1247,21 @@ export function runEditorialQA(
   // ---------------------------------------------------------------------------
   const hardRejectReasons: string[] = [];
 
-  if (!REBUILD_MODE) {
-    // Fact check: score < 50 is unreliable — hard reject
-    const fc = article.factCheckScore ?? 0;
-    if (fc < 50) {
-      hardRejectReasons.push(`factCheckScore=${fc} < 50 minimum`);
-    }
+  // Fact check: hard floor applies in ALL modes (production=50, rebuild=35)
+  // Articles with factCheck scores of 29–40 were leaking through in rebuild mode.
+  const FC_HARD_FLOOR = REBUILD_MODE ? 35 : 50;
+  const fc = article.factCheckScore ?? 0;
+  if (fc < FC_HARD_FLOOR) {
+    hardRejectReasons.push(`factCheckScore=${fc} < ${FC_HARD_FLOOR} minimum`);
+  }
 
+  // Headline banned words: hard reject in all modes (editorial integrity)
+  const titleTest = tests.find((t) => t.test === "Title Quality");
+  if (titleTest && titleTest.detail?.includes("banned word")) {
+    hardRejectReasons.push(`headline contains banned word — ${titleTest.detail}`);
+  }
+
+  if (!REBUILD_MODE) {
     // Confidence: < 0.60 means insufficient source corroboration
     const conf = article.confidenceScore ?? 0;
     if (conf < 0.60) {

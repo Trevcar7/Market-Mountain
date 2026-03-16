@@ -117,6 +117,30 @@ export async function POST(request: NextRequest) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the first real prose paragraph from a story body, skipping:
+ *  - Bullet lines (• / - / *) that may be leaked MARKET_IMPACT data
+ *  - Section headings (## ...)
+ *  - Blank lines
+ */
+function extractLeadParagraph(story: string): string {
+  const lines = story.split("\n");
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    if (t.startsWith("##")) continue;
+    if (/^[•\-\*]\s/.test(t)) continue;
+    // Return the first real prose line (first sentence)
+    const firstSentence = t.split(/(?<=[.!?])\s/)[0];
+    return firstSentence || t.substring(0, 200);
+  }
+  return story.substring(0, 200);
+}
+
+// ---------------------------------------------------------------------------
 // Core briefing generation
 // ---------------------------------------------------------------------------
 
@@ -195,7 +219,7 @@ async function generateBriefing(
         `STORY ${i + 1} [${s.category.toUpperCase()}]
 Headline: ${s.title}
 Why it matters: ${s.whyThisMatters ?? ""}
-Summary: ${s.story.split("\n")[0]}`
+Summary: ${extractLeadParagraph(s.story)}`
     )
     .join("\n\n");
 
@@ -260,8 +284,9 @@ Generate a concise editorial briefing with this exact JSON structure. Return ONL
   // Build "What to Watch" — prefer Claude's output, supplement with FMP earnings calendar
   let whatToWatch = generated?.whatToWatch ?? [];
 
-  if (whatToWatch.length < 2) {
-    // Fetch FMP-powered events to fill gaps (or as sole source if Claude failed)
+  // Always try to fill to 3 "What to Watch" items from FMP if Claude
+  // returned fewer than 3 (audit found briefings with only 1 item)
+  if (whatToWatch.length < 3) {
     try {
       const fmpEvents = await fetchBriefingWhatToWatch();
       // Merge: Claude events first, FMP events fill remaining slots up to 3
@@ -272,15 +297,26 @@ Generate a concise editorial briefing with this exact JSON structure. Return ONL
     }
   }
 
-  // Final safety net — always have at least one event
+  // Final safety net — always have at least 2 events
   if (whatToWatch.length === 0) {
     whatToWatch = [
       {
         event: "Next Federal Reserve meeting",
-        timing: "Upcoming",
+        timing: "Policy watch",
         significance: "Rate decisions drive bond yields and rate-sensitive equity sectors.",
       },
+      {
+        event: "Upcoming economic data releases",
+        timing: "Upcoming economic data",
+        significance: "CPI, jobs, and GDP prints shape Fed rate expectations and equity risk premiums.",
+      },
     ];
+  } else if (whatToWatch.length === 1) {
+    whatToWatch.push({
+      event: "Upcoming economic data releases",
+      timing: "Upcoming economic data",
+      significance: "CPI, jobs, and GDP prints shape Fed rate expectations and equity risk premiums.",
+    });
   }
 
   const briefing: DailyBriefing = {
@@ -289,8 +325,8 @@ Generate a concise editorial briefing with this exact JSON structure. Return ONL
     leadStory: {
       id: leadStory.id,
       title: leadStory.title,
-      whyItMatters: leadStory.whyThisMatters ?? leadStory.story.split(".")[0] + ".",
-      summary: generated?.leadSummary ?? leadStory.story.split("\n")[0],
+      whyItMatters: leadStory.whyThisMatters ?? extractLeadParagraph(leadStory.story),
+      summary: generated?.leadSummary ?? leadStory.whyThisMatters ?? extractLeadParagraph(leadStory.story),
     },
     topDevelopments: supporting.map((s, i) => ({
       id: s.id,
@@ -299,7 +335,7 @@ Generate a concise editorial briefing with this exact JSON structure. Return ONL
       summary:
         generated?.topDevelopmentsSummaries?.[i] ??
         s.whyThisMatters ??
-        s.story.split(".")[0] + ".",
+        extractLeadParagraph(s.story),
       category: s.category,
     })),
     keyData: macroData,

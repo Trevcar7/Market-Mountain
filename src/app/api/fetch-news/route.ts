@@ -1063,13 +1063,27 @@ async function handleNewsFetch() {
       );
     }
 
-    // Sentiment diversity check — log warning when all candidates share the
-    // same sentiment. Does not block publishing (editorial tone varies by
-    // market conditions), but flags potential monotone feeds for review.
+    // Sentiment diversity check — enforce diversity for batches of 3+ articles.
+    // All-negative feeds erode reader trust and suggest a one-sided editorial bias.
+    // For batches of 3+, drop the lowest-importance negative article to make room
+    // for coverage balance. For batches of 1-2, only warn.
     if (publishCandidates.length >= 2) {
       const sentiments = publishCandidates.map((s) => s.sentiment);
       const uniqueSentiments = new Set(sentiments);
-      if (uniqueSentiments.size === 1) {
+      if (uniqueSentiments.size === 1 && sentiments[0] === "negative" && publishCandidates.length >= 3) {
+        // Drop the lowest-importance negative article to signal editorial diversity
+        const sorted = [...publishCandidates].sort((a, b) => a.importance - b.importance);
+        const dropped = sorted[0];
+        publishCandidates = publishCandidates.filter((s) => s.id !== dropped.id);
+        stats.rejected++;
+        stats.rejectionDetails.push(
+          `sentiment-diversity: dropped "${dropped.title.substring(0, 60)}..." (lowest importance=${dropped.importance}) — all ${sentiments.length} stories were negative`
+        );
+        console.warn(
+          `[fetch-news] Sentiment diversity: dropped 1 of ${sentiments.length} all-negative stories ` +
+          `(lowest importance=${dropped.importance}). ${publishCandidates.length} remain.`
+        );
+      } else if (uniqueSentiments.size === 1) {
         console.warn(
           `[fetch-news] ⚠ Sentiment diversity: ALL ${publishCandidates.length} stories are "${sentiments[0]}" — ` +
           `consider whether the feed appears one-sided. Topics: [${publishCandidates.map((s) => s.topicKey ?? "?").join(", ")}]`

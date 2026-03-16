@@ -517,6 +517,24 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
 
   result.story = storyLines.join("\n\n");
 
+  // ── Story body sanitization ────────────────────────────────────────────
+  // Strip MARKET_IMPACT-format bullet lines that leaked into the story body.
+  // These are lines like "• IWM -2.1% down" or "• OIL +4.1% up" that should
+  // have been captured by the MARKET_IMPACT parser but weren't (e.g., if Claude
+  // placed them after a blank line that triggered inStory=true).
+  const MARKET_IMPACT_BULLET_RE = /^[•\-\*]\s*[A-Za-z0-9&. /]+\s+[+\-]\d+[.,]?\d*\s*(?:%|bps|bp)\s*(?:up|down|flat)?\s*$/i;
+  const sanitizedStoryLines = result.story.split("\n").filter((line) => {
+    const trimmedLine = line.trim();
+    if (MARKET_IMPACT_BULLET_RE.test(trimmedLine)) {
+      // Rescue the bullet into marketImpact if not already present
+      const bulletText = trimmedLine.replace(/^[•\-\*]\s*/, "").trim();
+      parseMarketImpactLine(bulletText, result.marketImpact);
+      return false;
+    }
+    return true;
+  });
+  result.story = sanitizedStoryLines.join("\n").replace(/^\n+/, "").replace(/\n{3,}/g, "\n\n");
+
   // ── Hashtag sanitization ───────────────────────────────────────────────
   // Strip social-media-style #Hashtags from all text fields.
   // e.g., "#Stagflation" → "Stagflation", "#Fed" → "Fed"
