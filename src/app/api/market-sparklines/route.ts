@@ -4,7 +4,7 @@ import { MarketSparklinesData, SparklineSet } from "@/lib/news-types";
 
 export const runtime = "nodejs";
 
-const KV_KEY        = "market-sparklines";
+const KV_KEY        = "market-sparklines-v2";
 const CACHE_SECONDS = 10 * 60; // 10 minutes — intraday sparklines don't need sub-minute freshness
 const MIN_POINTS    = 3;       // Lower threshold for intraday (may only have a few bars early in the day)
 
@@ -18,7 +18,7 @@ const MIN_POINTS    = 3;       // Lower threshold for intraday (may only have a 
  */
 const SPARKLINE_SYMBOLS: Array<{ symbol: string; label: string }> = [
   { symbol: "SPY",     label: "S&P 500" },
-  { symbol: "VIX",     label: "VIX" },
+  { symbol: "UVXY",    label: "VIX" },       // UVXY = 2× VIX short-term futures — shows VIX direction; free-tier compatible
   { symbol: "USO",     label: "WTI Oil" },
   { symbol: "XAU/USD", label: "Gold" },
   { symbol: "UUP",     label: "Broad U.S. Dollar Index" },
@@ -165,8 +165,12 @@ async function fetchIntradaySeries(
   label: string,
 ): Promise<SparklineSet | null> {
   try {
-    // Request 78 bars of 5-min data = one full trading day (6.5h × 12 bars/h)
-    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=78&apikey=${apiKey}`;
+    // Request 390 bars = 5 full trading sessions worth of 5-min data.
+    // This ensures we capture the complete most-recent session even when
+    // TwelveData includes extended-hours bars that push the regular-hours
+    // bars further back in the response. The latest-date filter below
+    // extracts only the bars belonging to the most recent trading day.
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=390&apikey=${apiKey}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10000), cache: "no-store" });
 
     if (!res.ok) {
