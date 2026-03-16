@@ -84,10 +84,10 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
   const hasLegend = cfg.series.length > 1;
 
   return (
-    <div className="not-prose my-8 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="not-prose my-8 rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
-        <p className="text-sm font-semibold text-slate-800">{cfg.title}</p>
+      <div className="px-5 py-4 bg-surface-2 border-b border-border">
+        <p className="text-sm font-semibold text-text">{cfg.title}</p>
       </div>
 
       {/* Chart */}
@@ -100,7 +100,7 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
           {[0.25, 0.5, 0.75, 1.0].map((f) => (
             <div
               key={f}
-              className="absolute left-0 right-0 border-t border-slate-100"
+              className="absolute left-0 right-0 border-t border-border/60"
               style={{ bottom: `${f * BAR_AREA}px` }}
             />
           ))}
@@ -144,7 +144,7 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
                 })}
               </div>
               {/* Category label */}
-              <span className="text-xs font-medium text-slate-500 text-center whitespace-nowrap">
+              <span className="text-xs font-medium text-text-muted text-center whitespace-nowrap">
                 {group.label}
               </span>
             </div>
@@ -154,11 +154,11 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
 
       {/* Legend */}
       {hasLegend && (
-        <div className="px-5 py-3 bg-white border-t border-slate-100 flex flex-wrap gap-x-5 gap-y-1.5 justify-center">
+        <div className="px-5 py-3 bg-card border-t border-border flex flex-wrap gap-x-5 gap-y-1.5 justify-center">
           {cfg.series.map((s) => (
             <div key={s.name} className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: s.color }} />
-              <span className="text-xs text-slate-500">{s.name}</span>
+              <span className="text-xs text-text-muted">{s.name}</span>
             </div>
           ))}
         </div>
@@ -166,7 +166,7 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
 
       {/* Caption */}
       {cfg.caption && (
-        <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-400">
+        <div className="bg-surface-2 border-t border-border px-5 py-2.5 text-[11px] text-text-light">
           {cfg.caption}
         </div>
       )}

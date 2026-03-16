@@ -66,8 +66,29 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
 export default function MarketStrip() {
   const { snapshot, loading } = useMarketData();
 
-  // Don't render at all until initial data arrives (avoids layout shift on SSR)
-  if (loading) return null;
+  if (loading) return (
+    <div className="w-full bg-white sm:overflow-hidden" aria-hidden="true">
+      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center h-10 gap-6 animate-pulse">
+          <div className="shrink-0 flex items-center gap-1.5 px-2 border-r border-border/60">
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+            <div className="h-2 bg-slate-200 rounded w-12" />
+          </div>
+          <div className="flex-1 flex items-center sm:justify-center gap-0">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex gap-2 items-center px-4 sm:px-6 border-r border-border/60 last:border-0 py-2">
+                <div className="h-2 bg-slate-200 rounded w-8" />
+                <div className="h-3 bg-slate-200 rounded w-12" />
+                <div className="h-2 bg-slate-200 rounded w-10" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
+    </div>
+  );
 
   // Silent failure — strip disappears rather than showing an error state
   // Require at least 3 items to avoid a sparse single-item ticker

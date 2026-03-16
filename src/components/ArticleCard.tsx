@@ -101,7 +101,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
           {article.title}
         </h3>
 
-        <p className="text-text-muted text-sm leading-relaxed line-clamp-2 flex-1 hidden sm:block">
+        <p className="text-text-muted text-sm leading-relaxed line-clamp-1 sm:line-clamp-2 flex-1">
           {article.excerpt}
         </p>
 

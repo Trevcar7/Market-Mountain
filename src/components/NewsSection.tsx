@@ -246,21 +246,26 @@ export default function NewsSection({
         )}
       </div>
 
-      {/* Last updated indicator */}
-      {lastUpdated && !loading && (
-        <div className="flex items-center gap-2 text-xs text-slate-400 mb-4">
-          <span>Last updated {formatRelativeTime(lastUpdated)}</span>
-        </div>
-      )}
-
       {/* Status messages */}
       {loading && (
-        <div className="text-center py-12">
-          <div className="inline-block">
-            <div className="animate-spin h-8 w-8 border-4 border-slate-300 border-t-accent-500 rounded-full"></div>
+        <>
+          <div className="mb-6 sm:mb-8">
+            <div className="animate-pulse rounded-xl bg-navy-900/10 h-[360px] w-full" />
           </div>
-          <p className="mt-4 text-slate-600">Loading market news...</p>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="animate-pulse rounded-lg border border-border overflow-hidden">
+                <div className="bg-slate-200 aspect-video w-full" />
+                <div className="p-5 space-y-3">
+                  <div className="h-2 bg-slate-200 rounded w-16" />
+                  <div className="h-4 bg-slate-200 rounded w-full" />
+                  <div className="h-4 bg-slate-200 rounded w-3/4" />
+                  <div className="h-3 bg-slate-100 rounded w-1/2 mt-4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {error && (
@@ -304,12 +309,6 @@ export default function NewsSection({
         )
       )}
 
-      {/* Result count */}
-      {!loading && !error && filtered.length > 0 && (
-        <p className="mt-6 text-sm text-slate-500 text-center">
-          Showing {filtered.length} of {news.length} news articles
-        </p>
-      )}
     </div>
   );
 }

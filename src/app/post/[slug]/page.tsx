@@ -10,6 +10,8 @@ import BarChart from "@/components/BarChart";
 import DataTable from "@/components/DataTable";
 import ReadingProgress from "@/components/ReadingProgress";
 import ArticleCard from "@/components/ArticleCard";
+import TableOfContents from "@/components/TableOfContents";
+import { parseHeadings } from "@/lib/parse-headings";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -47,6 +49,8 @@ export default async function ArticlePage({ params }: Props) {
   const related = getAllArticles()
     .filter((a) => a.slug !== slug)
     .slice(0, 3);
+
+  const tocHeadings = parseHeadings(article.content);
 
   return (
     <>
@@ -122,9 +126,15 @@ export default async function ArticlePage({ params }: Props) {
       {/* Accent divider */}
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
-      {/* Article body */}
-      <article className="mx-auto max-w-[680px] px-4 sm:px-6 py-10 sm:py-14">
-        <div className="prose prose-slate max-w-none">
+      {/* Article body — with optional ToC sidebar on xl+ screens */}
+      <div className="mx-auto max-w-[900px] px-4 sm:px-6 py-10 sm:py-14 xl:flex xl:gap-14">
+        {tocHeadings.length >= 3 && (
+          <aside className="hidden xl:block w-44 shrink-0">
+            <TableOfContents headings={tocHeadings} />
+          </aside>
+        )}
+      <article className="min-w-0 flex-1 max-w-[680px]">
+        <div className="prose prose-lg prose-slate max-w-none">
           <MDXRemote
             source={article.content}
             components={{ DCFHeatmap, BarChart, DataTable }}
@@ -174,6 +184,7 @@ export default async function ArticlePage({ params }: Props) {
           </Link>
         </div>
       </article>
+      </div>
 
       {/* Related Articles */}
       {related.length > 0 && (

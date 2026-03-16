@@ -205,8 +205,8 @@ export default async function BriefingPage() {
                     {briefing.whatToWatch.map((item, i) => (
                       <div key={i} className="p-4 rounded-lg bg-white border border-border">
                         <div className="flex items-start gap-3 mb-2">
-                          <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-navy-900 text-white text-[10px] font-bold mt-0.5">
-                            {i + 1}
+                          <span className="shrink-0 text-[11px] font-bold text-accent-600 tabular-nums w-5 text-right mt-0.5 leading-snug">
+                            {i + 1}.
                           </span>
                           <div className="min-w-0">
                             <h4 className="font-semibold text-navy-900 text-sm leading-snug">
@@ -268,7 +268,7 @@ export default async function BriefingPage() {
                           )}
                         </div>
                         {dp.source && (
-                          <p className="text-white/25 text-[9px] mt-1 tracking-wide">
+                          <p className="text-white/45 text-[10px] mt-1 tracking-wide">
                             {dp.source}
                           </p>
                         )}

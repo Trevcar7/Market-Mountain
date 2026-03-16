@@ -171,20 +171,6 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
           {excerpt}
         </p>
 
-        {/* Why this matters strip */}
-        {news.whyThisMatters && (
-          <div className="mt-3 pt-3 border-t border-border/60">
-            <div className="flex items-start gap-1.5">
-              <span className="shrink-0 text-[10px] font-bold tracking-widest uppercase text-accent-600 mt-0.5">
-                Why it matters
-              </span>
-              <p className="text-text-muted text-xs leading-relaxed line-clamp-2">
-                {news.whyThisMatters}
-              </p>
-            </div>
-          </div>
-        )}
-
         <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 pt-3 border-t border-border/60">
           <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
         </div>

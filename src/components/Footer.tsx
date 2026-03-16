@@ -63,7 +63,7 @@ export default function Footer() {
                 <Link
                   key={article.slug}
                   href={`/post/${article.slug}`}
-                  className="text-sm hover:text-accent-400 transition-colors line-clamp-1"
+                  className="text-[13px] hover:text-accent-400 transition-colors line-clamp-2 leading-snug"
                 >
                   {article.title}
                 </Link>

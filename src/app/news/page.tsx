@@ -24,9 +24,12 @@ export default function NewsPage() {
             <h1 className="font-playfair text-4xl sm:text-5xl font-bold mb-4">
               Market News
             </h1>
-            <p className="text-lg text-white/60">
+            <p className="text-base sm:text-lg text-white/70 mb-2">
               Curated daily market coverage — macroeconomic updates, Fed policy,
               earnings, and market-moving events that matter.
+            </p>
+            <p className="text-xs text-white/40 font-medium tracking-wide">
+              Updated {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
             </p>
           </div>
         </div>
@@ -37,12 +40,6 @@ export default function NewsPage() {
 
       {/* News grid */}
       <section className="container mx-auto px-4 sm:px-6 max-w-6xl py-12 sm:py-16">
-        <div className="mb-8">
-          <h2 className="font-playfair text-2xl font-bold text-navy-900 mb-2">
-            Latest News
-          </h2>
-        </div>
-
         <NewsSection
           limit={50}
           showCategories={true}

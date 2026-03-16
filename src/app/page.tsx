@@ -1,6 +1,5 @@
 import { getAllArticles } from "@/lib/articles";
 import ArticleCard from "@/components/ArticleCard";
-import Logo from "@/components/Logo";
 import Link from "next/link";
 import NewsSection from "@/components/NewsSection";
 import MacroBoard from "@/components/MacroBoard";
@@ -15,37 +14,35 @@ export default function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="bg-navy-900 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20 flex flex-col items-center text-center">
-          <div className="mb-5">
-            <Logo variant="light" size="xl" />
+      <section className="bg-navy-900 text-white border-b border-white/10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-6 sm:gap-12">
+            <div className="flex-1">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-accent-400 mb-2">
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-bold font-playfair leading-tight text-white mb-2">
+                Independent market research and macro commentary
+              </h1>
+              <p className="text-white/50 text-sm leading-relaxed max-w-lg">
+                Data-driven equity analysis and curated daily briefings by Trevor Carnovsky.
+              </p>
+            </div>
+            <div className="flex gap-3 shrink-0">
+              <Link
+                href="/briefing"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent-500 hover:bg-accent-400 text-navy-950 font-semibold text-sm transition-colors"
+              >
+                Today&apos;s Briefing
+              </Link>
+              <Link
+                href="/articles"
+                className="inline-flex items-center px-5 py-2.5 rounded-full border border-white/20 hover:bg-white/10 text-white font-medium text-sm transition-colors"
+              >
+                Latest Analysis
+              </Link>
+            </div>
           </div>
-          <p className="text-white/55 text-base sm:text-lg max-w-lg leading-relaxed">
-            Independent market news, equity research, and macro commentary.
-          </p>
-          <div className="mt-7 flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/articles"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-accent-500 hover:bg-accent-400 text-navy-950 font-semibold text-sm transition-colors"
-            >
-              Latest Analysis
-            </Link>
-            <Link
-              href="/news"
-              className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-white/20 hover:bg-white/10 text-white font-medium text-sm transition-colors"
-            >
-              Latest News
-            </Link>
-          </div>
-          <Link
-            href="/briefing"
-            className="mt-4 inline-flex items-center gap-1 text-[11px] font-medium text-white/50 hover:text-white/70 tracking-wide transition-colors"
-          >
-            Morning Brief
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-              <path d="M2 5h6M5 2l3 3-3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </Link>
         </div>
       </section>
 
@@ -58,51 +55,38 @@ export default function HomePage() {
         <MacroBoard />
       </MarketDataProvider>
 
-      {/* Accent divider */}
-      <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
-
-      {/* Morning Brief — link to today's curated briefing */}
-      <section className="bg-navy-50 border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between gap-4">
+      {/* Morning Brief — prominently above market data */}
+      <section className="bg-navy-800 border-b border-white/10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-navy-900 flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <circle cx="7" cy="7" r="5.5" stroke="#22C55E" strokeWidth="1.5" />
-                <path d="M7 4v3l2 2" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
+            <div className="w-6 h-6 rounded-full bg-accent-500/20 flex items-center justify-center shrink-0">
+              <span className="w-2 h-2 rounded-full bg-accent-400 animate-pulse" />
+            </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-accent-600 mb-0.5">
-                Morning Brief
-              </p>
-              <p className="text-navy-900 text-sm font-medium">
-                Today&apos;s curated summary — lead story, key data, and what to watch
-              </p>
+              <span className="text-[10px] font-bold tracking-widest uppercase text-accent-400 block mb-0.5">
+                Today&apos;s Briefing
+              </span>
+              <p className="text-white/60 text-xs">Lead story, key data, and what to watch next</p>
             </div>
           </div>
           <Link
             href="/briefing"
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-navy-900 hover:bg-navy-800 text-white font-medium text-xs transition-colors"
+            className="shrink-0 text-xs font-semibold text-accent-400 hover:text-accent-300 transition-colors whitespace-nowrap"
           >
-            Read Briefing
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            Read now →
           </Link>
         </div>
       </section>
 
-      {/* Accent divider */}
-      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
-
       {/* Market News */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
-        <div className="flex items-baseline justify-between mb-8 sm:mb-10">
-          <h2
-            className="text-2xl sm:text-3xl font-bold text-navy-900 font-playfair"
-          >
-            Market News
-          </h2>
+        <div className="flex items-center justify-between mb-8 sm:mb-10">
+          <div className="flex items-center gap-3">
+            <span className="block w-[3px] h-5 rounded-full bg-accent-500 shrink-0" aria-hidden="true" />
+            <h2 className="text-xl sm:text-2xl font-bold text-navy-900 font-playfair tracking-tight">
+              Market News
+            </h2>
+          </div>
           <Link
             href="/news"
             className="text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors hidden sm:inline-flex items-center gap-1"
@@ -135,18 +119,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Accent divider */}
-      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
-
       {/* Latest Analysis — Trevor's original research posts */}
       <section className="bg-navy-50 border-t border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
-        <div className="flex items-baseline justify-between mb-8 sm:mb-10">
-          <h2
-            className="text-2xl sm:text-3xl font-bold text-navy-900 font-playfair"
-          >
-            Latest Analysis
-          </h2>
+        <div className="flex items-center justify-between mb-8 sm:mb-10">
+          <div className="flex items-center gap-3">
+            <span className="block w-[3px] h-5 rounded-full bg-accent-500 shrink-0" aria-hidden="true" />
+            <h2 className="text-xl sm:text-2xl font-bold text-navy-900 font-playfair tracking-tight">
+              Latest Analysis
+            </h2>
+          </div>
           <Link
             href="/articles"
             className="text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors hidden sm:inline-flex items-center gap-1"

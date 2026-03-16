@@ -17,12 +17,12 @@ export default function AboutPage() {
           About
         </p>
         <div className="flex items-center gap-6 mb-4">
-          <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0 shadow-md">
+          <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden flex-shrink-0 shadow-lg ring-4 ring-accent-500/20">
             <Image
               src="/images/trevor.jpg"
               alt="Trevor Carnovsky"
-              width={80}
-              height={80}
+              width={128}
+              height={128}
               className="object-cover w-full h-full"
             />
           </div>
