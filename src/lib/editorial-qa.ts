@@ -5,7 +5,7 @@
  * Raw points are normalized to a 0–100 scale before threshold comparison.
  * Only articles scoring ≥ QA_PASS_THRESHOLD may be published.
  *
- * Scoring breakdown (14 tests, normalized to 100):
+ * Scoring breakdown (16 tests, normalized to 100):
  *   Story Worthiness   (15) — market impact, catalyst chain, investor implication
  *   Confidence         (15) — composite editorial confidence score
  *   Fact Check         (10) — claim verification score
@@ -14,6 +14,8 @@
  *   Metadata Accuracy   (5) — tickers, sentiment, marketImpact consistency
  *   Title Quality      (10) — word count, specificity, no vague language
  *   Thesis Clarity     (10) — four editorial questions answered
+ *   Section Headings    (5) — enforces 5-section ## heading structure
+ *   Key Takeaways       (5) — 3 distinct, specific takeaways with numbers
  *   Chart Quality      (10) — mandatory for key topics; internal quality score
  *   Story Completeness  (5) — length (≥120 words) + numerical grounding
  *   Originality         (5) — language similarity vs. recent articles
@@ -596,6 +598,107 @@ function scoreThesisClarity(article: NewsItem): QATestResult {
 }
 
 // ---------------------------------------------------------------------------
+// Section Headings — enforces 5-section format with ## headings
+// ---------------------------------------------------------------------------
+
+function scoreSectionHeadings(article: NewsItem): QATestResult {
+  const headingMatches = article.story.match(/^## .+/gm) ?? [];
+  const headingCount = headingMatches.length;
+  let score = 0;
+  const details: string[] = [];
+
+  if (headingCount >= 5) {
+    score = 5;
+  } else if (headingCount >= 3) {
+    score = 3;
+    details.push(`only ${headingCount} section headings (need ≥5 for 5-section format)`);
+  } else if (headingCount >= 1) {
+    score = 1;
+    details.push(`only ${headingCount} section heading(s) — article lacks proper structure`);
+  } else {
+    score = 0;
+    details.push("no section headings (## ) found — article lacks any structure");
+  }
+
+  return {
+    test: "Section Headings",
+    passed: score >= 3,
+    score,
+    maxScore: 5,
+    detail: details.length > 0 ? details.join("; ") : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Key Takeaways Quality — uniqueness, specificity, no repetition
+// ---------------------------------------------------------------------------
+
+function scoreKeyTakeawaysQuality(article: NewsItem): QATestResult {
+  const takeaways = article.keyTakeaways ?? [];
+  let score = 0;
+  const details: string[] = [];
+
+  if (takeaways.length === 0) {
+    return {
+      test: "Key Takeaways",
+      passed: false,
+      score: 0,
+      maxScore: 5,
+      detail: "no key takeaways present",
+    };
+  }
+
+  // 2 pts: have 3 takeaways
+  if (takeaways.length >= 3) {
+    score += 2;
+  } else {
+    score += 1;
+    details.push(`only ${takeaways.length} takeaway(s) — need 3`);
+  }
+
+  // 2 pts: takeaways are distinct (low pairwise overlap)
+  const STOP = new Set(["the","and","for","are","but","not","all","can","was","has","have","been","will","with","this","that","from","they","than","into","over","said","were","after","about","would","could","also","more","just","like","does","some","only"]);
+  const wordSets = takeaways.map((t) =>
+    new Set(t.toLowerCase().split(/\W+/).filter((w) => w.length > 3 && !STOP.has(w)))
+  );
+
+  let maxOverlap = 0;
+  for (let i = 0; i < wordSets.length; i++) {
+    for (let j = i + 1; j < wordSets.length; j++) {
+      const intersection = [...wordSets[i]].filter((w) => wordSets[j].has(w)).length;
+      const smaller = Math.min(wordSets[i].size, wordSets[j].size);
+      const overlap = smaller > 0 ? intersection / smaller : 0;
+      maxOverlap = Math.max(maxOverlap, overlap);
+    }
+  }
+
+  if (maxOverlap < 0.4) {
+    score += 2;
+  } else if (maxOverlap < 0.6) {
+    score += 1;
+    details.push(`takeaways have ${Math.round(maxOverlap * 100)}% word overlap — could be more distinct`);
+  } else {
+    details.push(`takeaways are repetitive (${Math.round(maxOverlap * 100)}% word overlap)`);
+  }
+
+  // 1 pt: at least one takeaway contains a number (specificity)
+  const hasNumber = takeaways.some((t) => /\d/.test(t));
+  if (hasNumber) {
+    score += 1;
+  } else {
+    details.push("no takeaway contains a specific number");
+  }
+
+  return {
+    test: "Key Takeaways",
+    passed: score >= 3,
+    score,
+    maxScore: 5,
+    detail: details.length > 0 ? details.join("; ") : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Source quality
 // ---------------------------------------------------------------------------
 
@@ -880,6 +983,12 @@ function scoreUpdateLanguage(article: NewsItem): QATestResult {
 // Source coherence — validates sources are topically related to article
 // ---------------------------------------------------------------------------
 
+/** Crypto-specific source domains — penalize when used for non-crypto articles */
+const CRYPTO_SOURCE_DOMAINS = new Set([
+  "coindesk", "cointelegraph", "decrypt", "the block", "bitcoin magazine",
+  "cryptoslate", "bitcoinist", "u.today", "newsbtc", "ambcrypto",
+]);
+
 function scoreSourceCoherence(article: NewsItem): QATestResult {
   const STOP = new Set(["the","and","for","are","but","not","all","can","was","has","have","been","will","with","this","that","from","they","than","into","over","such","what","when","how","each","which","their","said","were","after","about","would","could","also","more","just","like","does","some","only","very"]);
 
@@ -895,9 +1004,6 @@ function scoreSourceCoherence(article: NewsItem): QATestResult {
   }
 
   // ── Cross-sector ticker detection ──
-  // Extract stock tickers from source titles (2-5 uppercase letters)
-  // and check if they appear in the article's relatedTickers or text.
-  // A source about "PRU" used in a managed care (HUM/UNH) article = contamination.
   const articleTickers = new Set(
     (article.relatedTickers ?? []).map((t) => t.toUpperCase())
   );
@@ -908,12 +1014,26 @@ function scoreSourceCoherence(article: NewsItem): QATestResult {
     const srcTitle = src.title ?? "";
     const matches = [...srcTitle.matchAll(TICKER_RE)].map((m) => m[1]);
     for (const ticker of matches) {
-      // Skip common English words that look like tickers
       if (["THE","AND","FOR","ARE","BUT","NOT","ALL","CAN","WAS","HAS","ITS","CEO","GDP","CPI","IPO","ETF","SEC","FED","USA","FBI","FDA"].includes(ticker)) continue;
-      // If source title contains a ticker NOT in article's tickers AND not in article text, flag it
       if (articleTickers.size > 0 && !articleTickers.has(ticker) && !articleText.includes(ticker.toLowerCase())) {
         foreignTickerSources.push(`${src.source} (ticker ${ticker} not in article)`);
         break;
+      }
+    }
+  }
+
+  // ── Crypto source domain penalization ──
+  // Flag crypto-specific sources (CoinDesk, CoinTelegraph, etc.) used in non-crypto articles
+  const isCryptoArticle = article.category === "crypto" ||
+    article.topicKey === "crypto" ||
+    /\b(bitcoin|crypto|ethereum|blockchain)\b/i.test(articleText);
+
+  const cryptoSources: string[] = [];
+  if (!isCryptoArticle) {
+    for (const src of sources) {
+      const srcLower = src.source.toLowerCase();
+      if (CRYPTO_SOURCE_DOMAINS.has(srcLower) || [...CRYPTO_SOURCE_DOMAINS].some((d) => srcLower.includes(d))) {
+        cryptoSources.push(src.source);
       }
     }
   }
@@ -938,12 +1058,14 @@ function scoreSourceCoherence(article: NewsItem): QATestResult {
   let score: number;
   let detail: string | undefined;
 
-  if (coherenceRatio >= 0.8 && foreignTickerSources.length === 0) {
+  if (coherenceRatio >= 0.8 && foreignTickerSources.length === 0 && cryptoSources.length === 0) {
     score = 5;
   } else if (foreignTickerSources.length > 0) {
-    // Cross-sector source contamination: hard penalty
     score = 1;
     detail = `cross-sector source contamination: ${foreignTickerSources.join("; ")}`;
+  } else if (cryptoSources.length > 0) {
+    score = 2;
+    detail = `crypto-specific source(s) used in non-crypto article: ${cryptoSources.join(", ")}`;
   } else if (coherenceRatio >= 0.6) {
     score = 3;
     detail = `${incoherent.length} source(s) have low topical relevance: ${incoherent.join(", ")}`;
@@ -1000,7 +1122,7 @@ function scoreMetadataAccuracy(article: NewsItem): QATestResult {
     score += 2;
   }
 
-  // 3. Validate marketImpact direction matches change sign AND format (1 pt)
+  // 3. Validate marketImpact direction, format, AND asset relevance (1 pt)
   if (article.marketImpact && article.marketImpact.length > 0) {
     const inconsistent = article.marketImpact.filter((mi) => {
       if (mi.direction === "up" && mi.change.startsWith("-")) return true;
@@ -1012,13 +1134,33 @@ function scoreMetadataAccuracy(article: NewsItem): QATestResult {
     const badFormat = article.marketImpact.filter(
       (mi) => !VALID_CHANGE_FORMAT.test(mi.change.trim())
     );
-    if (inconsistent.length === 0 && badFormat.length === 0) {
+    // Validate that marketImpact assets appear in the article text
+    const ASSET_ALIASES: Record<string, string[]> = {
+      "OIL": ["oil", "crude", "wti", "brent", "petroleum"],
+      "WTI": ["oil", "crude", "wti", "brent"],
+      "S&P 500": ["s&p", "spy", "equities", "equity", "stock market"],
+      "SPY": ["s&p", "spy", "equities", "stock market"],
+      "10Y YIELD": ["yield", "treasury", "10-year", "bond"],
+      "BTC": ["bitcoin", "btc", "crypto"],
+      "GOLD": ["gold", "gld", "safe haven"],
+      "DXY": ["dollar", "dxy", "greenback", "usd"],
+      "VIX": ["vix", "volatility", "fear"],
+    };
+    const missingAssets = article.marketImpact.filter((mi) => {
+      const assetUpper = mi.asset.toUpperCase();
+      const aliases = ASSET_ALIASES[assetUpper] ?? [mi.asset.toLowerCase()];
+      return !aliases.some((alias) => lower.includes(alias));
+    });
+
+    if (inconsistent.length === 0 && badFormat.length === 0 && missingAssets.length === 0) {
       score += 1;
     } else {
       if (inconsistent.length > 0)
         details.push(`marketImpact direction/change mismatch for ${inconsistent.map((m) => m.asset).join(", ")}`);
       if (badFormat.length > 0)
         details.push(`marketImpact change format invalid for ${badFormat.map((m) => `${m.asset}="${m.change}"`).join(", ")} — expected +/-N.N% or +/-Nbps`);
+      if (missingAssets.length > 0)
+        details.push(`marketImpact asset(s) not mentioned in article: ${missingAssets.map((m) => m.asset).join(", ")}`);
     }
   } else {
     score += 1; // No marketImpact is acceptable (not all articles have it)
@@ -1057,6 +1199,8 @@ export function runEditorialQA(
     scoreMetadataAccuracy(article),
     scoreTitle(article.title),
     scoreThesisClarity(article),
+    scoreSectionHeadings(article),
+    scoreKeyTakeawaysQuality(article),
     scoreChartQuality(article),
     scoreStoryCompleteness(article),
     scoreOriginality(article, existingArticles),

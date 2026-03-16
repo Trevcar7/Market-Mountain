@@ -579,18 +579,50 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
  *   "S&P 500: -1.2% down"
  *   "10Y YIELD +8bps up"
  */
+/** Normalize generic asset labels to proper ticker symbols */
+const ASSET_NORMALIZATION: Record<string, string> = {
+  "OIL": "WTI",
+  "CRUDE": "WTI",
+  "CRUDE OIL": "WTI",
+  "BRENT": "BRENT",
+  "GOLD": "GLD",
+  "SILVER": "SLV",
+  "BITCOIN": "BTC",
+  "ETHEREUM": "ETH",
+  "DOLLAR": "DXY",
+  "DOLLAR INDEX": "DXY",
+  "USD": "DXY",
+  "GREENBACK": "DXY",
+  "S&P": "SPY",
+  "S&P 500": "SPY",
+  "NASDAQ": "QQQ",
+  "DOW": "DIA",
+  "DOW JONES": "DIA",
+  "10Y YIELD": "10Y",
+  "10Y": "10Y",
+  "2Y YIELD": "2Y",
+  "30Y YIELD": "30Y",
+  "TREASURY": "TLT",
+  "VIX": "VIX",
+};
+
 function parseMarketImpactLine(text: string, out: MarketImpactItem[]): void {
   // Pattern: ASSET CHANGE direction  (e.g. "OIL +4.1% up" or "S&P 500: -1.2% down")
   const m = text.match(/^([A-Za-z0-9&. /]+?)[:]\s*([+\-]\d+[.,]?\d*\s*(?:%|bps|bp))\s*(up|down|flat)?$/i)
     ?? text.match(/^([A-Za-z0-9&. /]+?)\s+([+\-]\d+[.,]?\d*\s*(?:%|bps|bp))\s*(up|down|flat)?$/i);
   if (!m) return;
 
-  const asset = m[1].trim().toUpperCase();
+  const rawAsset = m[1].trim().toUpperCase();
+  // Normalize generic names to proper ticker symbols
+  const asset = ASSET_NORMALIZATION[rawAsset] ?? rawAsset;
   const change = m[2].trim();
   const dirText = (m[3] ?? "").toLowerCase();
   let direction: "up" | "down" | "flat" = "flat";
   if (dirText === "up" || change.startsWith("+")) direction = "up";
   else if (dirText === "down" || change.startsWith("-")) direction = "down";
+
+  // Prevent duplicate assets in the same article
+  if (out.some((existing) => existing.asset === asset)) return;
 
   out.push({ asset, change, direction });
 }
@@ -1000,7 +1032,7 @@ MARKET_IMPACT RULES:
 - Use actual ticker symbols (HUM, PRU, AAPL, SPY, etc.) not generic labels like "OIL" or "MACRO"
 - Only list assets that appear in your story or MARKET DATA
 
-Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, MARKET_IMPACT (1–3 asset bullets) first, then one blank line, then the 5-section story (500–800 words). Do NOT label the sections with headers.`;
+Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, MARKET_IMPACT (1–3 asset bullets) first, then one blank line, then the 5-section story (500–800 words). Each section MUST begin with a "## " heading on its own line (e.g., "## Event Summary", "## Market Reaction", "## Macro Context", "## Investor Implications", "## What to Watch"). The heading must be descriptive and specific to the article content.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1624,7 +1656,8 @@ export async function synthesizeGroupedArticles(
         factCheckScore: overallScore,
         verifiedClaims: factCheckResults
           .filter((r) => r.verified)
-          .map((r) => r.claim)
+          .map((r) => cleanClaimForDisplay(r.claim))
+          .filter((c) => c.length > 20)
           .slice(0, 3),
         // Editorial enrichment
         whyThisMatters: parsed.whyThisMatters || undefined,
@@ -2045,6 +2078,30 @@ function generateTags(
   const combined = [...new Set([...topicTags, ...textAssets, ...catTags])];
   const valid = combined.filter((t) => ALLOWED_TAGS.has(t));
   return valid.slice(0, 3);
+}
+
+/**
+ * Clean a fact-check claim for display in the verifiedClaims array.
+ * Ensures claims are complete sentences without trailing fragments,
+ * garbled text from decimal splitting, or structural prefixes.
+ */
+function cleanClaimForDisplay(claim: string): string {
+  let clean = claim.trim();
+  // Remove any residual structural prefixes
+  clean = clean.replace(/^(HEADLINE|KEY_TAKEAWAYS|WHY_MATTERS|SECOND_ORDER|WHAT_WATCH|MARKET_IMPACT):\s*/gi, "");
+  // Remove section heading prefixes
+  clean = clean.replace(/^## /, "");
+  // Remove bullet prefixes
+  clean = clean.replace(/^[•\-\*]\s*/, "");
+  // Ensure first character is uppercase
+  if (clean.length > 0) {
+    clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+  }
+  // If claim ends mid-sentence (no period), add one
+  if (clean.length > 0 && !/[.!?]$/.test(clean)) {
+    clean += ".";
+  }
+  return clean;
 }
 
 function generateId(topic: string): string {
