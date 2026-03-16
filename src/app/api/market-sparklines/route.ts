@@ -165,12 +165,11 @@ async function fetchIntradaySeries(
   label: string,
 ): Promise<SparklineSet | null> {
   try {
-    // Request 390 bars = 5 full trading sessions worth of 5-min data.
-    // This ensures we capture the complete most-recent session even when
-    // TwelveData includes extended-hours bars that push the regular-hours
-    // bars further back in the response. The latest-date filter below
-    // extracts only the bars belonging to the most recent trading day.
-    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=390&apikey=${apiKey}`;
+    // Request 78 bars of 5-min data per symbol.
+    // TwelveData free tier caps intraday history for equity ETFs to ~20 bars
+    // regardless of outputsize; forex/crypto (XAU/USD, BTC/USD) return up to 78.
+    // Larger values cause response-size timeouts for 24/7 instruments.
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=78&apikey=${apiKey}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10000), cache: "no-store" });
 
     if (!res.ok) {
