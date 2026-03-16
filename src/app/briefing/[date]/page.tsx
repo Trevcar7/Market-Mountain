@@ -197,21 +197,29 @@ export default async function BriefingDatePage({ params }: Props) {
 
                 <div className="space-y-3">
                   {briefing.whatToWatch.map((item, i) => (
-                    <div key={i} className="flex gap-4 p-4 rounded-lg bg-white border border-border">
-                      <div className="shrink-0 mt-0.5">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-navy-900 text-white text-[10px] font-bold">
+                    <div key={i} className="p-4 rounded-lg bg-white border border-border">
+                      <div className="flex items-start gap-3 mb-2">
+                        <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-navy-900 text-white text-[10px] font-bold mt-0.5">
                           {i + 1}
                         </span>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-baseline gap-2 mb-1">
-                          <span className="font-semibold text-navy-900 text-sm">{item.event}</span>
-                          <span className="text-text-light text-xs">{item.timing}</span>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-navy-900 text-sm leading-snug">
+                            {item.event}
+                          </h4>
+                          <span className="inline-block mt-1 text-[9px] font-semibold tracking-wider uppercase text-navy-500 bg-navy-50 px-2 py-0.5 rounded">
+                            {item.timing}
+                          </span>
                         </div>
-                        <p className="text-text-muted text-sm leading-relaxed">
-                          {item.significance}
-                        </p>
                       </div>
+                      <p className="text-text-muted text-sm leading-relaxed ml-9">
+                        {item.significance}
+                      </p>
+                      {(item as { watchMetric?: string }).watchMetric && (
+                        <p className="ml-9 mt-2 text-[11px] font-semibold text-navy-700 tabular-nums">
+                          <span className="text-accent-600">Watch:</span>{" "}
+                          {(item as { watchMetric?: string }).watchMetric}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

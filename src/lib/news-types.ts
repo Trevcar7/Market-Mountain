@@ -137,6 +137,7 @@ export interface DailyBriefing {
     event: string;
     timing: string;
     significance: string;
+    watchMetric?: string;   // e.g., "10-Year Treasury above 4.30%"
   }>;
   storiesPublished: number;
   generatedFrom: string[]; // Story IDs used to generate briefing

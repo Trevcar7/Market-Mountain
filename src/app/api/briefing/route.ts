@@ -199,10 +199,18 @@ Summary: ${s.story.split("\n")[0]}`
     )
     .join("\n\n");
 
-  const prompt = `You are generating a Daily Markets Briefing for Market Mountain, a financial publication.
-This briefing publishes at 8:00 AM Eastern each trading day.
+  const prompt = `You are a macro strategist generating a Daily Markets Briefing for Market Mountain, a financial publication read by institutional investors, macro traders, and portfolio managers.
+This briefing publishes at 8:00 AM Eastern each trading day. Your tone must match Bloomberg, the Financial Times, or sell-side macro research notes.
 
-FOCUS: Only include the most impactful, market-driving news for the day. Lead with the story that will move markets most. Skip stories that are incremental updates or low-impact.
+FOCUS: Lead with the story that will move markets most. Skip incremental updates or low-impact developments.
+
+WHAT TO WATCH RULES:
+- Each item must identify a specific macro or market driver and explain the mechanism driving markets
+- Do NOT use generic phrases like "markets reacted", "this highlights", "investors are watching", "in today's environment"
+- Every item must explain the economic cause-and-effect mechanism
+- Use one of these monitoring labels for "timing": "Ongoing this week", "Intraday monitoring", "Earnings season updates", "Upcoming economic data", "Policy watch"
+- Include a "watchMetric" when a specific price level or threshold is economically meaningful (e.g., "10-Year Treasury above 4.30%", "WTI crude above $95", "S&P 500 testing 50-day MA")
+- Significance must be 1-2 sentences maximum, analytical and concise — no speculation or exaggerated predictions
 
 Today's published stories:
 
@@ -214,16 +222,16 @@ Generate a concise editorial briefing with this exact JSON structure. Return ONL
   "leadSummary": "[2-3 sentence analytical summary of the lead story — what happened, why it moves markets, and the key number or data point investors need to know]",
   "topDevelopmentsSummaries": ["[1 sentence for story 2 — focus on the market impact]", "[1 sentence for story 3]", "[1 sentence for story 4]"],
   "whatToWatch": [
-    {"event": "[specific catalyst — earnings, data release, policy event]", "timing": "[exact date or time if known, e.g. 'March 19 — 2:00 PM ET']", "significance": "[1 sentence: what outcome would move markets and in which direction]"},
-    {"event": "[event name]", "timing": "[when]", "significance": "[1 sentence why it matters for positioning]"},
-    {"event": "[event name]", "timing": "[when]", "significance": "[1 sentence why it matters for positioning]"}
+    {"event": "[specific macro or market driver — not generic]", "timing": "[monitoring label from the list above]", "significance": "[1-2 sentences: the economic mechanism and what outcome would move markets]", "watchMetric": "[specific level or threshold to monitor, e.g. '10-Year Treasury above 4.30%']"},
+    {"event": "[event name]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]", "watchMetric": "[level or null if none applies]"},
+    {"event": "[event name]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]"}
   ]
 }`;
 
   let generated: {
     leadSummary: string;
     topDevelopmentsSummaries: string[];
-    whatToWatch: Array<{ event: string; timing: string; significance: string }>;
+    whatToWatch: Array<{ event: string; timing: string; significance: string; watchMetric?: string }>;
   } | null = null;
 
   try {
