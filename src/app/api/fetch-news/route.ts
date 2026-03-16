@@ -65,8 +65,33 @@ const DEFAULT_DEDUP_HOURS = 8; // was 6
 // treated as the same ongoing story and suppressed (only the first wins).
 // ---------------------------------------------------------------------------
 const ONGOING_EVENT_WINDOW_HOURS = 72;
-const ENTITY_OVERLAP_THRESHOLD = 0.55; // 55% shared entities = same ongoing story
+const ENTITY_OVERLAP_THRESHOLD = 0.45; // 45% shared entities = same ongoing story (was 0.55)
 const HEADLINE_SIMILARITY_THRESHOLD = 0.50; // 50% word overlap = likely same story
+
+// ---------------------------------------------------------------------------
+// Causal-chain topic groups — topic keys that frequently surface the same
+// real-world event from different angles. An Iran crisis produces correlated
+// articles under "energy", "geopolitics", "inflation", and "crypto". When
+// groups in the same chain share ANY entity, a lower overlap threshold is
+// used because the correlation is expected and almost always signals a
+// duplicate rather than a genuinely distinct story.
+// ---------------------------------------------------------------------------
+const CAUSAL_CHAIN_GROUPS: string[][] = [
+  ["energy", "geopolitics", "inflation"],              // Oil supply shock → inflation
+  ["federal_reserve", "bond_market", "broad_market"],  // Rate decision → yields → equities
+  ["trade_policy", "broad_market", "inflation"],       // Tariffs → market + inflation
+  ["geopolitics", "crypto", "broad_market"],            // Geopolitical risk → safe haven
+  ["energy", "inflation", "federal_reserve"],           // Oil → inflation → Fed response
+  ["geopolitics", "energy", "crypto"],                  // Geopolitical crisis → oil + crypto
+];
+const CHAIN_ENTITY_OVERLAP_THRESHOLD = 0.30; // Lower bar for chain-linked topics
+
+function areInSameCausalChain(topicA: string, topicB: string): boolean {
+  if (topicA === topicB) return false; // same topic handled by cross-run dedup
+  return CAUSAL_CHAIN_GROUPS.some(
+    (chain) => chain.includes(topicA) && chain.includes(topicB)
+  );
+}
 
 /**
  * Extract a normalized set of key entities from a collection of text strings.
@@ -75,41 +100,55 @@ const HEADLINE_SIMILARITY_THRESHOLD = 0.50; // 50% word overlap = likely same st
  */
 function extractEventEntities(texts: string[]): Set<string> {
   const combined = texts.join(" ").toLowerCase();
-  const entities = new Set<string>();
+  const rawEntities = new Set<string>();
 
   // Geopolitical actors that commonly drive correlated market stories
+  // EXPANDED: includes crisis-specific actors, capitals, and strategic locations
   const GEO_ACTORS = [
-    "iran", "russia", "china", "ukraine", "israel", "taiwan",
-    "opec", "saudi", "middle east", "persian gulf", "red sea",
+    "iran", "iranian", "tehran",
+    "russia", "russian", "moscow", "kremlin",
+    "china", "chinese", "beijing",
+    "ukraine", "ukrainian", "kyiv",
+    "israel", "israeli", "tel aviv",
+    "taiwan", "taiwanese", "taipei",
+    "opec", "saudi", "saudi arabia",
+    "middle east", "persian gulf", "red sea",
+    "strait of hormuz", "suez canal",
     "nato", "europe", "eu", "japan", "korea",
+    "north korea", "pyongyang",
+    "india", "pakistan",
+    // Crisis-specific actors (common in geopolitical → oil → inflation chains)
+    "houthis", "hezbollah", "hamas",
+    "gaza", "west bank", "lebanon",
   ];
   for (const actor of GEO_ACTORS) {
-    if (combined.includes(actor)) entities.add(actor);
+    if (combined.includes(actor)) rawEntities.add(actor);
   }
 
   // Commodities — price moves in these often create correlated macro articles
   const COMMODITIES = [
-    "oil", "crude", "wti", "brent", "natural gas", "lng",
+    "oil", "crude", "crude oil", "petroleum",
+    "wti", "brent", "natural gas", "lng",
     "gold", "silver", "copper", "wheat", "corn",
   ];
   for (const c of COMMODITIES) {
-    if (combined.includes(c)) entities.add(c);
+    if (combined.includes(c)) rawEntities.add(c);
   }
 
   // Crypto assets — prevent "bitcoin" articles from spawning across topic keys
   const CRYPTO_ASSETS = ["bitcoin", "btc", "ethereum", "eth", "crypto", "blockchain"];
   for (const c of CRYPTO_ASSETS) {
-    if (combined.includes(c)) entities.add(c);
+    if (combined.includes(c)) rawEntities.add(c);
   }
 
   // Macro events — central bank actions, regulatory moves, economic data
   const MACRO_EVENTS = [
     "federal reserve", "fed", "rate cut", "rate hike", "interest rate",
     "inflation", "cpi", "pce", "gdp", "unemployment", "jobs",
-    "tariff", "sanction", "treasury", "yield",
+    "tariff", "sanction", "sanctions", "treasury", "yield",
   ];
   for (const e of MACRO_EVENTS) {
-    if (combined.includes(e)) entities.add(e);
+    if (combined.includes(e)) rawEntities.add(e);
   }
 
   // Major companies (add only if explicitly named — avoids false positives)
@@ -119,9 +158,40 @@ function extractEventEntities(texts: string[]): Set<string> {
     "boeing", "exxon", "chevron", "shell",
   ];
   for (const co of MAJOR_COS) {
-    if (new RegExp(`\\b${co}\\b`).test(combined)) entities.add(co);
+    if (new RegExp(`\\b${co}\\b`).test(combined)) rawEntities.add(co);
   }
 
+  // ── Entity normalization ────────────────────────────────────────────────
+  // Collapse synonyms to canonical forms so entity overlap catches pairs like
+  // "crude oil prices surge" vs "oil market disruption" as sharing the same
+  // commodity entity. Only truly synonymous terms are normalized; related-but-
+  // distinct concepts (e.g. "cpi" vs "inflation") stay separate to avoid
+  // false positives between genuinely different economic stories.
+  const CANONICAL: Record<string, string> = {
+    // Geographic: different names for the same political entity
+    "iranian": "iran", "tehran": "iran",
+    "russian": "russia", "moscow": "russia", "kremlin": "russia",
+    "chinese": "china", "beijing": "china",
+    "ukrainian": "ukraine", "kyiv": "ukraine",
+    "israeli": "israel", "tel aviv": "israel",
+    "taiwanese": "taiwan", "taipei": "taiwan",
+    "saudi arabia": "saudi",
+    "persian gulf": "middle east", "red sea": "middle east",
+    "strait of hormuz": "middle east",
+    "pyongyang": "north korea",
+    // Commodity: different grades/names for the same commodity
+    "crude": "oil", "wti": "oil", "brent": "oil",
+    "petroleum": "oil", "crude oil": "oil",
+    "lng": "natural gas",
+    // Crypto: tickers → canonical name
+    "btc": "bitcoin",
+    "eth": "ethereum",
+  };
+
+  const entities = new Set<string>();
+  for (const e of rawEntities) {
+    entities.add(CANONICAL[e] ?? e);
+  }
   return entities;
 }
 
@@ -602,27 +672,47 @@ async function handleNewsFetch() {
       (s) => Date.now() - new Date(s.publishedAt).getTime() < windowMs
     );
 
-    // Pre-compute entity signatures for existing recent articles
+    // Pre-compute entity signatures for existing recent articles.
+    // Include story lead (first 300 chars) for richer entity extraction —
+    // catches entities mentioned in the opening paragraph that may not appear
+    // in the headline (e.g. "Iran" in an oil story titled "Energy Supply
+    // Chains Under Pressure").
     const existingEntitySigs = recentPublishedArticles.map((article) => ({
       title: article.title,
       topicKey: article.topicKey ?? "",
-      entities: extractEventEntities([article.title, article.topicKey ?? ""]),
+      entities: extractEventEntities([
+        article.title,
+        article.topicKey ?? "",
+        (article.story ?? "").slice(0, 300),
+      ]),
     }));
 
     const entityMatchBefore = afterTierCheck.length;
     // Track which entity clusters have already been claimed by a group in this run
     // (prevents TWO new groups in the same run from publishing on the same cluster)
     const claimedEntityClusters: Set<string>[] = [];
+    const claimedTopicKeys: string[] = [];
 
     // Also track claimed headlines for in-run headline similarity suppression
     const claimedGroupHeadlines: string[] = [];
 
     const afterEntityMatch = afterTierCheck.filter((g) => {
+      // Extract all available text from the group for entity matching.
+      // Using headlines + descriptions/summaries gives better entity recall
+      // than headlines alone — a description may mention "Iran" even when
+      // the headline only says "Oil Prices Surge".
+      const groupTexts: string[] = [g.topic];
+      for (const a of g.articles) {
+        const raw = a as Record<string, unknown>;
+        groupTexts.push(String(raw.headline ?? raw.title ?? ""));
+        if (raw.summary) groupTexts.push(String(raw.summary));
+        if (raw.description) groupTexts.push(String(raw.description));
+      }
       const groupTitles = g.articles.map((a) => {
         const raw = a as Record<string, unknown>;
         return String(raw.headline ?? raw.title ?? "");
       });
-      const groupEntities = extractEventEntities([g.topic, ...groupTitles]);
+      const groupEntities = extractEventEntities(groupTexts);
       const compositeHeadline = groupTitles.join(" ");
 
       // ── Headline similarity check (catches near-dupes entity matching misses) ──
@@ -651,32 +741,56 @@ async function handleNewsFetch() {
         }
       }
 
-      // ── Entity-based matching ──
-      // Need at least 2 entities to do meaningful matching (1-entity groups are
-      // too broad — "oil" alone would match everything in an oil-driven run)
-      if (groupEntities.size >= 2) {
+      // ── Entity-based matching (with causal-chain awareness) ─────────────
+      //
+      // Standard comparison: ENTITY_OVERLAP_THRESHOLD (0.45), min 2 entities.
+      // Chain-linked comparison: CHAIN_ENTITY_OVERLAP_THRESHOLD (0.30), min 1 entity.
+      //
+      // For chain-linked topics (e.g. "energy" and "geopolitics" are in the
+      // ["energy", "geopolitics", "inflation"] chain), even a SINGLE shared
+      // entity like "oil" is a strong signal they cover the same crisis.
+      // The lower threshold + lower entity minimum catches cases like:
+      //   - energy{iran, oil} vs geopolitics{middle east, oil} → 50% overlap
+      //     (missed at 0.55, caught at 0.45 standard OR 0.30 chain threshold)
+      //   - crypto{bitcoin} vs energy{oil, iran} → 0% overlap → NOT caught
+      //     (correctly allows genuinely different stories through)
+      if (groupEntities.size >= 1) {
         // Check against published articles in the ongoing-event window
         for (const sig of existingEntitySigs) {
-          if (sig.entities.size < 2) continue;
+          const inChain = sig.topicKey && areInSameCausalChain(g.topic, sig.topicKey);
+          const threshold = inChain ? CHAIN_ENTITY_OVERLAP_THRESHOLD : ENTITY_OVERLAP_THRESHOLD;
+          const minEntities = inChain ? 1 : 2;
+
+          if (groupEntities.size < minEntities || sig.entities.size < minEntities) continue;
+
           const overlap = computeEntityOverlap(groupEntities, sig.entities);
-          if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+          if (overlap >= threshold) {
             console.log(
               `[fetch-news] Entity-match suppress: "${g.topic}" ` +
               `(${Math.round(overlap * 100)}% entity overlap with published ` +
-              `"${sig.title.slice(0, 60)}" [${sig.topicKey}] — same ongoing story)`
+              `"${sig.title.slice(0, 60)}" [${sig.topicKey}]` +
+              `${inChain ? " — causal-chain linked" : ""} — same ongoing story)`
             );
             return false;
           }
         }
 
         // Check against other groups already accepted in this run
-        for (const claimedEntities of claimedEntityClusters) {
-          if (claimedEntities.size < 2) continue;
+        for (let i = 0; i < claimedEntityClusters.length; i++) {
+          const claimedEntities = claimedEntityClusters[i];
+          const claimedTopic = claimedTopicKeys[i];
+          const inChain = areInSameCausalChain(g.topic, claimedTopic);
+          const threshold = inChain ? CHAIN_ENTITY_OVERLAP_THRESHOLD : ENTITY_OVERLAP_THRESHOLD;
+          const minEntities = inChain ? 1 : 2;
+
+          if (groupEntities.size < minEntities || claimedEntities.size < minEntities) continue;
+
           const overlap = computeEntityOverlap(groupEntities, claimedEntities);
-          if (overlap >= ENTITY_OVERLAP_THRESHOLD) {
+          if (overlap >= threshold) {
             console.log(
               `[fetch-news] Entity-match suppress: "${g.topic}" ` +
-              `(${Math.round(overlap * 100)}% entity overlap with another group in this run — ` +
+              `(${Math.round(overlap * 100)}% entity overlap with "${claimedTopic}" group in this run` +
+              `${inChain ? " — causal-chain linked" : ""} — ` +
               `same ongoing story, only first group synthesized)`
             );
             return false;
@@ -686,6 +800,7 @@ async function handleNewsFetch() {
 
       // This group's entity cluster is novel — claim it and allow synthesis
       claimedEntityClusters.push(groupEntities);
+      claimedTopicKeys.push(g.topic);
       claimedGroupHeadlines.push(compositeHeadline);
       return true;
     });
