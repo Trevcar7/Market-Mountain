@@ -17,12 +17,10 @@ const MIN_POINTS    = 3;       // Lower threshold for intraday (may only have a 
  *   SPY tracks S&P 500 direction, USO tracks WTI crude, etc.
  */
 const SPARKLINE_SYMBOLS: Array<{ symbol: string; label: string }> = [
-  { symbol: "SPY",     label: "S&P 500" },
-  { symbol: "UVXY",    label: "VIX" },       // UVXY = 2× VIX short-term futures — shows VIX direction; free-tier compatible
-  { symbol: "USO",     label: "WTI Oil" },
-  { symbol: "XAU/USD", label: "Gold" },
-  { symbol: "UUP",     label: "Broad U.S. Dollar Index" },
-  { symbol: "BTC/USD", label: "Bitcoin" },
+  { symbol: "SPY",  label: "S&P 500" },
+  { symbol: "UVXY", label: "VIX" },    // 2× VIX short-term futures — shows VIX direction; free-tier compatible
+  { symbol: "USO",  label: "WTI Oil" },
+  { symbol: "UUP",  label: "Broad U.S. Dollar Index" },
 ];
 
 /**
@@ -49,12 +47,10 @@ function todayMarketOpenET(): Date {
  * Data resets at 9:30 AM ET each trading day and builds throughout the session.
  *
  * Sources: TwelveData intraday (5min interval)
- *   S&P 500  → SPY (ETF proxy)
- *   VIX      → VIX index
- *   WTI Oil  → USO (ETF proxy)
- *   Gold     → XAU/USD (forex)
- *   DXY      → UUP (ETF proxy)
- *   Bitcoin   → BTC/USD (crypto, trades 24/7)
+ *   S&P 500       → SPY  (ETF proxy)
+ *   VIX           → UVXY (2× VIX futures ETF — direction proxy)
+ *   WTI Oil       → USO  (ETF proxy)
+ *   Dollar Index  → UUP  (ETF proxy)
  *
  * TTL: 10-min server-side Redis cache (within each session)
  */
@@ -112,26 +108,14 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
     return { sparklines: [], generatedAt: now.toISOString(), validUntil: validUntil.toISOString() };
   }
 
-  // Fetch in two batches to stay under TwelveData's 8-credits/minute rate limit.
-  // Batch 1: 3 symbols, Batch 2: 3 symbols (with brief pause between).
-  const batch1Symbols = SPARKLINE_SYMBOLS.slice(0, 3);
-  const batch2Symbols = SPARKLINE_SYMBOLS.slice(3);
-
-  const batch1 = await Promise.allSettled(
-    batch1Symbols.map(({ symbol, label }) => fetchIntradaySeries(twKey, symbol, label))
-  );
-
-  // Brief pause so batch 2 falls into the next rate-limit minute window
-  if (batch2Symbols.length > 0) {
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-
-  const batch2 = await Promise.allSettled(
-    batch2Symbols.map(({ symbol, label }) => fetchIntradaySeries(twKey, symbol, label))
+  // 4 symbols = 4 API credits, well under TwelveData's 8-credits/minute limit.
+  // Single parallel batch is safe.
+  const results = await Promise.allSettled(
+    SPARKLINE_SYMBOLS.map(({ symbol, label }) => fetchIntradaySeries(twKey, symbol, label))
   );
 
   const sparklines: SparklineSet[] = [];
-  for (const result of [...batch1, ...batch2]) {
+  for (const result of results) {
     if (result.status === "fulfilled" && result.value) {
       sparklines.push(result.value);
     }
