@@ -190,8 +190,7 @@ export async function POST(req: NextRequest) {
 
       // ── Fix 8: Strip leaked MARKET_IMPACT bullets from story body ──
       // Bullets like "• IWM -2.1% down" that appear before the first ## heading
-      // are MARKET_IMPACT data that leaked into the story body during synthesis.
-      // Rescue them into marketImpact (if not already present) then remove from story.
+      // are synthesis artifacts that leaked into the story body — strip them entirely.
       if (article.story) {
         const LEAKED_BULLET_RE = /^[•\-\*]\s+([A-Za-z0-9&. /]+)\s+([+\-]\d+[.,]?\d*\s*(?:%|bps|bp))\s*(up|down|flat)?\s*$/i;
         const lines = article.story.split("\n");
@@ -200,19 +199,7 @@ export async function POST(req: NextRequest) {
 
         for (const line of lines) {
           const t = line.trim();
-          const m = t.match(LEAKED_BULLET_RE);
-          if (m) {
-            // Try to rescue into marketImpact
-            const asset = m[1].trim().toUpperCase();
-            const change = m[2].trim();
-            const dir = (m[3] ?? "").toLowerCase();
-            const direction: "up" | "down" | "flat" =
-              dir === "up" || change.startsWith("+") ? "up" :
-              dir === "down" || change.startsWith("-") ? "down" : "flat";
-            if (!article.marketImpact) article.marketImpact = [];
-            if (!article.marketImpact.some((mi) => mi.asset === asset)) {
-              article.marketImpact.push({ asset, change, direction });
-            }
+          if (LEAKED_BULLET_RE.test(t)) {
             removedBullets++;
           } else {
             cleanedLines.push(line);
@@ -223,6 +210,25 @@ export async function POST(req: NextRequest) {
           // Collapse leading blank lines
           article.story = cleanedLines.join("\n").replace(/^\n+/, "");
           fixes.push(`story: removed ${removedBullets} leaked MARKET_IMPACT bullet(s) from body`);
+        }
+      }
+
+      // ── Fix 9: Remove erroneously rescued marketImpact entries ──
+      // The previous version of Fix 8 rescued leaked bullets into marketImpact.
+      // For articles where marketImpact was originally null, those rescued entries
+      // are unverified synthesis artifacts and should be removed.
+      const ERRONEOUSLY_RESCUED: Record<string, string[]> = {
+        "news-1773672499606-1279": ["IWM", "EWU"],
+      };
+      const toRemove = ERRONEOUSLY_RESCUED[article.id];
+      if (toRemove && article.marketImpact) {
+        const before = article.marketImpact.length;
+        article.marketImpact = article.marketImpact.filter(
+          (mi) => !toRemove.includes(mi.asset)
+        );
+        if (article.marketImpact.length === 0) article.marketImpact = undefined;
+        if (article.marketImpact === undefined || article.marketImpact.length < before) {
+          fixes.push(`marketImpact: removed erroneously rescued entries [${toRemove.join(", ")}]`);
         }
       }
 
