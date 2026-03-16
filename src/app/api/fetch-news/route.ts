@@ -1062,6 +1062,26 @@ async function handleNewsFetch() {
         `(feed was empty; bootstrap threshold met)`
       );
     }
+
+    // Sentiment diversity check — log warning when all candidates share the
+    // same sentiment. Does not block publishing (editorial tone varies by
+    // market conditions), but flags potential monotone feeds for review.
+    if (publishCandidates.length >= 2) {
+      const sentiments = publishCandidates.map((s) => s.sentiment);
+      const uniqueSentiments = new Set(sentiments);
+      if (uniqueSentiments.size === 1) {
+        console.warn(
+          `[fetch-news] ⚠ Sentiment diversity: ALL ${publishCandidates.length} stories are "${sentiments[0]}" — ` +
+          `consider whether the feed appears one-sided. Topics: [${publishCandidates.map((s) => s.topicKey ?? "?").join(", ")}]`
+        );
+      } else {
+        console.log(
+          `[fetch-news] Sentiment diversity: ${uniqueSentiments.size} sentiment(s) across ${publishCandidates.length} stories — ` +
+          `[${sentiments.join(", ")}]`
+        );
+      }
+    }
+
     console.log(
       `[fetch-news] Publish decision: PUBLISH — ${publishCandidates.length} new stories ` +
       `(${stats.storiesWithWhyMatters} with why-matters, ${stats.storiesWithKeyData} with key data, ` +

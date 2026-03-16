@@ -262,7 +262,14 @@ export default async function NewsStoryPage({ params }: Props) {
           <div className="prose prose-slate max-w-none">
             {paragraphs.map((para, i) => (
               <React.Fragment key={i}>
-                <p>{para}</p>
+                {/* Render ## headings as styled <h2> section dividers */}
+                {para.startsWith("## ") ? (
+                  <h2 className="text-lg font-bold text-navy-900 mt-8 mb-3 font-playfair tracking-tight">
+                    {para.slice(3)}
+                  </h2>
+                ) : (
+                  <p>{para}</p>
+                )}
                 {/* Inject charts assigned to this paragraph index */}
                 {chartsByParagraph.has(i) && (
                   <div className="not-prose">

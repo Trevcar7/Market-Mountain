@@ -34,8 +34,12 @@ export function extractClaimsFromStory(story: string): string[] {
 
   const claims: string[] = [];
 
-  // Split into sentences — handle both period-terminated and newline-separated
-  const sentences = cleaned.match(/[^.!?\n]+[.!?]+/g) || [];
+  // Split into sentences — handle both period-terminated and newline-separated.
+  // Protect decimal points (e.g. 0.7%, $2.1B, 4.28%) so they are not treated
+  // as sentence terminators by the regex.
+  const withProtectedDecimals = cleaned.replace(/(\d)\.(\d)/g, "$1\x00$2");
+  const sentences = (withProtectedDecimals.match(/[^.!?\n]+[.!?]+/g) || [])
+    .map((s) => s.replace(/\x00/g, "."));
 
   // Opinion/prediction filters — claims containing these are unverifiable
   const OPINION_PATTERNS = [

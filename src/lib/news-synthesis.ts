@@ -44,6 +44,10 @@ const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   layoffs:        "corporate downsizing workforce reduction office empty desk",
   ipo:            "stock market listing nasdaq new york exchange bell ringing",
   trade_policy_tariff: "us customs border trade tariff shipping containers port",
+  geopolitics:       "united nations diplomacy international relations world politics",
+  commodities:       "commodity trading gold silver copper raw materials exchange",
+  currency:          "foreign exchange currency trading us dollar bills finance",
+  markets:           "stock market trading floor data screen financial district",
 };
 
 const DEFAULT_IMAGE_QUERY = "wall street financial markets stock exchange data";
@@ -643,6 +647,7 @@ WHAT_WATCH: [one sentence on the most important forward-looking signal to monito
 MARKET_IMPACT:
 • [ASSET] [+/-change%] [up/down/flat] — e.g. "OIL +4.1% up" or "S&P 500 -1.2% down" or "10Y YIELD +8bps up"
 • [ASSET] [+/-change%] [up/down/flat]
+CRITICAL: Every MARKET_IMPACT line MUST use the exact format: ASSET +/-N.N% direction (or +/-Nbps for yields). Text descriptions like "elevated" or "under pressure" will be rejected. If you cannot find a specific numeric change for an asset, omit that MARKET_IMPACT line entirely.
 
 [blank line]
 [story body — 5 sections, 500–800 words total]
@@ -655,17 +660,17 @@ STORY RULES
 4 Section 3 (Macro Analysis): Why this happened. Economic context, precedent, and the broader macro narrative. Include a historical comparison or prior-period reference (e.g., "the largest single-day move since March 2023" or "the third consecutive month above the Fed's 2% target"). Bloomberg/FT standard: connect the event to the macro cycle, not just the headline.
 5 Section 4 (Investor Implications): Which sectors, tickers, or strategies benefit or suffer. Name specific assets. Barron's standard: name at least one ETF, sector, or strategy that benefits and one that faces headwinds. Include a specific price level, valuation multiple, or spread that supports the call.
 6 Section 5 (What to Watch Next): The most important catalyst or data point to monitor over the next 1–4 weeks. CNBC/Reuters standard: name the specific date, event, or data release (e.g., "March 19 FOMC statement" or "April 10 CPI print"). Do not write vague catalysts like "upcoming data releases" or "future Fed decisions."
-7 Separate each section with a blank line. Do NOT label sections with headers.
+7 Begin each section with a section heading on its own line, prefixed with "## ". Example headings: "## Event Summary", "## Market Reaction", "## Macro Context", "## Investor Implications", "## What to Watch". Each heading must be descriptive and specific to the article — e.g., "## How Oil Markets Responded" instead of a generic label. Separate each section with a blank line after the heading.
 8 Use specific numbers, company names, dates, and percentage figures from the sources
 9 Include at least FIVE numerical data points distributed across the story body (not clustered in one paragraph)
 10 Synthesize — do not repeat the same fact in multiple sections
 11 Write with analytical depth and measured tone — not sensationalism
 12 Do not invent any facts not present in the provided sources or the MARKET DATA section
-13 No markdown formatting — no headers, bullet points, bold, italic, or horizontal rules
+13 No markdown formatting except ## section headings — no bullet points, bold, italic, or horizontal rules
 14 No dashes of any kind (em dash or hyphen used as punctuation)
 15 Write in third person only — never use "I" or first-person perspective
 16 Write in plain prose paragraphs only
-17 MARKET_IMPACT bullets: only list assets that appear in your story or MARKET DATA. Omit assets you cannot support.
+17 MARKET_IMPACT bullets: only list assets that appear in your story or MARKET DATA. Omit assets you cannot support. Each line MUST contain a numeric change (e.g. +2.3%, -45bps). Never use text descriptions (e.g. "elevated", "under pressure") as the change value — omit the line instead.
 
 FACT ACCURACY RULES (Step 11 — Data Sanity)
 These rules prevent stale or fabricated numbers:
@@ -1816,16 +1821,24 @@ function filterRelevantSources(
     }
   }
 
-  // Keep sources with ≥30% headline word overlap with synthesized article
-  const relevant = scored.filter((s) => s.score >= 0.3);
+  // Keep sources with ≥40% headline word overlap with synthesized article.
+  // Previous threshold (30%) was too permissive and allowed wrong-company
+  // sources to bleed into articles (e.g. Prudential article in Humana story).
+  const relevant = scored.filter((s) => s.score >= 0.4);
 
   if (relevant.length > 0) {
     return relevant.map((s) => s.source);
   }
 
-  // Fallback: return the single best-matching source
+  // Fallback: return the single best-matching source ONLY if it meets a
+  // hard floor (15% overlap). Below that, the source is likely unrelated.
   scored.sort((a, b) => b.score - a.score);
-  return [scored[0].source];
+  if (scored.length > 0 && scored[0].score >= 0.15) {
+    return [scored[0].source];
+  }
+
+  // No sources meet even the minimum bar — return empty
+  return [];
 }
 
 /**
@@ -1923,45 +1936,52 @@ function inferSentiment(text: string): "positive" | "negative" | "neutral" {
 // Controlled tag taxonomy — prevents malformed/truncated tags forever
 // ---------------------------------------------------------------------------
 
-/** Complete list of allowed taxonomy tags */
+/** Complete list of allowed taxonomy tags — real tickers/assets only.
+ *  Generic labels like "MACRO", "RATES", "EQUITIES" are replaced with
+ *  investable ETF tickers so they render correctly in the UI. */
 const ALLOWED_TAGS = new Set([
-  "ENERGY", "MACRO", "RATES", "EQUITIES", "USD",
-  "GEOPOLITICS", "COMMODITIES", "TECH", "FINANCIALS", "AI", "CRYPTO",
-  // Asset-level identifiers (well-known, unambiguous)
+  // ETFs / indices
+  "SPY", "QQQ", "DIA", "IWM", "TLT", "HYG", "XLE", "XLF", "XLK", "XLV",
+  "GLD", "SLV", "UUP", "USO", "EEM",
+  // Well-known assets
   "WTI", "CRUDE", "GOLD", "SPX", "DXY", "BTC", "ETH", "VIX",
+  // Sector/theme labels (kept when no ETF is more specific)
+  "ENERGY", "GEOPOLITICS", "COMMODITIES", "CRYPTO", "AI",
 ]);
 
-/** Topic → canonical tags mapping */
+/** Topic → canonical tags mapping — uses real ETF tickers instead of
+ *  generic labels so tags are meaningful and investable. */
 const TOPIC_TAGS: Record<string, string[]> = {
-  energy:              ["WTI", "CRUDE", "ENERGY"],
-  trade_policy:        ["ENERGY", "MACRO", "USD"],
-  trade_policy_tariff: ["MACRO", "USD", "EQUITIES"],
-  federal_reserve:     ["RATES", "MACRO", "EQUITIES"],
-  fed_macro:           ["RATES", "MACRO"],
-  inflation:           ["MACRO", "RATES", "USD"],
-  gdp:                 ["MACRO", "EQUITIES"],
-  employment:          ["MACRO", "USD"],
-  bond_market:         ["RATES", "MACRO"],
-  broad_market:        ["EQUITIES", "MACRO"],
-  markets:             ["EQUITIES", "MACRO"],
-  crypto:              ["CRYPTO", "MACRO"],
-  commodities:         ["COMMODITIES", "MACRO"],
-  currency:            ["USD", "MACRO"],
-  earnings:            ["EQUITIES"],
-  merger_acquisition:  ["EQUITIES", "FINANCIALS"],
-  bankruptcy:          ["EQUITIES", "FINANCIALS"],
-  ipo:                 ["EQUITIES"],
-  layoffs:             ["EQUITIES", "MACRO"],
+  energy:              ["WTI", "USO", "XLE"],
+  trade_policy:        ["SPY", "UUP", "EEM"],
+  trade_policy_tariff: ["SPY", "UUP", "EEM"],
+  federal_reserve:     ["TLT", "SPY"],
+  fed_macro:           ["TLT", "SPY"],
+  inflation:           ["TLT", "GLD", "UUP"],
+  gdp:                 ["SPY", "QQQ"],
+  employment:          ["SPY", "UUP"],
+  bond_market:         ["TLT", "HYG"],
+  broad_market:        ["SPY", "QQQ", "DIA"],
+  markets:             ["SPY", "QQQ"],
+  crypto:              ["BTC", "ETH", "CRYPTO"],
+  commodities:         ["GLD", "COMMODITIES"],
+  currency:            ["UUP", "DXY"],
+  earnings:            ["SPY"],
+  merger_acquisition:  ["SPY", "XLF"],
+  bankruptcy:          ["HYG", "XLF"],
+  ipo:                 ["QQQ"],
+  layoffs:             ["SPY", "XLK"],
+  geopolitics:         ["GLD", "USO", "GEOPOLITICS"],
 };
 
-/** Category fallback tags */
+/** Category fallback tags — real tickers for each broad category */
 const CATEGORY_TAGS: Record<string, string[]> = {
-  macro:    ["MACRO"],
-  earnings: ["EQUITIES"],
-  markets:  ["EQUITIES", "MACRO"],
-  policy:   ["MACRO", "RATES"],
-  crypto:   ["CRYPTO"],
-  other:    ["MACRO"],
+  macro:    ["SPY", "TLT"],
+  earnings: ["SPY"],
+  markets:  ["SPY", "QQQ"],
+  policy:   ["SPY", "TLT"],
+  crypto:   ["BTC"],
+  other:    ["SPY"],
 };
 
 /** Well-known company/ticker patterns to extract from article text */
