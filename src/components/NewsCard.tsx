@@ -50,8 +50,12 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
   const gradient = categoryGradients[news.category] ?? categoryGradients.other;
   const categoryLabel = categoryLabels[news.category] ?? "Market News";
 
-  // Excerpt: first sentence of the story
-  const excerpt = news.story.split(/(?<=[.!?])\s/)[0] || news.story.substring(0, 180);
+  // Excerpt: first sentence of the story body (skip ## headings and hashtags)
+  const cleanStory = news.story
+    .replace(/^## .+$/gm, "")           // strip section headings
+    .replace(/(?<!\w)#([A-Za-z]\w*)/g, "$1") // strip hashtags
+    .trim();
+  const excerpt = cleanStory.split(/(?<=[.!?])\s/)[0] || cleanStory.substring(0, 180);
 
   if (variant === "featured") {
     return (

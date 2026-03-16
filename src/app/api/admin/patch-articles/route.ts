@@ -172,19 +172,19 @@ export async function POST(req: NextRequest) {
         fixes.push(`wordCount: set to ${article.wordCount}`);
       }
 
-      // ── Fix 6: Scrub raw CPI index values from keyDataPoints ──
-      // Raw BLS CPI index levels (e.g., "326.785", "333.242") are meaningless to readers.
-      // Remove any keyDataPoint whose label contains "CPI" and value looks like a raw index (no %).
+      // ── Fix 6: Scrub raw CPI/PPI index values from keyDataPoints ──
+      // Raw BLS index levels (e.g., "326.785", "333.242", "151.853") are meaningless to readers.
+      // Remove any keyDataPoint whose label contains "CPI" or "PPI" and value looks like a raw index.
       if (article.keyDataPoints && article.keyDataPoints.length > 0) {
-        const RAW_CPI_INDEX = /^\d{2,3}\.\d+$/; // e.g., "326.785" or "333.242"
+        const RAW_INDEX = /^\d{2,3}\.\d+$/; // e.g., "326.785", "333.242", "151.853"
         const before = article.keyDataPoints.length;
         article.keyDataPoints = article.keyDataPoints.filter((dp) => {
-          const isCpi = /cpi/i.test(dp.label);
-          const isRawIndex = RAW_CPI_INDEX.test(dp.value.replace(/[,$]/g, ""));
-          return !(isCpi && isRawIndex);
+          const isInflationMetric = /cpi|ppi|inflation.*index/i.test(dp.label);
+          const isRawIndex = RAW_INDEX.test(dp.value.replace(/[,$]/g, ""));
+          return !(isInflationMetric && isRawIndex);
         });
         if (article.keyDataPoints.length < before) {
-          fixes.push(`keyDataPoints: removed ${before - article.keyDataPoints.length} raw CPI index value(s)`);
+          fixes.push(`keyDataPoints: removed ${before - article.keyDataPoints.length} raw index value(s)`);
         }
       }
 
