@@ -27,12 +27,32 @@ async function getBriefing(): Promise<DailyBriefing | null> {
   const date = new Date().toISOString().split("T")[0];
   const key = `briefing-${date}`;
 
+  // 1. Try to return cached briefing from KV
   try {
     const briefing = await kv.get<DailyBriefing>(key);
-    return briefing ?? null;
+    if (briefing) return briefing;
   } catch {
-    return null;
+    // Fall through to lazy generation
   }
+
+  // 2. No cached briefing for today — trigger lazy generation via the API
+  // endpoint, which will generate from today's stories and save to KV.
+  // This ensures the first visitor to /briefing each day triggers generation
+  // automatically, even if no cron or pipeline produced one yet.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
+  try {
+    const res = await fetch(`${siteUrl}/api/briefing`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && !data.error) return data as DailyBriefing;
+    }
+  } catch {
+    // Generation failed — show empty state
+  }
+
+  return null;
 }
 
 function formatLongDate(dateStr: string): string {

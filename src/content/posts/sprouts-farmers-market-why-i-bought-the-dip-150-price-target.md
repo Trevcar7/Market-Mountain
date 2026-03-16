@@ -41,6 +41,8 @@ When performing the discounted cash flow analysis (DCF), I utilized a **long-ter
 
 If company management does begin to lever up as interest rates decline, the WACC would decrease to approximately 6.94%, giving an implied share price of **$163 per share**, or a 107% increase from the stock's current level.
 
+<DCFHeatmap variant="sprouts" />
+
 ## Conclusion
 
 Considering the recent share price decline and strong long-term growth prospects, I view Sprouts Farmers Market as **undervalued at current levels** and assign a **Strong Buy rating with a $150 price target**. I will continue monitoring management's growth initiatives, paying close attention to new store openings, revenue expansion, and a recovery in same-store sales as consumer softness fades.

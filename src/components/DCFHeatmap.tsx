@@ -1,4 +1,4 @@
-type DCFVariant = "nextracker" | "firstsolar";
+type DCFVariant = "nextracker" | "firstsolar" | "sprouts";
 
 interface DCFConfig {
   baseCaseValue: number;
@@ -37,6 +37,21 @@ const CONFIGS: Record<DCFVariant, DCFConfig> = {
       [274, 227, 192, 165, 144],
       [331, 264, 219, 185, 160],
       [419, 319, 255, 211, 179],
+    ],
+    baseCaseRow: 2,
+    baseCaseCol: 2,
+  },
+  sprouts: {
+    baseCaseValue: 153,
+    currentPrice: 79,
+    waccValues: ["5.24%", "6.24%", "7.24%", "8.24%", "9.24%"],
+    ltgrValues: ["0.5%", "1.0%", "2.0%", "3.0%", "3.5%"],
+    data: [
+      [169, 140, 119, 104,  92],
+      [189, 153, 129, 111,  97],
+      [247, 189, 153, 129, 111],
+      [358, 247, 189, 153, 129],
+      [461, 293, 214, 169, 140],
     ],
     baseCaseRow: 2,
     baseCaseCol: 2,

@@ -78,8 +78,8 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
     fetchFredSeries("DFEDTARU", 3),   // Fed Funds upper target
     fetchFredSeries("DGS10", 3),      // 10-Year Treasury
     fetchFredSeries("DGS2", 3),       // 2-Year Treasury
-    fetchFredSeries("CPIAUCSL", 14),  // CPI index — 14 months for YoY
-    fetchFredSeries("CPILFESL", 14),  // Core CPI index — 14 months for YoY
+    fetchFredSeries("CPIAUCSL", 18),  // CPI index — 18 months (extra buffer for missing FRED data points)
+    fetchFredSeries("CPILFESL", 18),  // Core CPI index — 18 months (extra buffer for missing FRED data points)
     fetchWtiCrudePrice(),             // WTI crude oil ($/bbl) — primary energy input
     fetchBlsMultipleSeries([BLS_SERIES.NONFARM_PAYROLLS, BLS_SERIES.UNEMPLOYMENT], 1),
   ]);
@@ -162,43 +162,76 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
   }
 
   // 5. CPI Year-over-Year
-  if (cpiData.length >= 13) {
-    const latest = parseFloat(cpiData[0].value);
-    const yearAgo = parseFloat(cpiData[12].value);
-    const yoy = ((latest / yearAgo - 1) * 100);
-    const prevMonthLatest  = cpiData.length >= 14 ? parseFloat(cpiData[1].value)  : latest;
-    const prevMonthYearAgo = cpiData.length >= 14 ? parseFloat(cpiData[13].value) : yearAgo;
-    const prevYoy = cpiData.length >= 14 ? ((prevMonthLatest / prevMonthYearAgo - 1) * 100) : yoy;
-    indicators.push({
-      label: "CPI (YoY)",
-      value: `${yoy.toFixed(1)}%`,
-      change: Math.abs(yoy - prevYoy) > 0.05
-        ? `${yoy > prevYoy ? "+" : ""}${(yoy - prevYoy).toFixed(1)}%`
-        : undefined,
-      direction: yoy > prevYoy + 0.05 ? "up" : yoy < prevYoy - 0.05 ? "down" : "flat",
-      source: "FRED",
-      updatedAt: cpiData[0].date,
-    });
+  // Uses date-based matching instead of index offsets to handle missing FRED
+  // data points (e.g. Oct 2025 reported as "."). Index-based cpiData[12]
+  // fails when filtered observations shift the array, producing stale YoY.
+  if (cpiData.length >= 2) {
+    const latestDate = new Date(cpiData[0].date);
+    const yearAgoTarget = new Date(latestDate);
+    yearAgoTarget.setFullYear(yearAgoTarget.getFullYear() - 1);
+    const prevMonthTarget = new Date(latestDate);
+    prevMonthTarget.setMonth(prevMonthTarget.getMonth() - 1);
+    const prevYearAgoTarget = new Date(prevMonthTarget);
+    prevYearAgoTarget.setFullYear(prevYearAgoTarget.getFullYear() - 1);
+
+    const yearAgoObs = findClosestObservation(cpiData, yearAgoTarget);
+    const prevMonthObs = findClosestObservation(cpiData, prevMonthTarget);
+    const prevYearAgoObs = findClosestObservation(cpiData, prevYearAgoTarget);
+
+    if (yearAgoObs) {
+      const latest = parseFloat(cpiData[0].value);
+      const yearAgo = parseFloat(yearAgoObs.value);
+      const yoy = ((latest / yearAgo - 1) * 100);
+      let prevYoy = yoy;
+      if (prevMonthObs && prevYearAgoObs) {
+        prevYoy = ((parseFloat(prevMonthObs.value) / parseFloat(prevYearAgoObs.value) - 1) * 100);
+      }
+      indicators.push({
+        label: "CPI (YoY)",
+        value: `${yoy.toFixed(1)}%`,
+        change: Math.abs(yoy - prevYoy) > 0.05
+          ? `${yoy > prevYoy ? "+" : ""}${(yoy - prevYoy).toFixed(1)}%`
+          : undefined,
+        direction: yoy > prevYoy + 0.05 ? "up" : yoy < prevYoy - 0.05 ? "down" : "flat",
+        source: "FRED",
+        updatedAt: cpiData[0].date,
+      });
+    }
   }
 
   // 6. Core CPI Year-over-Year (ex food & energy)
-  if (coreCpiData.length >= 13) {
-    const latest = parseFloat(coreCpiData[0].value);
-    const yearAgo = parseFloat(coreCpiData[12].value);
-    const yoy = ((latest / yearAgo - 1) * 100);
-    const prevMonthLatest  = coreCpiData.length >= 14 ? parseFloat(coreCpiData[1].value)  : latest;
-    const prevMonthYearAgo = coreCpiData.length >= 14 ? parseFloat(coreCpiData[13].value) : yearAgo;
-    const prevYoy = coreCpiData.length >= 14 ? ((prevMonthLatest / prevMonthYearAgo - 1) * 100) : yoy;
-    indicators.push({
-      label: "Core CPI (YoY)",
-      value: `${yoy.toFixed(1)}%`,
-      change: Math.abs(yoy - prevYoy) > 0.05
-        ? `${yoy > prevYoy ? "+" : ""}${(yoy - prevYoy).toFixed(1)}%`
-        : undefined,
-      direction: yoy > prevYoy + 0.05 ? "up" : yoy < prevYoy - 0.05 ? "down" : "flat",
-      source: "FRED",
-      updatedAt: coreCpiData[0].date,
-    });
+  if (coreCpiData.length >= 2) {
+    const latestDate = new Date(coreCpiData[0].date);
+    const yearAgoTarget = new Date(latestDate);
+    yearAgoTarget.setFullYear(yearAgoTarget.getFullYear() - 1);
+    const prevMonthTarget = new Date(latestDate);
+    prevMonthTarget.setMonth(prevMonthTarget.getMonth() - 1);
+    const prevYearAgoTarget = new Date(prevMonthTarget);
+    prevYearAgoTarget.setFullYear(prevYearAgoTarget.getFullYear() - 1);
+
+    const yearAgoObs = findClosestObservation(coreCpiData, yearAgoTarget);
+    const prevMonthObs = findClosestObservation(coreCpiData, prevMonthTarget);
+    const prevYearAgoObs = findClosestObservation(coreCpiData, prevYearAgoTarget);
+
+    if (yearAgoObs) {
+      const latest = parseFloat(coreCpiData[0].value);
+      const yearAgo = parseFloat(yearAgoObs.value);
+      const yoy = ((latest / yearAgo - 1) * 100);
+      let prevYoy = yoy;
+      if (prevMonthObs && prevYearAgoObs) {
+        prevYoy = ((parseFloat(prevMonthObs.value) / parseFloat(prevYearAgoObs.value) - 1) * 100);
+      }
+      indicators.push({
+        label: "Core CPI (YoY)",
+        value: `${yoy.toFixed(1)}%`,
+        change: Math.abs(yoy - prevYoy) > 0.05
+          ? `${yoy > prevYoy ? "+" : ""}${(yoy - prevYoy).toFixed(1)}%`
+          : undefined,
+        direction: yoy > prevYoy + 0.05 ? "up" : yoy < prevYoy - 0.05 ? "down" : "flat",
+        source: "FRED",
+        updatedAt: coreCpiData[0].date,
+      });
+    }
   }
 
   // 7. WTI Crude Oil
@@ -349,6 +382,31 @@ async function buildMacroBoard(): Promise<MacroBoardData> {
     generatedAt: now.toISOString(),
     validUntil: validUntil.toISOString(),
   };
+}
+
+/**
+ * Find the FRED observation closest to a target date.
+ * Used for YoY calculations where index-based offsets (e.g. data[12])
+ * break when FRED reports missing values (".") that get filtered out.
+ * Tolerates up to 45 days of drift to handle missing months gracefully.
+ */
+function findClosestObservation(
+  data: { date: string; value: string }[],
+  target: Date
+): { date: string; value: string } | null {
+  const targetMs = target.getTime();
+  let best: { date: string; value: string } | null = null;
+  let bestDiff = Infinity;
+  for (const obs of data) {
+    const diff = Math.abs(new Date(obs.date).getTime() - targetMs);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = obs;
+    }
+  }
+  // Reject if the closest observation is more than 45 days away
+  const MAX_DRIFT_MS = 45 * 24 * 60 * 60 * 1000;
+  return best && bestDiff <= MAX_DRIFT_MS ? best : null;
 }
 
 function emptyBoard(): MacroBoardData {

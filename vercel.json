@@ -6,12 +6,12 @@
   "outputDirectory": ".next",
   "crons": [
     {
-      "path": "/api/fetch-news",
-      "schedule": "30 11 * * 1-5"
-    },
-    {
       "path": "/api/briefing",
       "schedule": "0 12 * * 1-5"
+    },
+    {
+      "path": "/api/fetch-news",
+      "schedule": "30 11 * * 1-5"
     }
   ]
 }
