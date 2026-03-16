@@ -20,20 +20,12 @@ const MarketDataContext = createContext<MarketDataContextValue>({
 });
 
 // ---------------------------------------------------------------------------
-// Session-aware refresh interval (ET, DST-safe)
-// Market open (9:30–4 ET, Mon–Fri): 60s
-// All other times (extended hours, weekend, overnight): 5 min — BTC trades 24/7
+// Refresh interval — 5 minutes
+// Server-side caches (KV + CDN) use 5-min TTL, so polling faster would
+// only return cached data. Consistent 5-min interval across all sessions.
 // ---------------------------------------------------------------------------
 
-function getRefreshMs(): number {
-  const etNow = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
-  );
-  const day = etNow.getDay();
-  const tm  = etNow.getHours() * 60 + etNow.getMinutes();
-  if (day >= 1 && day <= 5 && tm >= 9 * 60 + 30 && tm < 16 * 60) return 60_000;
-  return 5 * 60_000;
-}
+const REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -44,8 +36,7 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
   const [sparklines, setSparklines] = useState<MarketSparklinesData | null>(null);
   const [loading,    setLoading]    = useState(true);
 
-  const intervalRef    = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sparkRefreshAt = useRef<number>(Date.now() + 15 * 60_000);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,41 +56,26 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
       setLoading(false);
     });
 
-    // Polling — single loop manages both snapshot (frequent) and sparklines (15-min)
-    function scheduleRefresh() {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      const intervalMs = getRefreshMs();
+    // Polling — refresh both snapshot and sparklines every 5 minutes
+    intervalRef.current = setInterval(async () => {
+      if (cancelled) return;
 
-      intervalRef.current = setInterval(async () => {
-        if (cancelled) return;
-
-        // Always refresh snapshot (price changes every 60s or 5min)
-        const snapRes = await fetch("/api/market-snapshot", { cache: "no-store" })
+      const [snapRes, sparksRes] = await Promise.all([
+        fetch("/api/market-snapshot", { cache: "no-store" })
           .then((r) => r.json())
-          .catch(() => null);
+          .catch(() => null),
+        fetch("/api/market-sparklines", { cache: "no-store" })
+          .then((r) => r.json())
+          .catch(() => null),
+      ]);
 
-        if (!cancelled && snapRes?.items?.length > 0) {
-          setSnapshot(snapRes as MarketSnapshotData);
-        }
-
-        // Refresh sparklines only when their 15-min TTL has elapsed
-        if (Date.now() >= sparkRefreshAt.current) {
-          const sparksRes = await fetch("/api/market-sparklines", { cache: "no-store" })
-            .then((r) => r.json())
-            .catch(() => null);
-
-          if (!cancelled && sparksRes?.sparklines) {
-            setSparklines(sparksRes as MarketSparklinesData);
-          }
-          sparkRefreshAt.current = Date.now() + 15 * 60_000;
-        }
-
-        // Re-schedule if the trading session changed (e.g., market just opened/closed)
-        if (getRefreshMs() !== intervalMs) scheduleRefresh();
-      }, intervalMs);
-    }
-
-    scheduleRefresh();
+      if (!cancelled && snapRes?.items?.length > 0) {
+        setSnapshot(snapRes as MarketSnapshotData);
+      }
+      if (!cancelled && sparksRes?.sparklines) {
+        setSparklines(sparksRes as MarketSparklinesData);
+      }
+    }, REFRESH_MS);
 
     return () => {
       cancelled = true;

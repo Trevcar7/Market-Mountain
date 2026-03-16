@@ -1,30 +1,42 @@
 import { NextResponse } from "next/server";
 import { getRedisClient } from "@/lib/redis";
 import { MarketSparklinesData, SparklineSet } from "@/lib/news-types";
-import { fetchFredSeries } from "@/lib/market-data";
 
 export const runtime = "nodejs";
 
 const KV_KEY        = "market-sparklines";
-const CACHE_SECONDS = 15 * 60; // 15 minutes — sparklines don't need sub-minute freshness
-const MIN_POINTS    = 5;       // Minimum useful data points for a sparkline
+const CACHE_SECONDS = 10 * 60; // 10 minutes — intraday sparklines don't need sub-minute freshness
+const MIN_POINTS    = 3;       // Lower threshold for intraday (may only have a few bars early in the day)
+
+/**
+ * Intraday sparkline configuration.
+ * Each entry maps to a TwelveData symbol for 5-min intraday data.
+ *
+ * These are SHAPE proxies — the sparkline just shows directional trend,
+ * not the literal value. ETF proxies are fine for this purpose:
+ *   SPY tracks S&P 500 direction, USO tracks WTI crude, etc.
+ */
+const SPARKLINE_SYMBOLS: Array<{ symbol: string; label: string }> = [
+  { symbol: "SPY",     label: "S&P 500" },
+  { symbol: "VIX",     label: "VIX" },
+  { symbol: "USO",     label: "WTI Oil" },
+  { symbol: "XAU/USD", label: "Gold" },
+  { symbol: "UUP",     label: "Broad U.S. Dollar Index" },
+  { symbol: "BTC/USD", label: "Bitcoin" },
+];
 
 /**
  * Compute today's 9:30 AM ET market open timestamp.
  * Used to invalidate stale sparkline cache from the previous session.
  *
- * Rule: All sparkline visualizations are session-based, not multi-day cached.
+ * Rule: All sparkline visualizations are session-based.
  * At 9:30 AM ET the cache is force-invalidated so sparklines rebuild with
- * the latest daily data, preventing carry-over of previous session trendlines.
+ * the current trading day's intraday data.
  */
 function todayMarketOpenET(): Date {
-  // Compute current date in ET (handles EST/EDT automatically)
   const etDate = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
-  // Build 9:30 AM in ET for today
   const [month, day, year] = etDate.split("/").map(Number);
   const etString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T09:30:00`;
-  // Convert ET local time string to UTC Date
-  // toLocaleString trick: construct Date in ET by computing the offset
   const utcNow = new Date();
   const etNow = new Date(utcNow.toLocaleString("en-US", { timeZone: "America/New_York" }));
   const offsetMs = utcNow.getTime() - etNow.getTime();
@@ -33,22 +45,18 @@ function todayMarketOpenET(): Date {
 
 /**
  * GET /api/market-sparklines
- * Returns 30-day daily trendline data for six market indicators:
- *   S&P 500, VIX, WTI Oil, Gold, DXY, Bitcoin
+ * Returns intraday 5-min trendline data for six market indicators.
+ * Data resets at 9:30 AM ET each trading day and builds throughout the session.
  *
- * Sources:
- *   S&P 500      → FRED SP500 (30 daily closes)
- *   VIX          → FRED VIXCLS (30 daily closes)
- *   WTI Oil      → FRED DCOILWTICO (30 daily closes)
- *   Gold         → TwelveData XAU/USD (30 daily) → FRED GOLDAMGBD228NLBM fallback
- *   DXY          → Polygon C:DXY (30 daily) → FRED DTWEXBGS fallback
- *   Bitcoin      → TwelveData BTC/USD (30 daily)
+ * Sources: TwelveData intraday (5min interval)
+ *   S&P 500  → SPY (ETF proxy)
+ *   VIX      → VIX index
+ *   WTI Oil  → USO (ETF proxy)
+ *   Gold     → XAU/USD (forex)
+ *   DXY      → UUP (ETF proxy)
+ *   Bitcoin   → BTC/USD (crypto, trades 24/7)
  *
- * Session-based cache invalidation:
- *   Cache is force-invalidated at 9:30 AM ET each trading day so sparklines
- *   rebuild with the latest close data and do not carry over stale trendlines.
- *
- * TTL: 15-minute server-side Redis cache (within each session)
+ * TTL: 10-min server-side Redis cache (within each session)
  */
 export async function GET() {
   const kv = getRedisClient();
@@ -57,7 +65,7 @@ export async function GET() {
   if (!kv) {
     const data = await buildSparklines();
     return NextResponse.json(data, {
-      headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=60" },
+      headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=60" },
     });
   }
 
@@ -74,14 +82,14 @@ export async function GET() {
 
     if (cached && !cacheIsStale) {
       return NextResponse.json(cached, {
-        headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=60" },
+        headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=60" },
       });
     }
 
     const data = await buildSparklines();
     await kv.set(KV_KEY, data, { ex: CACHE_SECONDS });
     return NextResponse.json(data, {
-      headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=60" },
+      headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=60" },
     });
   } catch (err) {
     console.error("[/api/market-sparklines] Error:", err);
@@ -91,60 +99,31 @@ export async function GET() {
 }
 
 // ---------------------------------------------------------------------------
-// Builder
+// Builder — intraday 5-min data from TwelveData
 // ---------------------------------------------------------------------------
 
 async function buildSparklines(): Promise<MarketSparklinesData> {
   const now        = new Date();
   const validUntil = new Date(now.getTime() + CACHE_SECONDS * 1000);
 
-  // Fetch all FRED series in parallel — each fails independently
-  const [sp500Res, vixRes, wtiRes, dxFredRes, goldFredRes] = await Promise.allSettled([
-    fetchFredSeries("SP500",            30),
-    fetchFredSeries("VIXCLS",           30),
-    fetchFredSeries("DCOILWTICO",       30),
-    fetchFredSeries("DTWEXBGS",         30), // USD Index (Trade Weighted Broad Dollar)
-    fetchFredSeries("GOLDAMGBD228NLBM", 30), // Fallback for Gold
-  ]);
-
-  const sparklines: SparklineSet[] = [];
-
-  // S&P 500
-  const sp500Points = fredToChronological(sp500Res.status === "fulfilled" ? sp500Res.value : []);
-  if (sp500Points.length >= MIN_POINTS) sparklines.push({ label: "S&P 500", points: sp500Points });
-
-  // VIX
-  const vixPoints = fredToChronological(vixRes.status === "fulfilled" ? vixRes.value : []);
-  if (vixPoints.length >= MIN_POINTS) sparklines.push({ label: "VIX", points: vixPoints });
-
-  // WTI Oil
-  const wtiPoints = fredToChronological(wtiRes.status === "fulfilled" ? wtiRes.value : []);
-  if (wtiPoints.length >= MIN_POINTS) sparklines.push({ label: "WTI Oil", points: wtiPoints });
-
   const twKey = process.env.TWELVEDATA_API_KEY;
-
-  // Gold: TwelveData XAU/USD primary, FRED GOLDAMGBD228NLBM fallback
-  if (twKey) {
-    const goldSpark = await fetchTwelveDataSeries(twKey, "XAU/USD", "Gold").catch(() => null);
-    if (goldSpark) {
-      sparklines.push(goldSpark);
-    } else {
-      const goldPoints = fredToChronological(goldFredRes.status === "fulfilled" ? goldFredRes.value : []);
-      if (goldPoints.length >= MIN_POINTS) sparklines.push({ label: "Gold", points: goldPoints });
-    }
-  } else {
-    const goldPoints = fredToChronological(goldFredRes.status === "fulfilled" ? goldFredRes.value : []);
-    if (goldPoints.length >= MIN_POINTS) sparklines.push({ label: "Gold", points: goldPoints });
+  if (!twKey) {
+    console.warn("[market-sparklines] TWELVEDATA_API_KEY not set — no intraday data");
+    return { sparklines: [], generatedAt: now.toISOString(), validUntil: validUntil.toISOString() };
   }
 
-  // USD Index: FRED DTWEXBGS (Trade Weighted Broad Dollar Index)
-  const dxPoints = fredToChronological(dxFredRes.status === "fulfilled" ? dxFredRes.value : []);
-  if (dxPoints.length >= MIN_POINTS) sparklines.push({ label: "Broad U.S. Dollar Index", points: dxPoints });
+  // Fetch all symbols in parallel — each fails independently
+  const results = await Promise.allSettled(
+    SPARKLINE_SYMBOLS.map(({ symbol, label }) =>
+      fetchIntradaySeries(twKey, symbol, label)
+    )
+  );
 
-  // Bitcoin: TwelveData BTC/USD — no FRED fallback (omit rather than show stale)
-  if (twKey) {
-    const btcSpark = await fetchTwelveDataSeries(twKey, "BTC/USD", "Bitcoin").catch(() => null);
-    if (btcSpark) sparklines.push(btcSpark);
+  const sparklines: SparklineSet[] = [];
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      sparklines.push(result.value);
+    }
   }
 
   return {
@@ -155,50 +134,49 @@ async function buildSparklines(): Promise<MarketSparklinesData> {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// TwelveData intraday time_series fetch
 // ---------------------------------------------------------------------------
 
-interface FredObservation { date: string; value: string; }
-
-/** Convert FRED descending obs array to chronological numeric points. */
-function fredToChronological(obs: FredObservation[]): number[] {
-  return obs
-    .slice()
-    .reverse()
-    .map((o) => parseFloat(o.value))
-    .filter((v) => !isNaN(v));
+interface TwelveDataBar {
+  datetime: string;
+  close:    string;
 }
 
-interface TwelveDataSeriesResponse {
-  values?: Array<{ close: string }>;
-  code?:   number;
+interface TwelveDataTimeSeriesResponse {
+  values?:  TwelveDataBar[];
+  code?:    number;
   message?: string;
 }
 
-async function fetchTwelveDataSeries(
+async function fetchIntradaySeries(
   apiKey: string,
   symbol: string,
-  label:  string,
+  label: string,
 ): Promise<SparklineSet | null> {
   try {
-    const res = await fetch(
-      `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=30&apikey=${apiKey}`,
-      { signal: AbortSignal.timeout(8000), next: { revalidate: 900 } }
-    );
+    // Request 78 bars of 5-min data = one full trading day (6.5h × 12 bars/h)
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=78&apikey=${apiKey}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000), cache: "no-store" });
+
     if (!res.ok) {
-      console.warn(`[market-sparklines/TwelveData] ${symbol}: HTTP ${res.status}`);
+      console.warn(`[market-sparklines] ${symbol}: HTTP ${res.status}`);
       return null;
     }
 
-    const raw = (await res.json()) as TwelveDataSeriesResponse;
+    const raw = (await res.json()) as TwelveDataTimeSeriesResponse;
     if (raw.code) {
-      console.warn(`[market-sparklines/TwelveData] ${symbol}: ${raw.message}`);
+      console.warn(`[market-sparklines] ${symbol}: ${raw.message}`);
       return null;
     }
     if (!raw.values || raw.values.length < MIN_POINTS) return null;
 
-    // TwelveData returns newest-first — reverse to chronological
-    const points = raw.values
+    // TwelveData returns newest-first. Group by date, keep only the latest
+    // trading session so sparklines show today's intraday action.
+    const latestDate = raw.values[0].datetime.split(" ")[0];
+    const sessionBars = raw.values.filter((v) => v.datetime.startsWith(latestDate));
+
+    // Reverse to chronological order (oldest bar first → newest last)
+    const points = sessionBars
       .slice()
       .reverse()
       .map((v) => parseFloat(v.close))
@@ -206,10 +184,14 @@ async function fetchTwelveDataSeries(
 
     return points.length >= MIN_POINTS ? { label, points } : null;
   } catch (err) {
-    console.error(`[market-sparklines/TwelveData] ${symbol} error:`, err);
+    console.error(`[market-sparklines] ${symbol} error:`, err);
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Empty fallback
+// ---------------------------------------------------------------------------
 
 function emptySparklines(): MarketSparklinesData {
   return {
