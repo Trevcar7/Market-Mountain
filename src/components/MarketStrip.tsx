@@ -75,9 +75,11 @@ export default function MarketStrip() {
 
   return (
     <div
-      className="w-full bg-white border-b border-border sm:overflow-hidden"
+      className="w-full bg-white sm:overflow-hidden"
       aria-label="Live market prices"
     >
+      {/* Top accent line — fading green matching the site accent divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center">
           {/* Left: Markets label — natural width, stays fixed while chips scroll on mobile */}
@@ -111,6 +113,8 @@ export default function MarketStrip() {
           </div>
         </div>
       </div>
+      {/* Bottom accent line — fading green matching the site accent divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
     </div>
   );
 }

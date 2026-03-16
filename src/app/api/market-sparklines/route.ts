@@ -10,6 +10,28 @@ const CACHE_SECONDS = 15 * 60; // 15 minutes — sparklines don't need sub-minut
 const MIN_POINTS    = 5;       // Minimum useful data points for a sparkline
 
 /**
+ * Compute today's 9:30 AM ET market open timestamp.
+ * Used to invalidate stale sparkline cache from the previous session.
+ *
+ * Rule: All sparkline visualizations are session-based, not multi-day cached.
+ * At 9:30 AM ET the cache is force-invalidated so sparklines rebuild with
+ * the latest daily data, preventing carry-over of previous session trendlines.
+ */
+function todayMarketOpenET(): Date {
+  // Compute current date in ET (handles EST/EDT automatically)
+  const etDate = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  // Build 9:30 AM in ET for today
+  const [month, day, year] = etDate.split("/").map(Number);
+  const etString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T09:30:00`;
+  // Convert ET local time string to UTC Date
+  // toLocaleString trick: construct Date in ET by computing the offset
+  const utcNow = new Date();
+  const etNow = new Date(utcNow.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const offsetMs = utcNow.getTime() - etNow.getTime();
+  return new Date(new Date(etString).getTime() + offsetMs);
+}
+
+/**
  * GET /api/market-sparklines
  * Returns 30-day daily trendline data for six market indicators:
  *   S&P 500, VIX, WTI Oil, Gold, DXY, Bitcoin
@@ -22,10 +44,15 @@ const MIN_POINTS    = 5;       // Minimum useful data points for a sparkline
  *   DXY          → Polygon C:DXY (30 daily) → FRED DTWEXBGS fallback
  *   Bitcoin      → TwelveData BTC/USD (30 daily)
  *
- * TTL: 15-minute server-side Redis cache
+ * Session-based cache invalidation:
+ *   Cache is force-invalidated at 9:30 AM ET each trading day so sparklines
+ *   rebuild with the latest close data and do not carry over stale trendlines.
+ *
+ * TTL: 15-minute server-side Redis cache (within each session)
  */
 export async function GET() {
   const kv = getRedisClient();
+  const marketOpen = todayMarketOpenET();
 
   if (!kv) {
     const data = await buildSparklines();
@@ -36,7 +63,16 @@ export async function GET() {
 
   try {
     const cached = await kv.get<MarketSparklinesData>(KV_KEY);
-    if (cached && new Date(cached.validUntil) > new Date()) {
+    const now = new Date();
+
+    // Session-based invalidation: discard cache if it was built before today's
+    // 9:30 AM ET market open AND we are now past that open time.
+    const cacheIsStale = cached && (
+      new Date(cached.validUntil) <= now ||
+      (now >= marketOpen && new Date(cached.generatedAt) < marketOpen)
+    );
+
+    if (cached && !cacheIsStale) {
       return NextResponse.json(cached, {
         headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=60" },
       });

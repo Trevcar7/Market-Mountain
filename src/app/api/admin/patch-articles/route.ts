@@ -172,6 +172,48 @@ export async function POST(req: NextRequest) {
         fixes.push(`wordCount: set to ${article.wordCount}`);
       }
 
+      // ── Fix 6: Scrub raw CPI index values from keyDataPoints ──
+      // Raw BLS CPI index levels (e.g., "326.785", "333.242") are meaningless to readers.
+      // Remove any keyDataPoint whose label contains "CPI" and value looks like a raw index (no %).
+      if (article.keyDataPoints && article.keyDataPoints.length > 0) {
+        const RAW_CPI_INDEX = /^\d{2,3}\.\d+$/; // e.g., "326.785" or "333.242"
+        const before = article.keyDataPoints.length;
+        article.keyDataPoints = article.keyDataPoints.filter((dp) => {
+          const isCpi = /cpi/i.test(dp.label);
+          const isRawIndex = RAW_CPI_INDEX.test(dp.value.replace(/[,$]/g, ""));
+          return !(isCpi && isRawIndex);
+        });
+        if (article.keyDataPoints.length < before) {
+          fixes.push(`keyDataPoints: removed ${before - article.keyDataPoints.length} raw CPI index value(s)`);
+        }
+      }
+
+      // ── Fix 7: Strip hashtags from story and text fields ──
+      const stripHashtags = (s: string) => s.replace(/(?<!\w)#([A-Za-z]\w*)/g, "$1");
+      if (article.story && /(?<!\w)#[A-Za-z]/.test(article.story)) {
+        article.story = stripHashtags(article.story);
+        fixes.push("story: stripped hashtags");
+      }
+      if (article.whyThisMatters && /(?<!\w)#[A-Za-z]/.test(article.whyThisMatters)) {
+        article.whyThisMatters = stripHashtags(article.whyThisMatters);
+        fixes.push("whyThisMatters: stripped hashtags");
+      }
+      if (article.whatToWatchNext && /(?<!\w)#[A-Za-z]/.test(article.whatToWatchNext)) {
+        article.whatToWatchNext = stripHashtags(article.whatToWatchNext);
+        fixes.push("whatToWatchNext: stripped hashtags");
+      }
+      if (article.secondOrderImplication && /(?<!\w)#[A-Za-z]/.test(article.secondOrderImplication)) {
+        article.secondOrderImplication = stripHashtags(article.secondOrderImplication);
+        fixes.push("secondOrderImplication: stripped hashtags");
+      }
+      if (article.keyTakeaways) {
+        const hadHashtag = article.keyTakeaways.some((t) => /(?<!\w)#[A-Za-z]/.test(t));
+        if (hadHashtag) {
+          article.keyTakeaways = article.keyTakeaways.map(stripHashtags);
+          fixes.push("keyTakeaways: stripped hashtags");
+        }
+      }
+
       if (fixes.length > 0) {
         patchLog.push({ id: article.id, title: article.title, fixes });
       }

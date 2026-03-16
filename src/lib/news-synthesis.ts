@@ -10,7 +10,7 @@ import {
   logRejection,
 } from "./fact-checker";
 import { formatNewsForStorage, hasQualitySource } from "./news";
-import { fetchContextualData, buildNewsChartData } from "./market-data";
+import { fetchContextualData, buildNewsChartData, sanitizeKeyDataPoints } from "./market-data";
 import { runEditorialQA, logQAResult, QA_PASS_THRESHOLD } from "./editorial-qa";
 
 let cachedToneProfile: ToneProfile | null = null;
@@ -517,6 +517,17 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
 
   result.story = storyLines.join("\n\n");
 
+  // ── Hashtag sanitization ───────────────────────────────────────────────
+  // Strip social-media-style #Hashtags from all text fields.
+  // e.g., "#Stagflation" → "Stagflation", "#Fed" → "Fed"
+  const stripHashtags = (s: string) => s.replace(/(?<!\w)#([A-Za-z]\w*)/g, "$1");
+  result.story = stripHashtags(result.story);
+  result.title = stripHashtags(result.title);
+  result.whyThisMatters = stripHashtags(result.whyThisMatters);
+  result.whatToWatchNext = stripHashtags(result.whatToWatchNext);
+  result.secondOrderImplication = stripHashtags(result.secondOrderImplication);
+  result.keyTakeaways = result.keyTakeaways.map(stripHashtags);
+
   // ── Fallback title extraction ──────────────────────────────────────────
   // If no HEADLINE: section was found (title === fallbackTitle), try to
   // extract a reasonable title from the first substantive line of the output.
@@ -709,9 +720,11 @@ These rules prevent stale or fabricated numbers:
 - If you cite the Fed Funds Rate, it must match the MARKET DATA section or omit entirely
 - If you cite a Treasury yield, it must match or be qualified as "approximately"
 - If you cite CPI, use the most recent figure from the MARKET DATA section
+- CRITICAL: NEVER cite a raw CPI index level (e.g., "326.785" or "333.242"). Always use the year-over-year percentage change (e.g., "CPI rose 2.8% year-over-year"). Raw index numbers are meaningless to readers.
 - Do not cite market data values that contradict the MARKET DATA section provided
 - If the sources and MARKET DATA conflict, prefer MARKET DATA for quantitative claims
 - Remove or soften any unverifiable numeric claim — write "around", "approximately", or omit
+- NEVER use hashtags (e.g., #Stagflation, #Fed). Write plain text without social media formatting.
 
 SOURCE CONFLICT RESOLUTION (Step 12a)
 When two sources report different numbers for the same metric:
@@ -1663,7 +1676,7 @@ export async function synthesizeGroupedArticles(
         whyThisMatters: parsed.whyThisMatters || undefined,
         whatToWatchNext: parsed.whatToWatchNext || undefined,
         secondOrderImplication: parsed.secondOrderImplication || undefined,
-        keyDataPoints: contextualData.length > 0 ? contextualData : undefined,
+        keyDataPoints: contextualData.length > 0 ? sanitizeKeyDataPoints(contextualData) : undefined,
         chartData,
         keyTakeaways: parsed.keyTakeaways.length > 0 ? parsed.keyTakeaways : undefined,
         confidenceScore,

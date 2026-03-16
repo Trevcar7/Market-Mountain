@@ -128,10 +128,10 @@ export default async function NewsStoryPage({ params }: Props) {
     })
     .slice(0, 6);
 
-  // Split story into paragraphs
+  // Split story into paragraphs, sanitizing hashtags (e.g., "#Stagflation" → "Stagflation")
   const paragraphs = item.story
     .split(/\n+/)
-    .map((p) => p.trim())
+    .map((p) => p.trim().replace(/(?<!\w)#([A-Za-z]\w*)/g, "$1"))
     .filter(Boolean);
 
   // Normalize chartData to array (backward-compatible: handles both legacy single-object and new array)

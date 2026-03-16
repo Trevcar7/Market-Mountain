@@ -867,11 +867,12 @@ export async function fetchContextualData(
       // ── Federal Reserve / monetary policy ──────────────────────────────
       case "federal_reserve":
       case "fed_macro": {
-        const [fedfunds, treasury10y, treasury2y, blsMacro] = await Promise.allSettled([
+        const [fedfunds, treasury10y, treasury2y, cpiYoyBls, cpiYoyFred] = await Promise.allSettled([
           fetchFredWithChange("FEDFUNDS"),
           fetchFredWithChange("DGS10"),
           fetchFredWithChange("DGS2"),
-          fetchBlsMacroSummary(),
+          fetchBlsMultipleSeries([BLS_SERIES.CPI_ALL], 2),
+          fetchFredSeries("CPIAUCSL", 18),
         ]);
 
         if (fedfunds.status === "fulfilled" && fedfunds.value)
@@ -880,30 +881,86 @@ export async function fetchContextualData(
           points.push({ label: "10-Year Treasury", value: `${treasury10y.value.value}%`, change: treasury10y.value.change || undefined, source: "FRED" });
         if (treasury2y.status === "fulfilled" && treasury2y.value)
           points.push({ label: "2-Year Treasury", value: `${treasury2y.value.value}%`, change: treasury2y.value.change || undefined, source: "FRED" });
-        if (blsMacro.status === "fulfilled" && blsMacro.value.cpi)
-          points.push({ label: "CPI (BLS)", value: blsMacro.value.cpi.value, source: "BLS" });
+
+        // CPI YoY % (BLS primary, FRED fallback) — never raw index
+        let cpiYoy: string | null = null;
+        if (cpiYoyBls.status === "fulfilled") {
+          const obs = cpiYoyBls.value[BLS_SERIES.CPI_ALL];
+          if (obs && obs.length >= 13) {
+            const latest = parseFloat(obs[0].value);
+            const yearAgo = parseFloat(obs[12].value);
+            if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+              cpiYoy = ((latest - yearAgo) / yearAgo * 100).toFixed(1);
+            }
+          }
+        }
+        if (!cpiYoy && cpiYoyFred.status === "fulfilled") {
+          const obs = cpiYoyFred.value;
+          if (obs && obs.length >= 13) {
+            const latest = parseFloat(obs[0].value);
+            const yearAgo = parseFloat(obs[12].value);
+            if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+              cpiYoy = ((latest - yearAgo) / yearAgo * 100).toFixed(1);
+            }
+          }
+        }
+        if (cpiYoy) {
+          points.push({ label: "CPI YoY", value: `${cpiYoy}%`, source: "BLS" });
+        }
         break;
       }
 
       // ── Inflation ───────────────────────────────────────────────────────
+      // RULE: Always return YoY percentages, NEVER raw index levels.
+      // Raw CPI index values (e.g., "326.785") are meaningless to readers.
       case "inflation": {
-        const seriesIds = [BLS_SERIES.CPI_ALL, BLS_SERIES.CPI_CORE, BLS_SERIES.PPI_FINISHED];
-        const [blsResult, fredCpi] = await Promise.allSettled([
-          fetchBlsMultipleSeries(seriesIds, 1),
-          fetchFredLatest("CPIAUCSL"),
+        const [blsResult, fredCpiSeries] = await Promise.allSettled([
+          fetchBlsMultipleSeries([BLS_SERIES.CPI_ALL, BLS_SERIES.CPI_CORE, BLS_SERIES.PPI_FINISHED], 2),
+          fetchFredSeries("CPIAUCSL", 18),
         ]);
 
+        // CPI All Items YoY %
         if (blsResult.status === "fulfilled") {
           const bls = blsResult.value;
-          if (bls[BLS_SERIES.CPI_ALL]?.[0])
-            points.push({ label: "CPI All Items", value: bls[BLS_SERIES.CPI_ALL][0].value, source: "BLS" });
-          if (bls[BLS_SERIES.CPI_CORE]?.[0])
-            points.push({ label: "Core CPI", value: bls[BLS_SERIES.CPI_CORE][0].value, source: "BLS" });
-          if (bls[BLS_SERIES.PPI_FINISHED]?.[0])
-            points.push({ label: "PPI Finished Goods", value: bls[BLS_SERIES.PPI_FINISHED][0].value, source: "BLS" });
+          const cpiAll = bls[BLS_SERIES.CPI_ALL];
+          if (cpiAll && cpiAll.length >= 13) {
+            const latest = parseFloat(cpiAll[0].value);
+            const yearAgo = parseFloat(cpiAll[12].value);
+            if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+              points.push({ label: "CPI YoY", value: `${((latest - yearAgo) / yearAgo * 100).toFixed(1)}%`, source: "BLS" });
+            }
+          }
+          // Core CPI YoY %
+          const cpiCore = bls[BLS_SERIES.CPI_CORE];
+          if (cpiCore && cpiCore.length >= 13) {
+            const latest = parseFloat(cpiCore[0].value);
+            const yearAgo = parseFloat(cpiCore[12].value);
+            if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+              points.push({ label: "Core CPI YoY", value: `${((latest - yearAgo) / yearAgo * 100).toFixed(1)}%`, source: "BLS" });
+            }
+          }
+          // PPI YoY %
+          const ppi = bls[BLS_SERIES.PPI_FINISHED];
+          if (ppi && ppi.length >= 13) {
+            const latest = parseFloat(ppi[0].value);
+            const yearAgo = parseFloat(ppi[12].value);
+            if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+              points.push({ label: "PPI YoY", value: `${((latest - yearAgo) / yearAgo * 100).toFixed(1)}%`, source: "BLS" });
+            }
+          }
         }
-        if (fredCpi.status === "fulfilled" && fredCpi.value && points.length === 0)
-          points.push({ label: "CPI Index (FRED)", value: fredCpi.value.value, source: "FRED" });
+
+        // FRED fallback for CPI YoY if BLS unavailable
+        if (points.length === 0 && fredCpiSeries.status === "fulfilled") {
+          const obs = fredCpiSeries.value;
+          if (obs && obs.length >= 13) {
+            const latest = parseFloat(obs[0].value);
+            const yearAgo = parseFloat(obs[12].value);
+            if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+              points.push({ label: "CPI YoY", value: `${((latest - yearAgo) / yearAgo * 100).toFixed(1)}%`, source: "FRED" });
+            }
+          }
+        }
         break;
       }
 
@@ -1089,7 +1146,28 @@ export async function fetchContextualData(
     logWarn("contextual", `fetchContextualData failed for ${topicKey}: ${String(err)}`);
   }
 
-  return points.slice(0, 5); // Cap at 5 data points per story
+  // ── Safeguard: scrub raw CPI index values that slipped through ──────────
+  // Raw BLS index levels (e.g., "326.785") are never meaningful to readers.
+  // This is a last-resort defense; the cases above should already compute YoY.
+  return sanitizeKeyDataPoints(points).slice(0, 5); // Cap at 5 data points per story
+}
+
+/**
+ * Safeguard: remove or flag any KeyDataPoint containing a raw CPI/PPI index
+ * value (a bare 2-3 digit decimal like "326.785" without a % or $ prefix).
+ * This ensures no raw BLS index levels reach articles or briefings.
+ */
+export function sanitizeKeyDataPoints(points: KeyDataPoint[]): KeyDataPoint[] {
+  const RAW_INDEX_PATTERN = /^\d{2,3}\.\d+$/;
+  return points.filter((dp) => {
+    const cleanValue = dp.value.replace(/[,$\s]/g, "");
+    const isCpiPpi = /cpi|ppi|inflation.*index/i.test(dp.label);
+    if (isCpiPpi && RAW_INDEX_PATTERN.test(cleanValue)) {
+      console.warn(`[safeguard] Scrubbed raw index value: "${dp.label}" = "${dp.value}" — use YoY % instead`);
+      return false;
+    }
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1564,11 +1642,33 @@ export async function buildNewsChartData(
     // Generate editorial caption from actual data
     const caption = generateChartCaption(result.title, result.values, result.unit, result.timeRange);
 
+    // ── Time-series validation ─────────────────────────────────────────────
+    // 1. Deduplicate labels — keep the last value for duplicate timestamps
+    // 2. Ensure chronological order — sort by label when date-parseable
+    const deduped = new Map<string, number>();
+    for (let i = 0; i < result.labels.length; i++) {
+      deduped.set(result.labels[i], result.values[i]);
+    }
+    let validatedLabels = Array.from(deduped.keys());
+    let validatedValues = Array.from(deduped.values());
+
+    // Sort chronologically if labels are date-like (YYYY-MM-DD or YYYY-MM)
+    if (validatedLabels.length > 0 && /^\d{4}-\d{2}/.test(validatedLabels[0])) {
+      const pairs = validatedLabels.map((l, i) => ({ label: l, value: validatedValues[i] }));
+      pairs.sort((a, b) => a.label.localeCompare(b.label));
+      validatedLabels = pairs.map((p) => p.label);
+      validatedValues = pairs.map((p) => p.value);
+    }
+
+    if (validatedLabels.length !== result.labels.length) {
+      console.warn(`[chart] ${topicKey}: deduplicated ${result.labels.length} → ${validatedLabels.length} points`);
+    }
+
     const dataset: ChartDataset = {
       title,
       type: result.type,
-      labels: result.labels,
-      values: result.values,
+      labels: validatedLabels,
+      values: validatedValues,
       unit: result.unit,
       source: result.source,
       timeRange: result.timeRange,
