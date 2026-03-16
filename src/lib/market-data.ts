@@ -1115,19 +1115,24 @@ export async function fetchBriefingMacroPanel(): Promise<KeyDataPoint[]> {
 
   try {
     // Fetch all data sources in parallel for speed
+    // WTI: EIA primary → FRED DCOILWTICO fallback (EIA_API_KEY often not set)
     const [
       fedfunds,
       treasury10y,
       spread2s10s,
-      cpiData,
+      cpiDataBls,
+      cpiDataFred,
       energy,
+      wtiFredFallback,
       dxy,
     ] = await Promise.allSettled([
       fetchFredWithChange("FEDFUNDS"),
       fetchFredWithChange("DGS10"),
       fetchFredWithChange("T10Y2Y"),          // 10Y minus 2Y spread (FRED series)
-      fetchBlsMultipleSeries([BLS_SERIES.CPI_ALL], 2),  // 2 years for YoY calc
+      fetchBlsMultipleSeries([BLS_SERIES.CPI_ALL], 2),  // BLS CPI for YoY calc (primary)
+      fetchFredSeries("CPIAUCSL", 18),                  // FRED CPI fallback (18 months)
       fetchEnergySummary(),
+      fetchFredWithChange("DCOILWTICO"),      // FRED WTI fallback when EIA key missing
       fetchFredWithChange("DTWEXBGS"),        // Trade-weighted Dollar Index
     ]);
 
@@ -1172,31 +1177,57 @@ export async function fetchBriefingMacroPanel(): Promise<KeyDataPoint[]> {
       });
     }
 
-    // 4. CPI YoY % — compute from 2 years of BLS data
-    if (cpiData.status === "fulfilled") {
-      const cpiPoints = cpiData.value[BLS_SERIES.CPI_ALL];
+    // 4. CPI YoY % — BLS primary, FRED CPIAUCSL fallback
+    //    Compute year-over-year from index values (latest vs 12 months ago)
+    let cpiAdded = false;
+    if (cpiDataBls.status === "fulfilled") {
+      const cpiPoints = cpiDataBls.value[BLS_SERIES.CPI_ALL];
       if (cpiPoints && cpiPoints.length >= 13) {
         // BLS returns newest first — index 0 is latest, index 12 is 12 months ago
         const latest = parseFloat(cpiPoints[0].value);
         const yearAgo = parseFloat(cpiPoints[12].value);
         if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
           const yoy = ((latest - yearAgo) / yearAgo * 100);
-          points.push({
-            label: "CPI YoY",
-            value: `${yoy.toFixed(1)}%`,
-            source: "BLS",
-          });
+          points.push({ label: "CPI YoY", value: `${yoy.toFixed(1)}%`, source: "BLS" });
+          cpiAdded = true;
+        }
+      }
+    }
+    if (!cpiAdded && cpiDataFred.status === "fulfilled") {
+      // FRED returns newest first — need index 0 (latest) and ~index 12 (12 months ago)
+      const fredCpi = cpiDataFred.value;
+      if (fredCpi.length >= 13) {
+        const latest = parseFloat(fredCpi[0].value);
+        const yearAgo = parseFloat(fredCpi[12].value);
+        if (!isNaN(latest) && !isNaN(yearAgo) && yearAgo > 0) {
+          const yoy = ((latest - yearAgo) / yearAgo * 100);
+          points.push({ label: "CPI YoY", value: `${yoy.toFixed(1)}%`, source: "FRED" });
+          cpiAdded = true;
         }
       }
     }
 
-    // 5. WTI Crude Oil
+    // 5. WTI Crude Oil — EIA primary, FRED DCOILWTICO fallback
     if (energy.status === "fulfilled" && energy.value.wti) {
       points.push({
         label: "WTI Crude",
         value: `$${energy.value.wti.value.toFixed(2)}/bbl`,
         source: "EIA",
       });
+    } else if (wtiFredFallback.status === "fulfilled" && wtiFredFallback.value) {
+      const price = parseFloat(wtiFredFallback.value.value);
+      if (!isNaN(price)) {
+        const rawChange = parseFloat(wtiFredFallback.value.change || "0");
+        const pctChange = !isNaN(rawChange) && price > 0 && rawChange !== 0
+          ? `${rawChange > 0 ? "+" : ""}${((rawChange / (price - rawChange)) * 100).toFixed(1)}%`
+          : undefined;
+        points.push({
+          label: "WTI Crude",
+          value: `$${price.toFixed(2)}/bbl`,
+          change: pctChange,
+          source: "FRED",
+        });
+      }
     }
 
     // 6. Dollar Index (DTWEXBGS — Nominal Broad Trade-Weighted)
