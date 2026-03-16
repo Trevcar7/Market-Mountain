@@ -191,7 +191,7 @@ async function generateBriefing(
 
   // Lead story is the highest-importance article
   const leadStory = stories[0];
-  const supporting = stories.slice(1, 5);
+  const supporting = stories.slice(1, 4); // Always exactly 3 top developments
 
   // Fetch curated macro panel: 6 institutional-grade indicators
   // (Fed Funds, 10Y Treasury, 2s-10s Spread, CPI YoY, WTI Crude, Dollar Index)
@@ -240,11 +240,16 @@ Today's published stories:
 
 ${storyContext}
 
-Generate a concise editorial briefing with this exact JSON structure. Return ONLY valid JSON — no markdown, no explanation:
+Generate a concise editorial briefing with this exact JSON structure. Return ONLY valid JSON — no markdown, no explanation.
+CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MUST have exactly 3 items. No more, no fewer.
 
 {
   "leadSummary": "[2-3 sentence analytical summary of the lead story — what happened, why it moves markets, and the key number or data point investors need to know]",
-  "topDevelopmentsSummaries": ["[1 sentence for story 2 — focus on the market impact]", "[1 sentence for story 3]", "[1 sentence for story 4]"],
+  "topDevelopmentsSummaries": [
+    "[1 sentence for story 2 — focus on the market impact]",
+    "[1 sentence for story 3 — focus on the market impact]",
+    "[1 sentence for story 4 — focus on the market impact, or synthesize a key macro implication if fewer than 4 stories exist]"
+  ],
   "whatToWatch": [
     {"event": "[specific macro or market driver — not generic]", "timing": "[monitoring label from the list above]", "significance": "[1-2 sentences: the economic mechanism and what outcome would move markets]", "watchMetric": "[specific level or threshold to monitor, e.g. '10-Year Treasury above 4.30%']"},
     {"event": "[event name]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]", "watchMetric": "[level or null if none applies]"},
@@ -297,27 +302,35 @@ Generate a concise editorial briefing with this exact JSON structure. Return ONL
     }
   }
 
-  // Final safety net — always have at least 2 events
-  if (whatToWatch.length === 0) {
-    whatToWatch = [
-      {
-        event: "Next Federal Reserve meeting",
-        timing: "Policy watch",
-        significance: "Rate decisions drive bond yields and rate-sensitive equity sectors.",
-      },
-      {
-        event: "Upcoming economic data releases",
-        timing: "Upcoming economic data",
-        significance: "CPI, jobs, and GDP prints shape Fed rate expectations and equity risk premiums.",
-      },
-    ];
-  } else if (whatToWatch.length === 1) {
-    whatToWatch.push({
-      event: "Upcoming economic data releases",
+  // Safety net fillers — pad to exactly 3 items
+  const WATCH_FILLERS = [
+    {
+      event: "Next Federal Reserve meeting",
+      timing: "Policy watch",
+      significance: "Rate decisions drive bond yields and rate-sensitive equity sectors.",
+    },
+    {
+      event: "Upcoming CPI and jobs data",
       timing: "Upcoming economic data",
       significance: "CPI, jobs, and GDP prints shape Fed rate expectations and equity risk premiums.",
-    });
+    },
+    {
+      event: "Earnings season updates",
+      timing: "Earnings season updates",
+      significance: "Company guidance and margin trends reveal whether sector valuations can hold at current levels.",
+    },
+  ];
+
+  while (whatToWatch.length < 3) {
+    const filler = WATCH_FILLERS.find(
+      (f) => !whatToWatch.some((w) => w.event === f.event)
+    );
+    if (!filler) break;
+    whatToWatch.push(filler);
   }
+
+  // Hard cap at 3
+  whatToWatch = whatToWatch.slice(0, 3);
 
   const briefing: DailyBriefing = {
     date,
