@@ -34,12 +34,7 @@ export default function MacroSnapshotWidget({ initialData }: Props) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const poll = async () => {
-      if (!isMarketHours()) {
-        setLive(false);
-        return;
-      }
-      setLive(true);
+    const fetchFresh = async () => {
       try {
         const res = await fetch("/api/briefing-macro");
         if (res.ok) {
@@ -51,7 +46,19 @@ export default function MacroSnapshotWidget({ initialData }: Props) {
       }
     };
 
-    poll();
+    const poll = async () => {
+      if (!isMarketHours()) {
+        setLive(false);
+        return;
+      }
+      setLive(true);
+      await fetchFresh();
+    };
+
+    // Always sync on mount so the data agrees with the MacroBoard regardless of market hours
+    fetchFresh();
+
+    // Then poll every 5 min, but only update live state during market hours
     timerRef.current = setInterval(poll, POLL_INTERVAL_MS);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
