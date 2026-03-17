@@ -57,7 +57,8 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
     .replace(/(?<!\w)#([A-Za-z]\w*)/g, "$1") // strip hashtags
     .replace(/\n{2,}/g, "\n")           // collapse blank lines
     .trim();
-  const excerpt = cleanStory.split(/(?<=[.!?])\s/)[0] || cleanStory.substring(0, 180);
+  const firstSentence = cleanStory.split(/(?<=[.!?])\s+/)[0] ?? "";
+  const excerpt = firstSentence.length > 40 ? firstSentence : cleanStory.substring(0, 180);
 
   if (variant === "featured") {
     return (
