@@ -142,9 +142,9 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   trade_policy_tariff:
     "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1200&q=80",
 
-  // NVIDIA → GPU chip with dramatic green/purple lighting
+  // NVIDIA → colorful GPU / graphics card close-up
   nvidia:
-    "https://images.unsplash.com/photo-nUDEzNpPUlA?w=1200&q=80",
+    "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80",
 
   // ── Category-level fallbacks (used when topic key has no match) ──
   // These are intentionally diverse — no category should default to the same image.

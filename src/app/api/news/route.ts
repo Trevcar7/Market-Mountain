@@ -63,7 +63,7 @@ export async function GET() {
 
     // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
     const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
-    const NVIDIA_IMAGE = "https://images.unsplash.com/photo-nUDEzNpPUlA?w=1200&q=80";
+    const NVIDIA_IMAGE = "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80";
     const filteredNews = newsData.news
       .filter(
         (item) =>
