@@ -51,40 +51,69 @@ interface DisplayItem {
   sparkPoints?: number[];
 }
 
-// ─── Client-side refresh interval (ET-aware) ─────────────────────────────────
+// ─── Client-side refresh interval ────────────────────────────────────────────
+// Flat 5-minute cadence — matches the server-side Redis TTL on /api/macro-board
+// and /api/market-sparklines so every poll returns genuinely fresh data.
 
-function getClientRefreshMs(): number {
-  const etNow = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
-  );
-  const day = etNow.getDay();
-  const tm  = etNow.getHours() * 60 + etNow.getMinutes();
-  if (day >= 1 && day <= 5 && tm >= 9 * 60 + 30 && tm < 16 * 60) return 60_000;
-  return 5 * 60_000;
-}
+const REFRESH_MS = 5 * 60_000;
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
-// Minimal inline SVG trendline — no external library, no fill.
+// Webull-style intraday sparkline:
+//  • Gradient fill under the line fades to transparent
+//  • Bright dot marks the current (latest) price
+//  • x-axis is time-proportional — line builds left→right as trading day progresses
+//    (78 5-min bars = full 9:30 AM–4:00 PM ET session)
+//  • Early in the day the line is a small stub at the left; by close it fills the chart
+
+const SPARK_W        = 72;
+const SPARK_H        = 22;
+const SPARK_PAD      = 2;
+const FULL_DAY_BARS  = 78; // 6.5 hours × 12 bars/hr (5-min interval)
 
 const SPARK_COLORS: Record<"up" | "down" | "flat", string> = {
   up:   "#10b981", // emerald-500
   down: "#ef4444", // red-500
-  flat: "#475569", // slate-600
+  flat: "#6b7280", // gray-500
 };
 
-function Sparkline({ points, direction }: { points: number[]; direction: "up" | "down" | "flat" }) {
+function Sparkline({
+  points,
+  direction,
+  id,
+}: {
+  points: number[];
+  direction: "up" | "down" | "flat";
+  id: string;
+}) {
   if (points.length < 2) return null;
 
-  const W = 56, H = 14, PAD = 1;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
+  const color   = SPARK_COLORS[direction];
+  const gradId  = `sg-${id}`;
+  const W = SPARK_W, H = SPARK_H, PAD = SPARK_PAD;
 
-  const coords = points.map((v, i) => {
-    const x = PAD + (i / (points.length - 1)) * (W - PAD * 2);
-    const y = PAD + (1 - (v - min) / range) * (H - PAD * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
+  const min   = Math.min(...points);
+  const max   = Math.max(...points);
+  const range = max - min || 0.001;
+
+  // x proportional to time elapsed — a stub early in the day, full width at close
+  const dayFraction = Math.min(points.length / FULL_DAY_BARS, 1);
+  const activeW     = (W - PAD * 2) * dayFraction;
+
+  const coords = points.map((v, i) => ({
+    x: PAD + (points.length === 1 ? 0 : (i / (points.length - 1)) * activeW),
+    y: PAD + (1 - (v - min) / range) * (H - PAD * 2 - 2), // -2 leaves room for end dot
+  }));
+
+  const linePath = coords
+    .map(({ x, y }, i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(" ");
+
+  const fillPath =
+    `M ${coords[0].x.toFixed(1)} ${(H - PAD).toFixed(1)} ` +
+    coords.map(({ x, y }) => `L ${x.toFixed(1)} ${y.toFixed(1)}`).join(" ") +
+    ` L ${coords[coords.length - 1].x.toFixed(1)} ${(H - PAD).toFixed(1)} Z`;
+
+  const { x: dotX, y: dotY } = coords[coords.length - 1];
 
   return (
     <svg
@@ -94,15 +123,25 @@ function Sparkline({ points, direction }: { points: number[]; direction: "up" | 
       aria-hidden="true"
       className="shrink-0"
     >
-      <polyline
-        points={coords.join(" ")}
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
+        </linearGradient>
+      </defs>
+      {/* Gradient fill */}
+      <path d={fillPath} fill={`url(#${gradId})`} />
+      {/* Line */}
+      <path
+        d={linePath}
         fill="none"
-        stroke={SPARK_COLORS[direction]}
+        stroke={color}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity="0.75"
       />
+      {/* Current price dot */}
+      <circle cx={dotX.toFixed(1)} cy={dotY.toFixed(1)} r="2" fill={color} />
     </svg>
   );
 }
@@ -388,7 +427,11 @@ function IndicatorCard({ item }: { item: DisplayItem }) {
       </div>
       {item.sparkPoints && item.sparkPoints.length >= 2 && (
         <div className="mt-1 self-center">
-          <Sparkline points={item.sparkPoints} direction={item.direction} />
+          <Sparkline
+            points={item.sparkPoints}
+            direction={item.direction}
+            id={item.label.replace(/[^a-z0-9]/gi, "-").toLowerCase()}
+          />
         </div>
       )}
     </div>
@@ -473,21 +516,11 @@ export default function MacroBoard() {
       setMacroLoading(false);
     });
 
-    // Macro data refreshes on the same trading-hours cadence as market prices
-    function scheduleMacroRefresh() {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      const intervalMs = getClientRefreshMs();
-      intervalRef.current = setInterval(async () => {
-        const res = await fetch("/api/macro-board").then((r) => r.json()).catch(() => null);
-        if (res && !cancelled) {
-          setMacroData(res as MacroBoardData);
-          const newMs = getClientRefreshMs();
-          if (newMs !== intervalMs) scheduleMacroRefresh();
-        }
-      }, intervalMs);
-    }
-
-    scheduleMacroRefresh();
+    // Refresh macro indicators every 5 minutes (matches server TTL)
+    intervalRef.current = setInterval(async () => {
+      const res = await fetch("/api/macro-board").then((r) => r.json()).catch(() => null);
+      if (res && !cancelled) setMacroData(res as MacroBoardData);
+    }, REFRESH_MS);
 
     return () => {
       cancelled = true;

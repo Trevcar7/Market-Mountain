@@ -5,7 +5,7 @@ import { MarketSparklinesData, SparklineSet } from "@/lib/news-types";
 export const runtime = "nodejs";
 
 const KV_KEY        = "market-sparklines-v2";
-const CACHE_SECONDS = 10 * 60; // 10 minutes — intraday sparklines don't need sub-minute freshness
+const CACHE_SECONDS = 5 * 60; // 5 minutes — matches client poll interval
 const MIN_POINTS    = 3;       // Lower threshold for intraday (may only have a few bars early in the day)
 
 /**

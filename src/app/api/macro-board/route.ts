@@ -6,7 +6,7 @@ import { buildMacroBoardIndicators } from "@/lib/macro-board-builder";
 export const runtime = "nodejs";
 
 const KV_KEY = "macro-board";
-const CACHE_SECONDS = 900; // 15-minute Redis TTL
+const CACHE_SECONDS = 300; // 5-minute Redis TTL — matches client poll interval
 
 /**
  * GET /api/macro-board
