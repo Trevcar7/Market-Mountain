@@ -229,6 +229,7 @@ This briefing publishes at 8:00 AM Eastern each trading day. Your tone must matc
 FOCUS: Lead with the story that will move markets most. Skip incremental updates or low-impact developments.
 
 WHAT TO WATCH RULES:
+- PRIORITY ORDER: (1) scheduled macro releases (FOMC decisions, CPI, PCE, Non-Farm Payrolls, GDP, PMI/ISM, Retail Sales, PPI, Fed speakers), (2) geopolitical / policy events with market-moving potential, (3) major earnings only if no macro events apply
 - Each item must identify a specific macro or market driver and explain the mechanism driving markets
 - Do NOT use generic phrases like "markets reacted", "this highlights", "investors are watching", "in today's environment"
 - Every item must explain the economic cause-and-effect mechanism

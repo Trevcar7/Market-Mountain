@@ -1693,9 +1693,49 @@ export async function buildNewsChartData(
 // SECTION 9 — Briefing helpers (What to Watch)
 // ---------------------------------------------------------------------------
 
+// Macro event significance library — maps common event keywords to analytical descriptions
+const MACRO_SIGNIFICANCE: Record<string, string> = {
+  "fomc": "Fed rate decisions directly reprice the entire yield curve; any surprise shifts forward guidance for rate-sensitive sectors and the dollar.",
+  "federal reserve": "Fed commentary shifts rate expectations and reprices bonds, equities, and the dollar simultaneously.",
+  "fed": "Fed rate decisions directly reprice the entire yield curve; any surprise shifts forward guidance for rate-sensitive sectors and the dollar.",
+  "cpi": "CPI beats relative to consensus force the market to re-price near-term Fed cuts, pressuring rate-sensitive equities and lifting real yields.",
+  "consumer price": "CPI beats relative to consensus force the market to re-price near-term Fed cuts, pressuring rate-sensitive equities and lifting real yields.",
+  "pce": "The Fed's preferred inflation gauge; a hot print reduces the pace of rate cuts and lifts real yields, pressuring equity multiples.",
+  "non-farm payroll": "A strong payroll print delays Fed cuts by reducing urgency for easing, lifting the dollar and compressing equity P/E multiples.",
+  "nonfarm payroll": "A strong payroll print delays Fed cuts by reducing urgency for easing, lifting the dollar and compressing equity P/E multiples.",
+  "jobs report": "Labor market strength or weakness directly shapes Fed policy expectations and thus the discount rate applied to all asset classes.",
+  "unemployment": "Unemployment data informs Fed slack estimates; a tighter labor market keeps inflation pressure alive, extending the higher-for-longer rate narrative.",
+  "gdp": "GDP surprises shift growth expectations and recalibrate Fed trajectory — a miss raises recession risk and pressures cyclical earnings.",
+  "ism manufacturing": "Manufacturing PMI below 50 signals contraction in goods-producing sectors and tends to pull Treasury yields and commodity prices lower.",
+  "ism services": "Services PMI captures the dominant sector of the U.S. economy; a miss raises recession risk given services account for ~70% of GDP.",
+  "pmi": "PMI data signals whether economic momentum is expanding or contracting, shaping earnings revision cycles for cyclical sectors.",
+  "retail sales": "Retail sales measure consumer spending, the largest GDP component; a miss raises stagflation risk if inflation remains elevated.",
+  "ppi": "PPI measures upstream price pressure that feeds into CPI with a lag — a hot print warns of future consumer inflation.",
+  "housing": "Housing data reflects the transmission of monetary policy; sustained weakness signals rate-sensitive sectors remain under pressure.",
+  "durable goods": "Durable goods orders track business investment intentions; weakness signals corporate caution about future demand.",
+  "trade balance": "Trade deficits widen or narrow based on dollar strength and domestic demand, directly affecting GDP calculations.",
+  "treasury": "Treasury auctions test demand for U.S. debt; weak demand pushes yields higher, pressuring equity multiples.",
+  "debt ceiling": "Debt ceiling uncertainty raises default risk premia across all U.S.-denominated assets and increases volatility.",
+  "tariff": "Tariff changes directly alter import costs, corporate margins, and trade flows — a shock to both inflation and growth simultaneously.",
+};
+
+function getMacroSignificance(eventName: string, estimate?: number | null, previous?: number | null): string {
+  const lower = eventName.toLowerCase();
+  for (const [key, sig] of Object.entries(MACRO_SIGNIFICANCE)) {
+    if (lower.includes(key)) return sig;
+  }
+  // Generic fallback with estimate/previous context if available
+  const context = estimate != null && previous != null
+    ? ` Consensus estimate: ${estimate}; prior: ${previous}.`
+    : "";
+  return `A high-impact economic release that can reprice rate expectations and move equity risk premiums.${context}`;
+}
+
 /**
- * Build a "What to Watch" list for the Daily Briefing from FMP earnings calendar.
- * Returns up to 3 notable upcoming events.
+ * Build a "What to Watch" list for the Daily Briefing.
+ * Priority: (1) upcoming US high-impact macro releases from FMP economic calendar,
+ * (2) notable earnings as secondary fill only.
+ * Returns up to 3 events.
  */
 export async function fetchBriefingWhatToWatch(): Promise<Array<{
   event: string;
@@ -1704,30 +1744,70 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
 }>> {
   const events: Array<{ event: string; timing: string; significance: string }> = [];
 
+  // 1. FMP economic calendar — macro events are first priority
   try {
-    // Upcoming high-profile earnings
-    const earnings = await fetchFmpEarningsCalendar(7);
-    const notable = earnings
-      .filter((e) => e.revenueEstimated && e.revenueEstimated > 5_000_000_000) // >$5B companies
-      .slice(0, 2);
+    if (process.env.FMP_API_KEY) {
+      const from = new Date().toISOString().split("T")[0];
+      const to = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const res = await fetch(
+        fmpUrl("/api/v3/economic_calendar", { from, to, country: "US" }),
+        { signal: withTimeout() }
+      );
+      if (res.ok) {
+        const data: Array<{
+          event: string;
+          date: string;
+          country: string;
+          impact: string;
+          estimate?: number;
+          previous?: number;
+        }> = await res.json();
 
-    for (const e of notable) {
-      const when = e.time === "bmo" ? "Before market open" : e.time === "amc" ? "After market close" : "";
-      events.push({
-        event: `${e.symbol} earnings`,
-        timing: `${e.date}${when ? ` — ${when}` : ""}`,
-        significance: `Consensus EPS estimate${e.epsEstimated ? ` $${e.epsEstimated.toFixed(2)}` : " pending"}; results could drive sector-wide moves.`,
-      });
+        // US high-impact events only, deduplicated by event name
+        const seen = new Set<string>();
+        const highImpact = (Array.isArray(data) ? data : [])
+          .filter((e) => e.country === "US" && e.impact === "High" && !seen.has(e.event) && seen.add(e.event))
+          .slice(0, 2);
+
+        for (const e of highImpact) {
+          events.push({
+            event: e.event,
+            timing: `Upcoming economic data — ${e.date}`,
+            significance: getMacroSignificance(e.event, e.estimate, e.previous),
+          });
+        }
+      }
     }
   } catch {
-    // Non-fatal — briefing works without this
+    // Non-fatal — fall through to earnings
   }
 
-  // Fallback event if nothing from FMP
+  // 2. Fill remaining slots with major earnings (secondary priority)
+  if (events.length < 2) {
+    try {
+      const earnings = await fetchFmpEarningsCalendar(7);
+      const notable = earnings
+        .filter((e) => e.revenueEstimated && e.revenueEstimated > 5_000_000_000)
+        .slice(0, 2 - events.length);
+
+      for (const e of notable) {
+        const when = e.time === "bmo" ? "Before market open" : e.time === "amc" ? "After market close" : "";
+        events.push({
+          event: `${e.symbol} earnings`,
+          timing: `${e.date}${when ? ` — ${when}` : ""}`,
+          significance: `Consensus EPS estimate${e.epsEstimated ? ` $${e.epsEstimated.toFixed(2)}` : " pending"}; results could drive sector-wide moves.`,
+        });
+      }
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  // 3. Fallback if still nothing
   if (events.length === 0) {
     events.push({
       event: "Next FOMC meeting",
-      timing: "Upcoming",
+      timing: "Policy watch",
       significance: "Rate decisions drive bond yields and rate-sensitive equity sectors.",
     });
   }
