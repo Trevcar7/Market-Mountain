@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { DailyBriefing } from "@/lib/news-types";
 import { categoryLabelsShort as categoryLabels, categoryColors } from "@/lib/category-config";
+import MacroSnapshotWidget from "@/components/MacroSnapshotWidget";
 
 interface Props {
   params: Promise<{ date: string }>;
@@ -227,49 +228,10 @@ export default async function BriefingDatePage({ params }: Props) {
             )}
           </div>
 
-          {/* Macro Snapshot Sidebar */}
+          {/* Macro Snapshot Sidebar — polls /api/briefing-macro every 5 min during market hours */}
           {briefing.keyData.length > 0 && (
             <aside>
-              <div className="flex items-center gap-3 mb-5">
-                <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-navy-600 bg-slate-100 px-2.5 py-1 rounded">
-                  Macro Snapshot
-                </span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-
-              <div className="bg-navy-900 rounded-xl overflow-hidden">
-                <div className="divide-y divide-white/10">
-                  {briefing.keyData.map((dp, i) => (
-                    <div key={i} className="px-5 py-3.5">
-                      <p className="text-white/40 text-[9px] font-semibold tracking-widest uppercase mb-1.5">
-                        {dp.label}
-                      </p>
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-white font-bold text-[17px] tabular-nums tracking-tight">
-                          {dp.value}
-                        </span>
-                        {dp.change && (
-                          <span
-                            className={`text-[11px] font-semibold tabular-nums whitespace-nowrap ${
-                              dp.change.startsWith("-")
-                                ? "text-red-400"
-                                : "text-accent-400"
-                            }`}
-                          >
-                            {dp.change.startsWith("-") ? "▼ " : "▲ "}
-                            {dp.change.replace(/^[+-]/, "")}
-                          </span>
-                        )}
-                      </div>
-                      {dp.source && (
-                        <p className="text-white/25 text-[9px] mt-1 tracking-wide">
-                          {dp.source}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <MacroSnapshotWidget initialData={briefing.keyData} />
             </aside>
           )}
         </div>
