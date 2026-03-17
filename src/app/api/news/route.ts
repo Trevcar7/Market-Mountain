@@ -63,17 +63,21 @@ export async function GET() {
 
     // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
     const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
+    const NVIDIA_IMAGE = "https://images.unsplash.com/photo-nUDEzNpPUlA?w=1200&q=80";
     const filteredNews = newsData.news
       .filter(
         (item) =>
           !SUPPRESSED_ARTICLE_IDS.has(item.id) &&
           new Date(item.publishedAt).getTime() >= MARCH_13_CUTOFF_MS
       )
-      .map((item) =>
-        Object.fromEntries(
-          Object.entries(item).filter(([k]) => !STRIP_FIELDS.has(k))
-        ) as typeof item
-      );
+      .map((item) => {
+        // Patch imageUrl for NVIDIA articles that were cached before the NVIDIA image override was added
+        const isNvidiaArticle = /\bnvidia\b|\bNVDA\b/i.test(item.title ?? "");
+        const patchedItem = isNvidiaArticle ? { ...item, imageUrl: NVIDIA_IMAGE } : item;
+        return Object.fromEntries(
+          Object.entries(patchedItem).filter(([k]) => !STRIP_FIELDS.has(k))
+        ) as typeof item;
+      });
     const filtered = { ...newsData, news: filteredNews, meta: { ...newsData.meta, totalCount: filteredNews.length } };
 
     return NextResponse.json(filtered, {
