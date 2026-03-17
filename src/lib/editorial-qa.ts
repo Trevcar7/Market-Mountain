@@ -1,27 +1,29 @@
 /**
- * Editorial Quality Assurance Gate — v2
+ * Editorial Quality Assurance Gate — v3
  *
  * Runs a comprehensive quality score on every synthesized article.
  * Raw points are normalized to a 0–100 scale before threshold comparison.
  * Only articles scoring ≥ QA_PASS_THRESHOLD may be published.
  *
- * Scoring breakdown (16 tests, normalized to 100):
- *   Story Worthiness   (15) — market impact, catalyst chain, investor implication
- *   Confidence         (15) — composite editorial confidence score
- *   Fact Check         (10) — claim verification score
- *   Source Quality     (10) — Tier 1 source presence + corroboration
- *   Source Coherence    (5) — sources topically relevant to article
- *   Metadata Accuracy   (5) — tickers, sentiment, marketImpact consistency
- *   Title Quality      (10) — word count, specificity, no vague language
- *   Thesis Clarity     (10) — four editorial questions answered
- *   Section Headings    (5) — enforces 5-section ## heading structure
- *   Key Takeaways       (5) — 3 distinct, specific takeaways with numbers
- *   Chart Quality      (10) — mandatory for key topics; internal quality score
- *   Story Completeness  (5) — length (≥120 words) + numerical grounding
- *   Originality         (5) — language similarity vs. recent articles
- *   Editorial Voice     (5) — no generic filler phrases
- *   Image Quality       (5) — unique, relevant image
- *   Update Language     (0) — penalty-only (-10 for "update" phrasing)
+ * Scoring breakdown (18 tests, normalized to 100):
+ *   Story Worthiness    (15) — market impact, catalyst chain, investor implication
+ *   Confidence          (15) — composite editorial confidence score
+ *   Fact Check          (10) — claim verification score (heuristic/Google)
+ *   Source Quality      (10) — Tier 1 source presence + corroboration
+ *   Source Coherence     (5) — sources topically relevant to article
+ *   Metadata Accuracy    (5) — tickers, sentiment, marketImpact consistency
+ *   Title Quality       (10) — word count, specificity, no vague language
+ *   Thesis Clarity      (10) — four editorial questions answered
+ *   Section Headings     (5) — enforces 5-section ## heading structure
+ *   Key Takeaways        (5) — 3 distinct, specific takeaways with numbers
+ *   Chart Quality       (10) — mandatory for key topics; internal quality score
+ *   Story Completeness   (5) — length (≥120 words) + numerical grounding
+ *   Originality          (5) — language similarity vs. recent articles
+ *   Editorial Voice      (5) — no generic filler phrases
+ *   Image Quality        (5) — unique, relevant image
+ *   Update Language      (0) — penalty-only (-10 for "update" phrasing)
+ *   Data Verification   (10) — cross-references claims vs FRED/BLS/EIA live data
+ *   Source Alignment     (8) — verifies synthesized claims are grounded in sources
  *
  * Production threshold: 85 / 100
  * Rebuild mode threshold: 72 / 100 (set REBUILD_MODE=true in env)
@@ -832,6 +834,79 @@ function scoreFactCheck(article: NewsItem): QATestResult {
 }
 
 // ---------------------------------------------------------------------------
+// Data Verification — cross-reference against live FRED/BLS/EIA data
+// ---------------------------------------------------------------------------
+
+function scoreDataVerification(article: NewsItem): QATestResult {
+  const dvScore = article.dataVerificationScore;
+  let score = 0;
+  let detail: string | undefined;
+
+  if (dvScore === undefined || dvScore === null) {
+    // No data verification ran (no numeric claims found) — neutral
+    score = 5;
+    detail = "no verifiable numeric claims found";
+  } else if (dvScore >= 90) {
+    score = 10;
+    detail = article.dataVerificationDetails;
+  } else if (dvScore >= 70) {
+    score = 8;
+    detail = `data verification score ${dvScore} — ${article.dataVerificationDetails ?? ""}`;
+  } else if (dvScore >= 55) {
+    score = 5;
+    detail = `data verification score ${dvScore} — some claims could not be verified`;
+  } else {
+    score = 0;
+    detail = `data verification score ${dvScore} — numerical claims may be inaccurate`;
+  }
+
+  return {
+    test: "Data Verification",
+    passed: score >= 5,
+    score,
+    maxScore: 10,
+    detail,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Source Alignment — hallucination detection
+// ---------------------------------------------------------------------------
+
+function scoreSourceAlignment(article: NewsItem): QATestResult {
+  const saScore = article.sourceAlignmentScore;
+  let score = 0;
+  let detail: string | undefined;
+
+  if (saScore === undefined || saScore === null) {
+    // No source alignment ran — neutral
+    score = 4;
+    detail = "source alignment check was not performed";
+  } else if (saScore >= 90) {
+    score = 8;
+    detail = "all claims grounded in source articles";
+  } else if (saScore >= 70) {
+    score = 6;
+    detail = `source alignment ${saScore} — mostly grounded`;
+  } else if (saScore >= 50) {
+    score = 3;
+    detail = `source alignment ${saScore} — some claims not grounded in sources`;
+  } else {
+    score = 0;
+    const hallCount = article.hallucinations?.length ?? 0;
+    detail = `source alignment ${saScore} — ${hallCount} ungrounded claims detected`;
+  }
+
+  return {
+    test: "Source Alignment",
+    passed: score >= 4,
+    score,
+    maxScore: 8,
+    detail,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Image quality
 // ---------------------------------------------------------------------------
 
@@ -1232,6 +1307,8 @@ export function runEditorialQA(
     scoreEditorialVoice(article),
     scoreImageQuality(article, existingArticles),
     scoreUpdateLanguage(article),
+    scoreDataVerification(article),
+    scoreSourceAlignment(article),
   ];
 
   const rawScore = tests.reduce((sum, t) => sum + t.score, 0);
@@ -1283,6 +1360,18 @@ export function runEditorialQA(
       if (tickersInText.length === 0) {
         hardRejectReasons.push(`none of relatedTickers [${tickers.join(",")}] appear in article text`);
       }
+    }
+
+    // Data verification: hard reject if score < 40 (indicates numerical claims are wrong)
+    const dvScore = article.dataVerificationScore;
+    if (dvScore !== undefined && dvScore !== null && dvScore < 40) {
+      hardRejectReasons.push(`dataVerificationScore=${dvScore} < 40 — numerical claims likely inaccurate`);
+    }
+
+    // Source alignment: hard reject if too many hallucinations detected
+    const hallCount = article.hallucinations?.length ?? 0;
+    if (hallCount >= 3) {
+      hardRejectReasons.push(`${hallCount} ungrounded claims detected — possible hallucinations`);
     }
   }
 

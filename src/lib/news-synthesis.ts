@@ -8,6 +8,7 @@ import {
   scoreFactCheckResult,
   shouldRejectStory,
   logRejection,
+  runComprehensiveFactCheck,
 } from "./fact-checker";
 import { formatNewsForStorage, hasQualitySource } from "./news";
 import { fetchContextualData, buildNewsChartData, sanitizeKeyDataPoints } from "./market-data";
@@ -1385,30 +1386,86 @@ export async function synthesizeGroupedArticles(
         continue;
       }
 
-      // Fact-check — extract claims from PARSED STORY BODY (not raw output)
-      const claims = extractClaimsFromStory(parsed.story);
-      const { results: factCheckResults, overallScore } = await verifyClaims(claims);
-      const adjustedScore = scoreFactCheckResult(factCheckResults);
+      // ── Multi-Layer Fact Check ──────────────────────────────────────────
+      // Layer 1: Heuristic/Google keyword check (original — always runs)
+      // Layer 2: Data-backed verification (cross-refs claims vs FRED/BLS/EIA)
+      // Layer 3: Source-alignment check (synthesized claims vs source articles)
+      //
+      // Build source texts for Layer 3 alignment check
+      const sourceTexts = formattedArticles.map(
+        (a) => `${a.title}\n${a.summary ?? ""}`
+      );
+      const sourcesForAlignment = formattedArticles.map((a) => ({
+        title: a.title,
+        url: a.url,
+        source: a.source,
+      }));
 
-      // Log claim-to-source mapping for transparency
-      if (factCheckResults.length > 0) {
-        console.log(`[synthesis] Fact-check for "${group.topic}": score=${overallScore} (adjusted=${adjustedScore})`);
-        for (const r of factCheckResults) {
-          const status = r.verified ? "✓" : "✗";
-          const src = r.sources && r.sources.length > 0 ? ` [${r.sources[0]}]` : "";
-          console.log(`  ${status} "${r.claim.substring(0, 60)}..." — confidence=${r.confidence}${src}`);
+      const factCheckReport = await runComprehensiveFactCheck(
+        parsed.story,
+        parsed.title,
+        sourcesForAlignment,
+        sourceTexts
+      );
+
+      // Extract values needed for downstream compatibility
+      const factCheckResults = factCheckReport.heuristicResults;
+      const overallScore = factCheckReport.compositeScore;
+      const adjustedScore = factCheckReport.compositeScore;
+
+      // Log comprehensive fact-check results
+      console.log(
+        `[synthesis] Fact-check for "${group.topic}": composite=${factCheckReport.compositeScore} ` +
+        `(${factCheckReport.breakdown})`
+      );
+      if (factCheckReport.dataVerification && factCheckReport.dataVerification.claimsChecked > 0) {
+        console.log(
+          `  [data-verification] ${factCheckReport.dataVerification.claimsVerified}/${factCheckReport.dataVerification.claimsChecked} claims verified against live data`
+        );
+      }
+      if (factCheckReport.sourceAlignment && factCheckReport.sourceAlignment.claims.length > 0) {
+        console.log(
+          `  [source-alignment] ${factCheckReport.sourceAlignment.groundedCount}/${factCheckReport.sourceAlignment.claims.length} claims grounded in sources`
+        );
+        if (factCheckReport.sourceAlignment.hallucinations.length > 0) {
+          console.warn(
+            `  [source-alignment] ⚠ ${factCheckReport.sourceAlignment.hallucinations.length} ungrounded claims (possible hallucinations):`
+          );
+          for (const h of factCheckReport.sourceAlignment.hallucinations) {
+            console.warn(`    → "${h.substring(0, 80)}..."`);
+          }
         }
       }
 
-      // Reject if adjusted score too low
+      // Reject if composite score too low
       const FACT_CHECK_THRESHOLD = REBUILD_MODE ? 20 : 55;
       if (shouldRejectStory(adjustedScore, FACT_CHECK_THRESHOLD)) {
         stats.rejected++;
-        const reason = `"${group.topic}" fact-check ${adjustedScore} < ${FACT_CHECK_THRESHOLD}`;
+        const reason = `"${group.topic}" fact-check ${adjustedScore} < ${FACT_CHECK_THRESHOLD} (${factCheckReport.breakdown})`;
         stats.rejectionDetails.push(reason);
         stats.rejectedTopics.push(group.topic);
         console.warn(`[synthesis] Rejected ${reason}`);
-        logRejection(group.topic, `Fact check score: ${adjustedScore}`, adjustedScore);
+        logRejection(group.topic, `Composite fact-check score: ${adjustedScore}`, adjustedScore);
+        continue;
+      }
+
+      // Hard reject: if data verification found ANY numerical mismatches, block the article
+      // regardless of other scores — publishing wrong numbers is unacceptable
+      if (
+        !REBUILD_MODE &&
+        factCheckReport.dataVerification &&
+        factCheckReport.dataVerification.claimsFailed > 0
+      ) {
+        stats.rejected++;
+        const failedClaims = factCheckReport.dataVerification.results
+          .filter((r) => !r.verified && r.actualValue !== null)
+          .map((r) => `${r.dataPoint}: claimed ${r.claimedValue}, actual ${r.actualValue}`)
+          .join("; ");
+        const reason = `"${group.topic}" DATA MISMATCH — ${failedClaims}`;
+        stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
+        console.warn(`[synthesis] HARD REJECT — numerical data mismatch: ${reason}`);
+        logRejection(group.topic, `Data verification failed: ${failedClaims}`, adjustedScore);
         continue;
       }
 
@@ -1713,6 +1770,15 @@ export async function synthesizeGroupedArticles(
         chartData,
         keyTakeaways: parsed.keyTakeaways.length > 0 ? parsed.keyTakeaways : undefined,
         confidenceScore,
+        // Multi-layer fact-check results
+        dataVerificationScore: factCheckReport.dataVerification?.score,
+        sourceAlignmentScore: factCheckReport.sourceAlignment?.score,
+        dataVerificationDetails: factCheckReport.dataVerification
+          ? `${factCheckReport.dataVerification.claimsVerified}/${factCheckReport.dataVerification.claimsChecked} claims verified against live data`
+          : undefined,
+        hallucinations: factCheckReport.sourceAlignment?.hallucinations.length
+          ? factCheckReport.sourceAlignment.hallucinations
+          : undefined,
         // Event-first architecture — filter marketImpact to valid format only
         // Parser already enforces +/-N.N% or +/-Nbps, but defensive filter
         // catches any manually injected or edge-case bad formats

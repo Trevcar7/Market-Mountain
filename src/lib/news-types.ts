@@ -82,6 +82,12 @@ export interface NewsItem {
   keyTakeaways?: string[];         // 3-bullet editorial summary (displayed below headline)
   confidenceScore?: number;        // 0–1 editorial confidence gate (≥ 0.70 required to publish)
 
+  // Multi-layer fact-check results
+  dataVerificationScore?: number;  // 0–100 from data-backed verification (FRED/BLS/EIA cross-ref)
+  sourceAlignmentScore?: number;   // 0–100 from source-alignment check (hallucination detection)
+  dataVerificationDetails?: string; // Human-readable summary of data verification results
+  hallucinations?: string[];       // Claims not grounded in any source article
+
   // Event-first architecture
   eventId?: string;                // Links article to a NewsEvent (optional)
   marketImpact?: MarketImpactItem[]; // Asset-level impact strip (e.g., OIL +4.1%, S&P -1.2%)

@@ -1,4 +1,28 @@
-import { FactCheckResult } from "./news-types";
+import { FactCheckResult, NewsSource } from "./news-types";
+import { runDataFactCheck, DataFactCheckReport } from "./data-fact-checker";
+import { runSourceAlignment, SourceAlignmentReport } from "./source-alignment";
+
+// ---------------------------------------------------------------------------
+// Comprehensive Fact Check Report — combines all verification layers
+// ---------------------------------------------------------------------------
+
+export interface ComprehensiveFactCheckReport {
+  /** Layer 1: Keyword/API heuristic (original fact-checker) */
+  heuristicScore: number;
+  heuristicResults: FactCheckResult[];
+
+  /** Layer 2: Data-backed verification (FRED/BLS/EIA cross-reference) */
+  dataVerification: DataFactCheckReport | null;
+
+  /** Layer 3: Source-alignment check (synthesis vs. sources) */
+  sourceAlignment: SourceAlignmentReport | null;
+
+  /** Combined weighted score (0–100) */
+  compositeScore: number;
+
+  /** Per-layer breakdown for logging */
+  breakdown: string;
+}
 
 // ---------------------------------------------------------------------------
 // Google Fact Check Tools API response shape
@@ -298,4 +322,141 @@ export function logRejection(
   factCheckScore: number
 ): void {
   console.warn(`[REJECTED] "${title}" - Score: ${factCheckScore} - Reason: ${reason}`);
+}
+
+// ---------------------------------------------------------------------------
+// Comprehensive Multi-Layer Fact Check
+// ---------------------------------------------------------------------------
+//
+// Combines three verification layers into a single composite score:
+//
+//   Layer 1 — Heuristic (30% weight)
+//     Original keyword/Google Fact Check API scoring.
+//     Fast, always available, but shallow.
+//
+//   Layer 2 — Data Verification (40% weight)
+//     Cross-references numerical claims (CPI, yields, oil prices, etc.)
+//     against live FRED/BLS/EIA data. Strongest signal for financial articles.
+//     Returns null if no verifiable numerical claims are found.
+//
+//   Layer 3 — Source Alignment (30% weight)
+//     Uses Claude to verify synthesized claims trace back to source articles.
+//     Catches hallucinations — facts the AI invented beyond source material.
+//     Returns null if source texts are unavailable.
+//
+// The composite score is a weighted average with fallback handling:
+//   - If all 3 layers run: 30% heuristic + 40% data + 30% source
+//   - If data layer is null (no numeric claims): 50% heuristic + 50% source
+//   - If source layer is null (no source texts): 40% heuristic + 60% data
+//   - If both are null: 100% heuristic (original behavior)
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the full multi-layer fact-check pipeline.
+ *
+ * @param story       Parsed story body text
+ * @param title       Article headline
+ * @param sources     sourcesUsed from the NewsItem
+ * @param sourceTexts Original article snippets (from formatNewsForStorage)
+ * @returns ComprehensiveFactCheckReport with composite score
+ */
+export async function runComprehensiveFactCheck(
+  story: string,
+  title: string,
+  sources: NewsSource[],
+  sourceTexts: string[]
+): Promise<ComprehensiveFactCheckReport> {
+  // Layer 1 — Heuristic (always runs)
+  const claims = extractClaimsFromStory(story);
+  const { results: heuristicResults, overallScore: heuristicScore } =
+    await verifyClaims(claims);
+
+  // Layer 2 — Data Verification (runs in parallel with Layer 3)
+  // Layer 3 — Source Alignment (runs in parallel with Layer 2)
+  const [dataResult, sourceResult] = await Promise.allSettled([
+    runDataFactCheck(story, title),
+    sources.length > 0 && sourceTexts.length > 0
+      ? runSourceAlignment(story, title, sources, sourceTexts)
+      : Promise.resolve(null),
+  ]);
+
+  const dataVerification: DataFactCheckReport | null =
+    dataResult.status === "fulfilled" ? dataResult.value : null;
+  const sourceAlignment: SourceAlignmentReport | null =
+    sourceResult.status === "fulfilled" ? sourceResult.value : null;
+
+  // Compute composite score with dynamic weighting
+  let compositeScore: number;
+  const breakdown: string[] = [];
+
+  const hasData = dataVerification !== null && dataVerification.claimsChecked > 0;
+  const hasSource = sourceAlignment !== null && sourceAlignment.claims.length > 0;
+
+  if (hasData && hasSource) {
+    // All 3 layers — full weighting
+    compositeScore = Math.round(
+      heuristicScore * 0.30 +
+      dataVerification!.score * 0.40 +
+      sourceAlignment!.score * 0.30
+    );
+    breakdown.push(
+      `heuristic=${heuristicScore}×0.30`,
+      `data=${dataVerification!.score}×0.40`,
+      `source=${sourceAlignment!.score}×0.30`
+    );
+  } else if (hasData && !hasSource) {
+    // Data + heuristic only
+    compositeScore = Math.round(
+      heuristicScore * 0.40 +
+      dataVerification!.score * 0.60
+    );
+    breakdown.push(
+      `heuristic=${heuristicScore}×0.40`,
+      `data=${dataVerification!.score}×0.60`,
+      `source=N/A`
+    );
+  } else if (!hasData && hasSource) {
+    // Source + heuristic only
+    compositeScore = Math.round(
+      heuristicScore * 0.50 +
+      sourceAlignment!.score * 0.50
+    );
+    breakdown.push(
+      `heuristic=${heuristicScore}×0.50`,
+      `data=N/A`,
+      `source=${sourceAlignment!.score}×0.50`
+    );
+  } else {
+    // Heuristic only (original behavior)
+    compositeScore = heuristicScore;
+    breakdown.push(
+      `heuristic=${heuristicScore}×1.00`,
+      `data=N/A`,
+      `source=N/A`
+    );
+  }
+
+  // Hard penalty: if data verification found ANY mismatches, cap composite at 60
+  if (dataVerification && dataVerification.claimsFailed > 0) {
+    compositeScore = Math.min(compositeScore, 60);
+    breakdown.push(`DATA_MISMATCH_CAP=60`);
+  }
+
+  // Hard penalty: if source alignment found ≥3 hallucinations, cap composite at 50
+  if (sourceAlignment && sourceAlignment.ungroundedCount >= 3) {
+    compositeScore = Math.min(compositeScore, 50);
+    breakdown.push(`HALLUCINATION_CAP=50`);
+  }
+
+  const breakdownStr = breakdown.join(", ");
+  console.log(`[fact-check] Composite=${compositeScore}: ${breakdownStr}`);
+
+  return {
+    heuristicScore,
+    heuristicResults,
+    dataVerification,
+    sourceAlignment,
+    compositeScore,
+    breakdown: breakdownStr,
+  };
 }
