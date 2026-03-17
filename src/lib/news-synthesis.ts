@@ -23,7 +23,7 @@ function sleep(ms: number) {
 // Photo constants — curated Unsplash queries per topic key
 // ---------------------------------------------------------------------------
 
-// Unsplash queries are tuned to return English-language, US-context imagery.
+// Unsplash queries are tuned to return English-language, U.S.-context imagery.
 // Avoid queries that might return foreign storefront signs or unrelated retail.
 const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   federal_reserve: "federal reserve building washington dc architecture exterior",
@@ -73,7 +73,7 @@ const DEFAULT_IMAGE_QUERY = "wall street financial markets stock exchange data";
  *   photo-1466611653911-95081537e5b7 — Oil platform / offshore drilling rig at sunset
  *   photo-1590283603385-17ffb3a7f29f — Financial bar chart, quarterly data
  *   photo-1486312338219-ce68d2c6f44d — Person at laptop with financial data (IPO research)
- *   photo-1604594849809-dfedff58e37f — US Treasury / government financial building
+ *   photo-1604594849809-dfedff58e37f — U.S. Treasury / government financial building
  *   photo-1556742049-0cfed4f6a45d — Business person reviewing financial documents/charts
  */
 const FALLBACK_IMAGE_MAP: Record<string, string> = {
@@ -117,7 +117,7 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   merger_acquisition:
     "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80",
 
-  // Bond market → US Treasury / government finance building (unique image)
+  // Bond market → U.S. Treasury / government finance building (unique image)
   bond_market:
     "https://images.unsplash.com/photo-1604594849809-dfedff58e37f?w=1200&q=80",
 

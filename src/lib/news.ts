@@ -240,7 +240,7 @@ export const TIER_1_SOURCES = [
  * specialized financial/business outlets.
  */
 export const TIER_2_SOURCES = [
-  // US government data agencies
+  // U.S. government data agencies
   "fred",
   "bls",
   "eia",

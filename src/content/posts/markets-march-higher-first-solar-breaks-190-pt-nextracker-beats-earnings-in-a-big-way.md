@@ -3,7 +3,7 @@ title: "Markets March Higher, First Solar Breaks $190 PT, NEXTracker Beats on Ea
 date: "2025-05-14"
 updated: "2025-12-22"
 readTime: "4 min read"
-excerpt: "The S&P 500 erases 2025 losses on US–China trade pause. First Solar blows past my $190 target — new PT is $262. NEXTracker posts a major earnings beat: revenues up 25.5% YoY, EPS beats by 32%."
+excerpt: "The S&P 500 erases 2025 losses on U.S.–China trade pause. First Solar blows past my $190 target — new PT is $262. NEXTracker posts a major earnings beat: revenues up 25.5% YoY, EPS beats by 32%."
 tags: ["Market Commentary", "Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/markets-march-higher.png"

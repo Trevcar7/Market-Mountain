@@ -466,7 +466,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
     priority: 2,
   },
 
-  // EIA (US Energy Information Administration) — official energy data
+  // EIA (U.S. Energy Information Administration) — official energy data
   {
     name: "EIA Today in Energy",
     source: "EIA",
@@ -531,7 +531,7 @@ export const RSS_FEEDS: RssSourceConfig[] = [
 
   // Treasury.gov
   {
-    name: "US Treasury Press Releases",
+    name: "U.S. Treasury Press Releases",
     source: "Treasury",
     url: "https://home.treasury.gov/system/files/206/treasury-press-releases.rss",
     category: "policy",

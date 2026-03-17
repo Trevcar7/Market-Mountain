@@ -1733,7 +1733,7 @@ function getMacroSignificance(eventName: string, estimate?: number | null, previ
 
 /**
  * Build a "What to Watch" list for the Daily Briefing.
- * Priority: (1) upcoming US high-impact macro releases from FMP economic calendar,
+ * Priority: (1) upcoming U.S. high-impact macro releases from FMP economic calendar,
  * (2) notable earnings as secondary fill only.
  * Returns up to 3 events.
  */
@@ -1763,7 +1763,7 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
           previous?: number;
         }> = await res.json();
 
-        // US high-impact events only, deduplicated by event name
+        // U.S. high-impact events only, deduplicated by event name
         const seen = new Set<string>();
         const highImpact = (Array.isArray(data) ? data : [])
           .filter((e) => e.country === "US" && e.impact === "High" && !seen.has(e.event) && seen.add(e.event))
