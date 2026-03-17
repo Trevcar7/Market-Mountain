@@ -37,8 +37,15 @@ export async function GET() {
     // Build fresh data
     const data = await buildMacroBoard();
 
-    // Cache for 15 minutes
-    await kv.set(KV_KEY, data, { ex: CACHE_SECONDS });
+    // Only cache if we got a meaningful dataset (≥5 indicators).
+    // If FRED/EIA are down we might only get BLS data — don't cache that
+    // partial result so the next request retries fresh.
+    const MIN_INDICATORS_TO_CACHE = 5;
+    if (data.indicators.length >= MIN_INDICATORS_TO_CACHE) {
+      await kv.set(KV_KEY, data, { ex: CACHE_SECONDS });
+    } else {
+      console.warn(`[/api/macro-board] Only ${data.indicators.length} indicators resolved — skipping cache`);
+    }
 
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60" },

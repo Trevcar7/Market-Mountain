@@ -41,7 +41,15 @@ export async function GET() {
     }
 
     const data = await buildSnapshot();
-    await kv.set(KV_KEY, data, { ex: CACHE_SECONDS });
+
+    // Only cache if we got meaningful data (≥3 items).
+    // If FRED/TwelveData are down, don't cache the partial result
+    // so the next request retries fresh.
+    if (data.items.length >= 3) {
+      await kv.set(KV_KEY, data, { ex: CACHE_SECONDS });
+    } else {
+      console.warn(`[/api/market-snapshot] Only ${data.items.length} items resolved — skipping cache`);
+    }
 
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60" },
