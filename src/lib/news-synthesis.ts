@@ -48,6 +48,8 @@ const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   commodities:       "commodity trading gold silver copper raw materials exchange",
   currency:          "foreign exchange currency trading us dollar bills finance",
   markets:           "stock market trading floor data screen financial district",
+  // NVIDIA: GPU chip / AI accelerator / data center — distinct from generic earnings imagery
+  nvidia:            "nvidia gpu chip artificial intelligence data center green technology",
 };
 
 const DEFAULT_IMAGE_QUERY = "wall street financial markets stock exchange data";
@@ -139,6 +141,10 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
 
   trade_policy_tariff:
     "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1200&q=80",
+
+  // NVIDIA → GPU chip with dramatic green/purple lighting
+  nvidia:
+    "https://images.unsplash.com/photo-nUDEzNpPUlA?w=1200&q=80",
 
   // ── Category-level fallbacks (used when topic key has no match) ──
   // These are intentionally diverse — no category should default to the same image.
@@ -732,6 +738,7 @@ STORY RULES
 15 Write in third person only — never use "I" or first-person perspective
 16 Write in plain prose paragraphs only
 17 MARKET_IMPACT bullets: only list assets that appear in your story or MARKET DATA. Omit assets you cannot support. Each line MUST contain a numeric change (e.g. +2.3%, -45bps). Never use text descriptions (e.g. "elevated", "under pressure") as the change value — omit the line instead.
+18 Always write "U.S." (with periods) when referring to the United States — never "US"
 
 FACT ACCURACY RULES (Step 11 — Data Sanity)
 These rules prevent stale or fabricated numbers:
@@ -1464,14 +1471,22 @@ export async function synthesizeGroupedArticles(
           topicAndTitles
         );
 
+      // Rule D: NVIDIA story — use GPU chip imagery instead of generic earnings/market visuals.
+      const isNvidiaStory =
+        group.topic !== "nvidia" &&
+        /\bnvidia\b|\bNVDA\b/i.test(topicAndTitles);
+
       // Step 2: Pick Unsplash query — override for mis-categorized stories.
-      //   Oil story beats crypto story (energy is primary driver if both match).
-      //   Trade/tariff beats generic macro. Oil beats all.
-      const imageTopicOverride = isOilStory ? "energy" : isCryptoStory ? "crypto" : isTradeStory ? "trade_policy" : group.topic;
+      //   Oil beats all; NVIDIA beats earnings; trade beats macro; crypto beats broad_market.
+      const imageTopicOverride = isOilStory ? "energy" : isNvidiaStory ? "nvidia" : isCryptoStory ? "crypto" : isTradeStory ? "trade_policy" : group.topic;
 
       if (isOilStory) {
         console.log(
           `[synthesis] Image override: "${group.topic}" → "energy" (oil keywords detected in titles)`
+        );
+      } else if (isNvidiaStory) {
+        console.log(
+          `[synthesis] Image override: "${group.topic}" → "nvidia" (NVIDIA/NVDA keywords detected in titles)`
         );
       } else if (isCryptoStory) {
         console.log(

@@ -37,7 +37,8 @@ Rules:
 - Keep STATEMENT under 30 words
 - Cover different assets/sectors — do not generate 3 signals on the same topic
 - Be direct and specific: "Oil faces downward pressure" not "Oil may possibly decline"
-- Confidence is "high" only when multiple sources corroborate the signal`;
+- Confidence is "high" only when multiple sources corroborate the signal
+- Always write "U.S." (with periods) when referring to the United States — never "US"`;
 
 function buildSignalsPrompt(stories: NewsItem[]): string {
   const summaries = stories
