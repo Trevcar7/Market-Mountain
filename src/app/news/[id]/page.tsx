@@ -24,9 +24,13 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
 
   try {
     const data = await kv.get<NewsCollection>("news");
-    const item = data?.news.find((n) => n.id === id) ?? null;
+    let item = data?.news.find((n) => n.id === id) ?? null;
     // Block direct URL access to March 12 articles
     if (item && new Date(item.publishedAt).getTime() < MARCH_13_CUTOFF_MS) return null;
+    // Patch imageUrl for NVIDIA articles cached before the NVIDIA image override
+    if (item && /\bnvidia\b|\bNVDA\b/i.test(item.title ?? "")) {
+      item = { ...item, imageUrl: "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80" };
+    }
     return item;
   } catch {
     return null;
