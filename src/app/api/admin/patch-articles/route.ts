@@ -362,6 +362,15 @@ export async function POST(req: NextRequest) {
           fixes.push(`marketImpact: removed ${article.marketImpact.length} hallucinated entries [${article.marketImpact.map(m => m.asset).join(",")}]`);
           article.marketImpact = undefined;
         }
+        // Chart position: move 10Y chart from after Event Summary to after Market Reaction
+        if (article.chartData && article.chartData.length > 0) {
+          for (const chart of article.chartData) {
+            if (chart.insertAfterParagraph === 1) {
+              chart.insertAfterParagraph = 2;
+              fixes.push("chartData: moved 10Y chart from P1→P2 (after Market Reaction)");
+            }
+          }
+        }
       }
 
       // ── Fix 14: Clear hallucinations list from articles that have been patched ──
