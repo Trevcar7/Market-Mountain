@@ -25,7 +25,7 @@
  *   Data Verification   (10) — cross-references claims vs FRED/BLS/EIA live data
  *   Source Alignment     (8) — verifies synthesized claims are grounded in sources
  *
- * Production threshold: 85 / 100
+ * Production threshold: 93 / 100 (A+ quality — 10/10 in every category)
  * Rebuild mode threshold: 72 / 100 (set REBUILD_MODE=true in env)
  */
 
@@ -57,7 +57,12 @@ export interface QAResult {
 
 /**
  * Minimum quality score required to publish.
- * Production: 85 | Rebuild mode: 72
+ * Production: 93 | Rebuild mode: 72
+ *
+ * A+ quality standard: articles must score near-perfect on every test.
+ * Fact check hard floor: 90 (requires Google Fact Check API + data verification).
+ * Confidence hard floor: 0.80 (requires strong source corroboration).
+ * Data verification hard floor: 70 (requires strong numerical accuracy).
  *
  * Why 72 in rebuild:
  *   - Chart soft-fail costs up to 4 pts when FRED/BLS/EIA keys are missing
@@ -65,7 +70,7 @@ export interface QAResult {
  *   - Together these two penalties can drop a strong story from ~83 to ~74
  *   - Threshold 72 gives enough headroom while still blocking thin content
  */
-export const QA_PASS_THRESHOLD = REBUILD_MODE ? 72 : 85;
+export const QA_PASS_THRESHOLD = REBUILD_MODE ? 72 : 93;
 
 if (REBUILD_MODE) {
   console.log(
@@ -185,7 +190,7 @@ function scoreStoryWorthiness(article: NewsItem): QATestResult {
 
   return {
     test: "Story Worthiness",
-    passed: score >= 10,
+    passed: score >= 13,
     score,
     maxScore: 15,
     detail: details.length > 0 ? details.join("; ") : undefined,
@@ -566,7 +571,7 @@ function scoreTitle(title: string): QATestResult {
 
   return {
     test: "Title Quality",
-    passed: score >= 6,
+    passed: score >= 8,
     score,
     maxScore: 10,
     detail: details.length > 0 ? details.join("; ") : undefined,
@@ -617,7 +622,7 @@ function scoreThesisClarity(article: NewsItem): QATestResult {
 
   return {
     test: "Thesis Clarity",
-    passed: score >= 7,
+    passed: score >= 9,
     score,
     maxScore: 10,
     detail: details.length > 0 ? details.join("; ") : undefined,
@@ -755,7 +760,7 @@ function scoreSourceQuality(article: NewsItem): QATestResult {
 
   return {
     test: "Source Quality",
-    passed: score >= 7,
+    passed: score >= 9,
     score,
     maxScore: 10,
     detail: details.length > 0 ? details.join("; ") : undefined,
@@ -795,7 +800,7 @@ function scoreConfidence(article: NewsItem): QATestResult {
 
   return {
     test: "Editorial Confidence",
-    passed: score >= 11,
+    passed: score >= 13,
     score,
     maxScore: 15,
     detail,
@@ -826,7 +831,7 @@ function scoreFactCheck(article: NewsItem): QATestResult {
 
   return {
     test: "Fact Verification",
-    passed: score >= 7,
+    passed: score >= 9,
     score,
     maxScore: 10,
     detail,
@@ -862,7 +867,7 @@ function scoreDataVerification(article: NewsItem): QATestResult {
 
   return {
     test: "Data Verification",
-    passed: score >= 5,
+    passed: score >= 8,
     score,
     maxScore: 10,
     detail,
@@ -899,7 +904,7 @@ function scoreSourceAlignment(article: NewsItem): QATestResult {
 
   return {
     test: "Source Alignment",
-    passed: score >= 4,
+    passed: score >= 6,
     score,
     maxScore: 8,
     detail,
@@ -907,34 +912,116 @@ function scoreSourceAlignment(article: NewsItem): QATestResult {
 }
 
 // ---------------------------------------------------------------------------
-// Image quality
+// Image quality & relevance
 // ---------------------------------------------------------------------------
+
+/**
+ * Known Unsplash photo IDs per topic — used to verify image relevance.
+ * Each topic key maps to expected Unsplash photo ID substrings that are editorially approved.
+ * If an article's image doesn't match its topic's expected images, it's flagged as generic.
+ */
+const TOPIC_IMAGE_IDS: Record<string, string[]> = {
+  federal_reserve: ["1569025591598"],
+  fed_macro:       ["1569025591598"],
+  inflation:       ["1556742049"],
+  gdp:             ["1477959858617"],
+  employment:      ["1521737711867"],
+  trade_policy:    ["1494412574643"],
+  trade_policy_tariff: ["1494412574643"],
+  broad_market:    ["1611974789855"],
+  crypto:          ["1518546305927"],
+  bankruptcy:      ["1507679799987"],
+  merger_acquisition: ["1521791136064"],
+  bond_market:     ["1604594849809"],
+  energy:          ["1466611653911"],
+  earnings:        ["1590283603385"],
+  layoffs:         ["1486312338219"],
+  ipo:             ["1611974789855"],
+  nvidia:          ["1587202372775"],
+};
+
+/**
+ * Keywords expected in article titles/stories for each topic — used to validate
+ * that the image topic assignment actually matches the article content.
+ */
+const TOPIC_CONTENT_KEYWORDS: Record<string, RegExp> = {
+  federal_reserve: /\b(fed|federal reserve|fomc|rate|powell|monetary)\b/i,
+  fed_macro:       /\b(fed|federal reserve|fomc|rate|powell|monetary)\b/i,
+  inflation:       /\b(cpi|ppi|inflation|price|deflat)\b/i,
+  gdp:             /\b(gdp|growth|economic output|recession)\b/i,
+  employment:      /\b(job|employment|payroll|unemployment|labor|hiring|layoff)\b/i,
+  trade_policy:    /\b(tariff|trade|import|export|customs|duty|wto)\b/i,
+  trade_policy_tariff: /\b(tariff|trade|import|export|customs|duty)\b/i,
+  broad_market:    /\b(s&p|nasdaq|dow|market|index|rally|selloff)\b/i,
+  crypto:          /\b(bitcoin|btc|ethereum|crypto|blockchain|defi|token)\b/i,
+  energy:          /\b(oil|crude|wti|brent|opec|energy|petroleum|natural gas)\b/i,
+  earnings:        /\b(earnings|revenue|profit|eps|quarter|fiscal|beat|miss)\b/i,
+  nvidia:          /\b(nvidia|nvda|gpu|chip|blackwell|jensen)\b/i,
+  merger_acquisition: /\b(acqui|merger|m&a|takeover|buyout|deal)\b/i,
+  bankruptcy:      /\b(bankrupt|chapter\s*11|restructur|insolvenc)\b/i,
+  ipo:             /\b(ipo|listing|public offering|debut)\b/i,
+  bond_market:     /\b(treasury|bond|yield|fixed income|tlt|dgs10)\b/i,
+  layoffs:         /\b(layoff|cut|downsiz|restructur|workforce reduc)\b/i,
+};
 
 function scoreImageQuality(article: NewsItem, existingArticles: NewsItem[]): QATestResult {
   let score = 0;
   const details: string[] = [];
 
+  // 1. Valid HTTP URL present (+2)
   if (article.imageUrl && article.imageUrl.startsWith("http")) {
-    score += 3;
+    score += 2;
   } else {
     details.push("no image URL");
   }
 
+  // 2. Uniqueness — not duplicated across feed (+1)
   if (article.imageUrl) {
     const baseUrl = article.imageUrl.split("?")[0];
     const isDuplicate = existingArticles.some(
       (ex) => ex.imageUrl && ex.imageUrl.split("?")[0] === baseUrl
     );
     if (!isDuplicate) {
-      score += 2;
+      score += 1;
     } else {
       details.push("image URL already used by another article");
     }
   }
 
+  // 3. Topic relevance — image should match article's topic/content (+2)
+  if (article.imageUrl && article.topicKey) {
+    const topicKey = article.topicKey;
+    const expectedIds = TOPIC_IMAGE_IDS[topicKey];
+    const contentPattern = TOPIC_CONTENT_KEYWORDS[topicKey];
+    const articleText = `${article.title} ${article.story?.substring(0, 500) ?? ""}`;
+
+    if (expectedIds) {
+      // Check if image is from the expected topic's curated set
+      const imageMatchesTopic = expectedIds.some((id) => article.imageUrl!.includes(id));
+      if (imageMatchesTopic) {
+        score += 2;
+      } else {
+        // Image doesn't match expected topic — check if content actually matches topic
+        if (contentPattern && contentPattern.test(articleText)) {
+          details.push(`image does not match topic "${topicKey}" — may be generic or mis-assigned`);
+        } else {
+          // Topic itself may be wrong — partial credit
+          score += 1;
+          details.push(`topic "${topicKey}" may not match article content — image relevance unclear`);
+        }
+      }
+    } else {
+      // Unknown topic — partial credit if URL is valid
+      score += 1;
+    }
+  } else if (article.imageUrl) {
+    // No topicKey — can't validate relevance, partial credit
+    score += 1;
+  }
+
   return {
     test: "Image Quality",
-    passed: score >= 3,
+    passed: score >= 4,
     score,
     maxScore: 5,
     detail: details.length > 0 ? details.join("; ") : undefined,
@@ -1174,7 +1261,7 @@ function scoreSourceCoherence(article: NewsItem): QATestResult {
     detail = `most sources (${incoherent.length}/${sources.length}) are topically unrelated to the article`;
   }
 
-  return { test: "Source Coherence", passed: score >= 3, score, maxScore: 5, detail };
+  return { test: "Source Coherence", passed: score >= 4, score, maxScore: 5, detail };
 }
 
 // ---------------------------------------------------------------------------
@@ -1324,9 +1411,9 @@ export function runEditorialQA(
   // ---------------------------------------------------------------------------
   const hardRejectReasons: string[] = [];
 
-  // Fact check: hard floor applies in ALL modes (production=50, rebuild=35)
-  // Articles with factCheck scores of 29–40 were leaking through in rebuild mode.
-  const FC_HARD_FLOOR = REBUILD_MODE ? 35 : 50;
+  // Fact check: hard floor applies in ALL modes (production=90, rebuild=35)
+  // Only publish articles with very high fact-check confidence.
+  const FC_HARD_FLOOR = REBUILD_MODE ? 35 : 90;
   const fc = article.factCheckScore ?? 0;
   if (fc < FC_HARD_FLOOR) {
     hardRejectReasons.push(`factCheckScore=${fc} < ${FC_HARD_FLOOR} minimum`);
@@ -1339,10 +1426,10 @@ export function runEditorialQA(
   }
 
   if (!REBUILD_MODE) {
-    // Confidence: < 0.60 means insufficient source corroboration
+    // Confidence: < 0.80 means insufficient source corroboration
     const conf = article.confidenceScore ?? 0;
-    if (conf < 0.60) {
-      hardRejectReasons.push(`confidenceScore=${conf} < 0.60 minimum`);
+    if (conf < 0.80) {
+      hardRejectReasons.push(`confidenceScore=${conf} < 0.80 minimum`);
     }
 
     // Source coherence: 0/5 means sources are topically unrelated to article
@@ -1362,10 +1449,10 @@ export function runEditorialQA(
       }
     }
 
-    // Data verification: hard reject if score < 40 (indicates numerical claims are wrong)
+    // Data verification: hard reject if score < 70 (requires strong numerical accuracy)
     const dvScore = article.dataVerificationScore;
-    if (dvScore !== undefined && dvScore !== null && dvScore < 40) {
-      hardRejectReasons.push(`dataVerificationScore=${dvScore} < 40 — numerical claims likely inaccurate`);
+    if (dvScore !== undefined && dvScore !== null && dvScore < 70) {
+      hardRejectReasons.push(`dataVerificationScore=${dvScore} < 70 — numerical claims insufficiently verified`);
     }
 
     // Source alignment: hard reject if too many hallucinations detected

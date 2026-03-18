@@ -265,7 +265,7 @@ const REBUILD_MODE = process.env.REBUILD_MODE === "true";
  *     No tier1, 2+ sources → 0.20 (blocked) ✓
  *     Tier1 + 2 sources    → 0.50 (passes)  ✓
  */
-const CONFIDENCE_THRESHOLD = REBUILD_MODE ? 0.48 : 0.70;
+const CONFIDENCE_THRESHOLD = REBUILD_MODE ? 0.48 : 0.85;
 
 /** In rebuild mode, cap published articles per run at 2 to avoid bulk-publishing weak content. */
 const REBUILD_MAX_ARTICLES = 2;
@@ -1438,7 +1438,7 @@ export async function synthesizeGroupedArticles(
       }
 
       // Reject if composite score too low
-      const FACT_CHECK_THRESHOLD = REBUILD_MODE ? 20 : 55;
+      const FACT_CHECK_THRESHOLD = REBUILD_MODE ? 20 : 80;
       if (shouldRejectStory(adjustedScore, FACT_CHECK_THRESHOLD)) {
         stats.rejected++;
         const reason = `"${group.topic}" fact-check ${adjustedScore} < ${FACT_CHECK_THRESHOLD} (${factCheckReport.breakdown})`;
@@ -1875,7 +1875,8 @@ async function buildChartData(topicKey: string): Promise<ChartDataset | undefine
 
 async function fetchUnsplashImage(
   topicKey: string,
-  cache: Map<string, string>
+  cache: Map<string, string>,
+  usedBaseUrls?: Set<string>
 ): Promise<string | null> {
   const apiKey = process.env.UNSPLASH_ACCESS_KEY;
   if (!apiKey) return null;
@@ -1889,7 +1890,7 @@ async function fetchUnsplashImage(
     const url =
       `https://api.unsplash.com/search/photos` +
       `?query=${encodeURIComponent(query)}` +
-      `&per_page=5` +
+      `&per_page=10` +
       `&orientation=landscape` +
       `&content_filter=high`;
 
@@ -1899,14 +1900,42 @@ async function fetchUnsplashImage(
 
     if (!res.ok) return null;
 
-    const data = await res.json() as { results?: Array<{ urls?: { regular?: string } }> };
-    const photoUrl = data.results?.[0]?.urls?.regular ?? null;
-    if (!photoUrl) return null;
+    const data = await res.json() as {
+      results?: Array<{
+        urls?: { regular?: string };
+        description?: string | null;
+        alt_description?: string | null;
+      }>;
+    };
+    if (!data.results || data.results.length === 0) return null;
 
-    const base = photoUrl.split("?")[0];
-    const normalized = `${base}?w=1200&q=80`;
-    cache.set(topicKey, normalized);
-    return normalized;
+    // Pick the first result that isn't already used and has a relevant description
+    const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+    let bestUrl: string | null = null;
+
+    for (const photo of data.results) {
+      const photoUrl = photo.urls?.regular;
+      if (!photoUrl) continue;
+
+      const base = photoUrl.split("?")[0];
+
+      // Skip if already used in the feed
+      if (usedBaseUrls && usedBaseUrls.has(base)) continue;
+
+      // Check description relevance — prefer images with descriptions matching query
+      const desc = `${photo.description ?? ""} ${photo.alt_description ?? ""}`.toLowerCase();
+      const relevanceHits = queryWords.filter((w) => desc.includes(w)).length;
+
+      if (relevanceHits >= 2 || !bestUrl) {
+        bestUrl = `${base}?w=1200&q=80`;
+        if (relevanceHits >= 2) break; // Good enough — stop looking
+      }
+    }
+
+    if (!bestUrl) return null;
+
+    cache.set(topicKey, bestUrl);
+    return bestUrl;
   } catch {
     return null;
   }
