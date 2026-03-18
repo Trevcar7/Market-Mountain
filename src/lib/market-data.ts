@@ -1741,10 +1741,11 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
   event: string;
   timing: string;
   significance: string;
+  watchMetric?: string;
 }>> {
-  const events: Array<{ event: string; timing: string; significance: string }> = [];
+  const events: Array<{ event: string; timing: string; significance: string; watchMetric?: string }> = [];
 
-  // 1. FMP economic calendar — macro events are first priority
+  // 1. FMP economic calendar — macro events are ABSOLUTE first priority
   try {
     if (process.env.FMP_API_KEY) {
       const from = new Date().toISOString().split("T")[0];
@@ -1763,17 +1764,25 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
           previous?: number;
         }> = await res.json();
 
-        // U.S. high-impact events only, deduplicated by event name
+        // U.S. high-impact events only, deduplicated by event name, sorted by date
         const seen = new Set<string>();
         const highImpact = (Array.isArray(data) ? data : [])
           .filter((e) => e.country === "US" && e.impact === "High" && !seen.has(e.event) && seen.add(e.event))
-          .slice(0, 2);
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(0, 3);
 
         for (const e of highImpact) {
+          const estimateCtx = e.estimate != null && e.previous != null
+            ? ` Consensus: ${e.estimate}; prior: ${e.previous}.`
+            : e.previous != null
+            ? ` Prior: ${e.previous}.`
+            : "";
+
           events.push({
             event: e.event,
             timing: `Upcoming economic data — ${e.date}`,
-            significance: getMacroSignificance(e.event, e.estimate, e.previous),
+            significance: getMacroSignificance(e.event, e.estimate, e.previous) + estimateCtx,
+            watchMetric: getWatchMetric(e.event),
           });
         }
       }
@@ -1809,8 +1818,39 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
       event: "Next FOMC meeting",
       timing: "Policy watch",
       significance: "Rate decisions drive bond yields and rate-sensitive equity sectors.",
+      watchMetric: "Fed Funds futures pricing for next meeting",
     });
   }
 
   return events;
+}
+
+/**
+ * Returns a suggested watchMetric for common macro events.
+ * These are the specific price levels / thresholds investors monitor
+ * around each data release.
+ */
+function getWatchMetric(eventName: string): string | undefined {
+  const lower = eventName.toLowerCase();
+  if (lower.includes("fomc") || lower.includes("federal reserve") || lower.includes("fed"))
+    return "Fed Funds futures pricing; 2-Year Treasury yield direction";
+  if (lower.includes("cpi") || lower.includes("consumer price"))
+    return "Core CPI vs. 0.3% MoM consensus; 10-Year breakeven inflation rate";
+  if (lower.includes("pce"))
+    return "Core PCE vs. Fed's 2% target; 10-Year Treasury yield reaction";
+  if (lower.includes("non-farm") || lower.includes("nonfarm") || lower.includes("payroll"))
+    return "NFP vs. consensus; unemployment rate; average hourly earnings";
+  if (lower.includes("gdp"))
+    return "GDP growth rate vs. consensus; GDPNow tracker comparison";
+  if (lower.includes("ism") || lower.includes("pmi"))
+    return "ISM/PMI above or below 50 expansion threshold";
+  if (lower.includes("retail sales"))
+    return "Retail sales MoM change; control group ex-autos";
+  if (lower.includes("ppi"))
+    return "PPI vs. consensus; pass-through implications for CPI";
+  if (lower.includes("housing") || lower.includes("home"))
+    return "Housing starts/permits vs. consensus; 30-year mortgage rate";
+  if (lower.includes("jobless") || lower.includes("claims"))
+    return "Initial claims vs. 4-week moving average; continuing claims trend";
+  return undefined;
 }

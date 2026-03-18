@@ -210,6 +210,27 @@ async function generateBriefing(
     // Fine — use story key data as fallback
   }
 
+  // ── Fetch upcoming macro calendar events FIRST so Claude can prioritize them ──
+  // This is the critical fix: Claude must see real scheduled macro events
+  // (FOMC, CPI, NFP, etc.) to generate proper "What to Watch" items.
+  let upcomingMacroEvents: Array<{
+    event: string;
+    date: string;
+    estimate?: number | null;
+    previous?: number | null;
+  }> = [];
+  try {
+    const calendarEvents = await fetchBriefingWhatToWatch();
+    upcomingMacroEvents = calendarEvents.map((e) => ({
+      event: e.event,
+      date: e.timing.replace("Upcoming economic data — ", ""),
+      estimate: null,
+      previous: null,
+    }));
+  } catch {
+    // Non-fatal — Claude will generate without calendar data
+  }
+
   // Use Claude to generate structured editorial summaries
   const client = getAnthropicClient();
 
@@ -223,6 +244,11 @@ Summary: ${extractLeadParagraph(s.story)}`
     )
     .join("\n\n");
 
+  // Build macro calendar block for the prompt
+  const macroCalendarBlock = upcomingMacroEvents.length > 0
+    ? `\n\nUPCOMING MACRO CALENDAR (this week):\n${upcomingMacroEvents.map((e) => `- ${e.event} (${e.date})`).join("\n")}\n\nIMPORTANT: Your first 1-2 "whatToWatch" items MUST reference these actual scheduled macro events. Only use story-derived themes for the 3rd item if all calendar slots are filled.`
+    : "";
+
   const prompt = `You are a macro strategist generating a Daily Markets Briefing for Market Mountain, a financial publication read by institutional investors, macro traders, and portfolio managers.
 This briefing publishes at 8:00 AM Eastern each trading day. Your tone must match Bloomberg, the Financial Times, or sell-side macro research notes.
 
@@ -232,9 +258,11 @@ STYLE RULES:
 - Always write "U.S." (with periods) when referring to the United States — never "US"
 
 WHAT TO WATCH RULES:
-- PRIORITY ORDER: (1) scheduled macro releases (FOMC decisions, CPI, PCE, Non-Farm Payrolls, GDP, PMI/ISM, Retail Sales, PPI, Fed speakers), (2) geopolitical / policy events with market-moving potential, (3) major earnings only if no macro events apply
+- ABSOLUTE PRIORITY: Use the UPCOMING MACRO CALENDAR events below as the first 1-2 "whatToWatch" items. These are real scheduled economic releases from the FMP economic calendar — they MUST take precedence over story-derived themes.
+- PRIORITY ORDER: (1) scheduled macro releases from the calendar below (FOMC decisions, CPI, PCE, Non-Farm Payrolls, GDP, PMI/ISM, Retail Sales, PPI, Fed speakers), (2) geopolitical / policy events with market-moving potential from today's stories, (3) major earnings only if no macro events apply
 - Each item must identify a specific macro or market driver and explain the mechanism driving markets
 - Do NOT use generic phrases like "markets reacted", "this highlights", "investors are watching", "in today's environment"
+- Do NOT generate vague ongoing themes like "tariff regime uncertainty" or "inflation persistence" — be specific about WHAT event and WHEN
 - Every item must explain the economic cause-and-effect mechanism
 - Use one of these monitoring labels for "timing": "Ongoing this week", "Intraday monitoring", "Earnings season updates", "Upcoming economic data", "Policy watch"
 - Include a "watchMetric" when a specific price level or threshold is economically meaningful (e.g., "10-Year Treasury above 4.30%", "WTI crude above $95", "S&P 500 testing 50-day MA")
@@ -242,7 +270,7 @@ WHAT TO WATCH RULES:
 
 Today's published stories:
 
-${storyContext}
+${storyContext}${macroCalendarBlock}
 
 Generate a concise editorial briefing with this exact JSON structure. Return ONLY valid JSON — no markdown, no explanation.
 CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MUST have exactly 3 items. No more, no fewer.
@@ -255,9 +283,9 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     "[1 sentence for story 4 — focus on the market impact, or synthesize a key macro implication if fewer than 4 stories exist]"
   ],
   "whatToWatch": [
-    {"event": "[specific macro or market driver — not generic]", "timing": "[monitoring label from the list above]", "significance": "[1-2 sentences: the economic mechanism and what outcome would move markets]", "watchMetric": "[specific level or threshold to monitor, e.g. '10-Year Treasury above 4.30%']"},
-    {"event": "[event name]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]", "watchMetric": "[level or null if none applies]"},
-    {"event": "[event name]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]"}
+    {"event": "[MUST be from UPCOMING MACRO CALENDAR if available — specific scheduled release name and date]", "timing": "[monitoring label from the list above]", "significance": "[1-2 sentences: the economic mechanism and what outcome would move markets]", "watchMetric": "[specific level or threshold to monitor, e.g. '10-Year Treasury above 4.30%']"},
+    {"event": "[second calendar event or high-impact geopolitical/policy event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]", "watchMetric": "[level or null if none applies]"},
+    {"event": "[third item — story-derived forward-looking signal or remaining calendar event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]"}
   ]
 }`;
 
@@ -290,19 +318,46 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     // Fall back to using existing story fields
   }
 
-  // Build "What to Watch" — prefer Claude's output, supplement with FMP earnings calendar
+  // Build "What to Watch" — ensure real macro calendar events take priority
   let whatToWatch = generated?.whatToWatch ?? [];
 
-  // Always try to fill to 3 "What to Watch" items from FMP if Claude
-  // returned fewer than 3 (audit found briefings with only 1 item)
+  // Post-processing: verify Claude actually used the macro calendar events.
+  // If Claude generated vague themes instead of real calendar events,
+  // replace the weakest items with actual FMP data.
+  if (upcomingMacroEvents.length > 0 && whatToWatch.length > 0) {
+    // Check which Claude items reference real calendar events
+    const calendarNames = upcomingMacroEvents.map((e) => e.event.toLowerCase());
+    const isCalendarItem = (item: { event: string }) =>
+      calendarNames.some((name) => item.event.toLowerCase().includes(name.split(" ")[0]));
+
+    const calendarItemCount = whatToWatch.filter(isCalendarItem).length;
+
+    // If Claude didn't include enough calendar events, inject them
+    if (calendarItemCount < Math.min(upcomingMacroEvents.length, 2)) {
+      try {
+        const fmpEvents = await fetchBriefingWhatToWatch();
+        // Replace from the back — keep Claude's best item (usually #1), replace #2 and #3
+        const keep = whatToWatch.filter(isCalendarItem);
+        const fill = fmpEvents.filter(
+          (f) => !keep.some((k) => k.event.toLowerCase().includes(f.event.toLowerCase().split(" ")[0]))
+        );
+        // Calendar events first, then Claude's items
+        whatToWatch = [...keep, ...fill, ...whatToWatch.filter((w) => !isCalendarItem(w))]
+          .slice(0, 3);
+      } catch {
+        // Non-fatal
+      }
+    }
+  }
+
+  // Fill remaining slots if Claude returned fewer than 3
   if (whatToWatch.length < 3) {
     try {
       const fmpEvents = await fetchBriefingWhatToWatch();
-      // Merge: Claude events first, FMP events fill remaining slots up to 3
       const merged = [...whatToWatch, ...fmpEvents].slice(0, 3);
       whatToWatch = merged.length > 0 ? merged : whatToWatch;
     } catch {
-      // Non-fatal — keep whatever Claude returned (possibly empty)
+      // Non-fatal
     }
   }
 
