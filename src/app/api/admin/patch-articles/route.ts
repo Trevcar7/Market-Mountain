@@ -362,12 +362,13 @@ export async function POST(req: NextRequest) {
           fixes.push(`marketImpact: removed ${article.marketImpact.length} hallucinated entries [${article.marketImpact.map(m => m.asset).join(",")}]`);
           article.marketImpact = undefined;
         }
-        // Chart position: move 10Y chart from after Event Summary to after Market Reaction
+        // Chart position: place after Market Reaction text (P3), not the heading (P2)
+        // Paragraphs: P0=heading, P1=text, P2=heading, P3=text, ...
         if (article.chartData && article.chartData.length > 0) {
           for (const chart of article.chartData) {
-            if (chart.insertAfterParagraph === 1) {
-              chart.insertAfterParagraph = 2;
-              fixes.push("chartData: moved 10Y chart from P1→P2 (after Market Reaction)");
+            if (chart.insertAfterParagraph !== 3) {
+              fixes.push(`chartData: moved chart from P${chart.insertAfterParagraph}→P3 (after Market Reaction text)`);
+              chart.insertAfterParagraph = 3;
             }
           }
         }
