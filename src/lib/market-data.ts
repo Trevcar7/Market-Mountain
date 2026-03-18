@@ -902,11 +902,43 @@ export async function fetchPrevClose(
  *   FRED_API_KEY, BLS_API_KEY, EIA_API_KEY, ALPHAVANTAGE_API_KEY, FMP_API_KEY
  */
 export async function fetchContextualData(
-  topicKey: string
+  topicKey: string,
+  /** Optional ticker for company-specific data enrichment */
+  ticker?: string,
 ): Promise<KeyDataPoint[]> {
   const points: KeyDataPoint[] = [];
 
   try {
+    // ── Company-specific data (any article with an identified subject) ────
+    // Fetch market cap, P/E, 52-week performance from FMP before topic-level
+    // data. These appear first in the key data strip, giving each article a
+    // unique identity instead of generic macro numbers.
+    if (ticker && process.env.FMP_API_KEY) {
+      try {
+        const profile = await fetchFmpCompanyProfile(ticker);
+        if (profile) {
+          if (profile.mktCap) {
+            const capB = (profile.mktCap / 1e9).toFixed(1);
+            points.push({ label: `${ticker} Market Cap`, value: `$${capB}B`, source: "FMP" });
+          }
+          if (profile.price) {
+            const changeStr = profile.changes != null
+              ? ` (${profile.changes >= 0 ? "+" : ""}${profile.changes.toFixed(2)}%)`
+              : "";
+            points.push({ label: `${ticker} Price`, value: `$${profile.price.toFixed(2)}${changeStr}`, source: "FMP" });
+          }
+          if (profile.pe) {
+            points.push({ label: `${ticker} P/E`, value: profile.pe.toFixed(1), source: "FMP" });
+          }
+          if (profile.sector) {
+            points.push({ label: "Sector", value: profile.sector, source: "FMP" });
+          }
+        }
+      } catch {
+        // Company data is supplemental — don't block on failure
+      }
+    }
+
     switch (topicKey) {
 
       // ── Federal Reserve / monetary policy ──────────────────────────────
@@ -1506,9 +1538,24 @@ function generateChartCaption(
  */
 export async function fetchChartSeriesForTopic(
   topicKey: string,
-  /** Optional ticker symbol for stock-specific charts (used by earnings articles) */
+  /** Optional ticker for stock-specific charts — used for ANY company-specific article */
   ticker?: string,
 ): Promise<(ChartSeriesConfig & { labels: string[]; values: number[] }) | null> {
+
+  // ── Ticker-first: if a company ticker is identified, show its stock chart
+  // regardless of topic category. A Novartis M&A story should show NVS, not
+  // a generic 10Y Treasury. Macro-only topics (fed, inflation, GDP, employment,
+  // bond_market) skip this since they have no company subject.
+  const MACRO_ONLY_TOPICS = new Set([
+    "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
+    "bond_market", "broad_market", "markets", "currency", "dxy",
+  ]);
+
+  if (ticker && process.env.FMP_API_KEY && !MACRO_ONLY_TOPICS.has(topicKey)) {
+    const stockChart = await fetchFmpStockHistory(ticker, 90);
+    if (stockChart) return stockChart;
+    // If FMP fails, fall through to topic-based chart below
+  }
 
   switch (topicKey) {
 
@@ -1676,7 +1723,12 @@ export async function buildNewsChartData(
     const result = await fetchChartSeriesForTopic(topicKey, ticker);
     if (!result || result.values.length < 3) return undefined;
 
-    const meta = CHART_METADATA[topicKey];
+    // If the chart is a stock price chart (from FMP), use "STOCK" label
+    // regardless of the topic's default chart metadata
+    const isStockChart = result.source?.includes("FMP") && result.unit === "$";
+    const meta = isStockChart
+      ? { chartLabel: "STOCK", insertAfterParagraph: 1 }
+      : CHART_METADATA[topicKey];
 
     // Append timeframe to title if not already present (e.g., "(12-Month)")
     let title = result.title;

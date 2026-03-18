@@ -1295,12 +1295,17 @@ export async function synthesizeGroupedArticles(
         `[synthesis] Processing: "${group.topic}" (${group.articles.length} sources, importance=${group.importance}, summaryChars=${totalSummaryChars})`
       );
 
+      // Infer primary ticker early from source headlines for data enrichment
+      const sourceText = formattedArticles.map((a) => `${a.title} ${a.summary ?? ""}`).join(" ");
+      const earlyTicker = inferTickerFromText(group.topic, sourceText);
+
       // Fetch contextual market data for evidence enrichment
+      // Pass the ticker so company-specific data (market cap, P/E) is included
       let contextualData: KeyDataPoint[] = [];
       try {
-        contextualData = await fetchContextualData(group.topic);
+        contextualData = await fetchContextualData(group.topic, earlyTicker);
         if (contextualData.length > 0) {
-          console.log(`[synthesis] Enriched "${group.topic}" with ${contextualData.length} market data points`);
+          console.log(`[synthesis] Enriched "${group.topic}" with ${contextualData.length} data points${earlyTicker ? ` (ticker: ${earlyTicker})` : ""}`);
         }
       } catch {
         // Market data failure never blocks synthesis
@@ -1554,7 +1559,10 @@ export async function synthesizeGroupedArticles(
           `[synthesis] Image override: "${group.topic}" → "trade_policy" (trade/tariff keywords detected in titles)`
         );
       }
-      let unsplashUrl = await fetchUnsplashImage(imageTopicOverride, runImageCache);
+      // Pass the first source headline to Unsplash for title-aware queries
+      const firstArticle = group.articles[0] as Record<string, unknown> | undefined;
+      const leadHeadline = String(firstArticle?.headline ?? firstArticle?.title ?? "");
+      let unsplashUrl = await fetchUnsplashImage(imageTopicOverride, runImageCache, undefined, leadHeadline);
 
       // Step 3: If Unsplash result is already in the feed, fetch a different image
       //   using the fallback map or try a slightly different query on retry.
@@ -1595,11 +1603,13 @@ export async function synthesizeGroupedArticles(
       // Track which topics are already charted to avoid duplicates in Phase 2.
       const articleChartedTopics = new Set<string>();
 
-      // For earnings articles, infer the primary ticker for a stock-specific chart
-      const earningsTicker = topicNorm === "earnings" ? inferTickerFromText(parsed.title, synthesizedText) : undefined;
+      // Infer the primary ticker for a company-specific stock chart on ANY article
+      // (not just earnings — an M&A, policy, or macro story about a specific company
+      // should show that company's stock, not a generic 10Y Treasury)
+      const subjectTicker = inferTickerFromText(parsed.title, synthesizedText);
 
       if (chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
-        const primary = await buildChartData(group.topic, earningsTicker);
+        const primary = await buildChartData(group.topic, subjectTicker);
         if (primary) {
           chartCount++;
           articleChartCount++;
@@ -1891,7 +1901,9 @@ async function buildChartData(topicKey: string, ticker?: string): Promise<ChartD
 async function fetchUnsplashImage(
   topicKey: string,
   cache: Map<string, string>,
-  usedBaseUrls?: Set<string>
+  usedBaseUrls?: Set<string>,
+  /** Optional article title to build a more specific image query */
+  articleTitle?: string,
 ): Promise<string | null> {
   const apiKey = process.env.UNSPLASH_ACCESS_KEY;
   if (!apiKey) return null;
@@ -1899,7 +1911,22 @@ async function fetchUnsplashImage(
   const cached = cache.get(topicKey);
   if (cached) return cached;
 
-  const query = TOPIC_IMAGE_QUERIES[topicKey] ?? DEFAULT_IMAGE_QUERY;
+  // Build a title-aware query: extract key nouns from the article title
+  // and append them to the base topic query for more specific results.
+  // "Novartis $11B Bond Sale" → topic query + "Novartis pharmaceutical"
+  let query = TOPIC_IMAGE_QUERIES[topicKey] ?? DEFAULT_IMAGE_QUERY;
+  if (articleTitle) {
+    const STOP = new Set(["the","and","for","are","but","not","all","can","had","was","one","has","with","this","that","from","they","into","over","such","what","when","how","its","will","could","should","also","more","most","other","some","only","very","just","like","new","why","big","may","yet","as","a","an","in","on","at","to","of","is","it","by","up","be","no","or","do","if","so","my","we","us"]);
+    const titleWords = articleTitle
+      .replace(/[^a-zA-Z\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !STOP.has(w.toLowerCase()))
+      .slice(0, 3)
+      .join(" ");
+    if (titleWords.length > 5) {
+      query = `${titleWords} ${query}`.substring(0, 120);
+    }
+  }
 
   try {
     const url =
