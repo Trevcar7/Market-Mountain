@@ -141,6 +141,74 @@ function extractLeadParagraph(story: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Lead story ranking — multi-factor sort for briefing prominence
+// ---------------------------------------------------------------------------
+
+/**
+ * Macro-first category weights. The lead story should always be a high-impact
+ * macro or policy event, not a company-specific story like Bentley or Humana.
+ *
+ * Weight scale: higher = more likely to be lead.
+ */
+const CATEGORY_LEAD_WEIGHT: Record<string, number> = {
+  // Tier 1: broad macro — always lead-worthy
+  macro: 10,
+  policy: 9,
+  // Tier 2: broad markets
+  markets: 7,
+  // Tier 3: sector-specific
+  earnings: 5,
+  crypto: 4,
+  // Tier 4: niche / company-specific
+  other: 2,
+};
+
+/**
+ * Topic keys that indicate broad macro impact — boosted for lead selection.
+ */
+const HIGH_IMPACT_TOPICS = new Set([
+  "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
+  "bond_market", "broad_market", "markets", "trade_policy",
+  "trade_policy_tariff", "geopolitics",
+]);
+
+/**
+ * Multi-factor comparator for selecting the lead story.
+ * Priority: (1) importance, (2) macro category weight, (3) high-impact topic,
+ * (4) number of sources (more corroboration = higher quality),
+ * (5) confidence score, (6) market impact breadth.
+ */
+function rankForLead(a: NewsItem, b: NewsItem): number {
+  // 1. Raw importance (higher = better)
+  if (a.importance !== b.importance) return b.importance - a.importance;
+
+  // 2. Category weight — macro/policy over earnings/company-specific
+  const catA = CATEGORY_LEAD_WEIGHT[a.category] ?? 2;
+  const catB = CATEGORY_LEAD_WEIGHT[b.category] ?? 2;
+  if (catA !== catB) return catB - catA;
+
+  // 3. High-impact topic boost
+  const topicA = HIGH_IMPACT_TOPICS.has(a.topicKey ?? "") ? 1 : 0;
+  const topicB = HIGH_IMPACT_TOPICS.has(b.topicKey ?? "") ? 1 : 0;
+  if (topicA !== topicB) return topicB - topicA;
+
+  // 4. Source count — more corroboration = more significant
+  const srcA = a.sourcesUsed?.length ?? 0;
+  const srcB = b.sourcesUsed?.length ?? 0;
+  if (srcA !== srcB) return srcB - srcA;
+
+  // 5. Confidence score
+  const confA = a.confidenceScore ?? 0;
+  const confB = b.confidenceScore ?? 0;
+  if (confA !== confB) return confB - confA;
+
+  // 6. Market impact breadth (more assets affected = bigger story)
+  const miA = a.marketImpact?.length ?? 0;
+  const miB = b.marketImpact?.length ?? 0;
+  return miB - miA;
+}
+
+// ---------------------------------------------------------------------------
 // Core briefing generation
 // ---------------------------------------------------------------------------
 
@@ -166,7 +234,7 @@ async function generateBriefing(
         const t = new Date(s.publishedAt).getTime();
         return t >= todayStart && t < todayEnd && t >= MARCH_13_CUTOFF_MS;
       })
-      .sort((a, b) => b.importance - a.importance);
+      .sort(rankForLead);
   } catch (err) {
     console.error("[briefing] Failed to load news from KV:", err);
     return null;
@@ -180,7 +248,7 @@ async function generateBriefing(
         (s) => new Date(s.publishedAt).getTime() >= MARCH_13_CUTOFF_MS
       );
       if (eligible.length >= 2) {
-        stories = eligible.slice(0, 6).sort((a, b) => b.importance - a.importance);
+        stories = eligible.slice(0, 6).sort(rankForLead);
       } else {
         return null;
       }
