@@ -31,6 +31,14 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
     if (item && /\bnvidia\b|\bNVDA\b/i.test(item.title ?? "")) {
       item = { ...item, imageUrl: "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80" };
     }
+    // Patch imageUrl and relatedTickers for Bentley articles
+    if (item && /\bbentley\b/i.test(item.title ?? "")) {
+      item = {
+        ...item,
+        imageUrl: "https://images.unsplash.com/photo-1629820402094-3c745c386950?w=1200&q=80",
+        relatedTickers: item.relatedTickers?.map((t) => t === "TSLA" ? "VWAGY" : t),
+      };
+    }
     return item;
   } catch {
     return null;
