@@ -419,6 +419,15 @@ export async function POST(req: NextRequest) {
           fixes.push(`hallucinations: cleared ${article.hallucinations.length} false positive(s)`);
           article.hallucinations = [];
         }
+
+        // 7. Fix second occurrence of wrong Avidity description in Investor Implications
+        if (article.story.includes("a company focused on heart, kidney, and metabolic disease alongside immunology")) {
+          article.story = article.story.replace(
+            "a company focused on heart, kidney, and metabolic disease alongside immunology",
+            "Avidity Biosciences, an RNA therapeutics innovator targeting neuromuscular diseases"
+          );
+          fixes.push("story: corrected second Avidity description in Investor Implications");
+        }
       }
 
       // ── Fix 14: Clear hallucinations list from articles that have been patched ──
