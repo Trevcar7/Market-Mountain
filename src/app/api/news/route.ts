@@ -64,6 +64,8 @@ export async function GET() {
     // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
     const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
     const NVIDIA_IMAGE = "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80";
+    // Bentley Continental GT front grill — Unsplash (Luca Bravo)
+    const BENTLEY_IMAGE = "https://images.unsplash.com/photo-1629820402094-3c745c386950?w=1200&q=80";
     const filteredNews = newsData.news
       .filter(
         (item) =>
@@ -73,7 +75,19 @@ export async function GET() {
       .map((item) => {
         // Patch imageUrl for NVIDIA articles that were cached before the NVIDIA image override was added
         const isNvidiaArticle = /\bnvidia\b|\bNVDA\b/i.test(item.title ?? "");
-        const patchedItem = isNvidiaArticle ? { ...item, imageUrl: NVIDIA_IMAGE } : item;
+        // Patch imageUrl and relatedTickers for Bentley articles
+        const isBentleyArticle = /\bbentley\b/i.test(item.title ?? "");
+        let patchedItem = isNvidiaArticle ? { ...item, imageUrl: NVIDIA_IMAGE } : item;
+        if (isBentleyArticle) {
+          patchedItem = {
+            ...patchedItem,
+            imageUrl: BENTLEY_IMAGE,
+            // Replace Tesla (mentioned only as EV comparison) with VWAGY (Bentley's parent company)
+            relatedTickers: patchedItem.relatedTickers?.map((t) =>
+              t === "TSLA" ? "VWAGY" : t
+            ) ?? patchedItem.relatedTickers,
+          };
+        }
         return Object.fromEntries(
           Object.entries(patchedItem).filter(([k]) => !STRIP_FIELDS.has(k))
         ) as typeof item;
