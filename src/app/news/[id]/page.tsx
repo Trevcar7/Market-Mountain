@@ -35,7 +35,8 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
     if (item && /\bbentley\b/i.test(item.title ?? "")) {
       item = {
         ...item,
-        imageUrl: "https://images.unsplash.com/photo-1629820402094-3c745c386950?w=1200&q=80",
+        // Continental GT close-up logo — logo naturally centered
+        imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80",
         relatedTickers: item.relatedTickers?.map((t) => t === "TSLA" ? "VWAGY" : t),
       };
     }
@@ -191,7 +192,7 @@ export default async function NewsStoryPage({ params }: Props) {
               src={item.imageUrl}
               alt={item.title}
               fill
-              className={`object-cover opacity-50 ${/\bbentley\b/i.test(item.title) ? "object-top" : ""}`}
+              className="object-cover opacity-50"
               priority
               sizes="100vw"
             />

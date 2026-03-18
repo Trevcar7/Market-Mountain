@@ -64,7 +64,7 @@ export async function GET() {
     // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
     const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
     const NVIDIA_IMAGE  = "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80";
-    const BENTLEY_IMAGE = "https://images.unsplash.com/photo-1629820402094-3c745c386950?w=1200&q=80";
+    const BENTLEY_IMAGE = "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80";
     const HUMANA_IMAGE  = "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80";
     const APPLE_IBM_IMAGE = "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80";
     const filteredNews = newsData.news
