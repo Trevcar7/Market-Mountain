@@ -63,9 +63,10 @@ export async function GET() {
 
     // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
     const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
-    const NVIDIA_IMAGE = "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80";
-    // Bentley Continental GT front grill — Unsplash (Luca Bravo)
+    const NVIDIA_IMAGE  = "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80";
     const BENTLEY_IMAGE = "https://images.unsplash.com/photo-1629820402094-3c745c386950?w=1200&q=80";
+    const HUMANA_IMAGE  = "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80";
+    const APPLE_IBM_IMAGE = "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80";
     const filteredNews = newsData.news
       .filter(
         (item) =>
@@ -87,6 +88,14 @@ export async function GET() {
               t === "TSLA" ? "VWAGY" : t
             ) ?? patchedItem.relatedTickers,
           };
+        }
+        // Patch imageUrl for Humana / managed care articles
+        if (/\bhumana\b|\bmanaged care\b/i.test(patchedItem.title ?? "")) {
+          patchedItem = { ...patchedItem, imageUrl: HUMANA_IMAGE };
+        }
+        // Patch imageUrl for Apple + IBM M&A article
+        if (/\bibm\b/i.test(patchedItem.title ?? "") && /\bapple\b/i.test(patchedItem.title ?? "")) {
+          patchedItem = { ...patchedItem, imageUrl: APPLE_IBM_IMAGE };
         }
         return Object.fromEntries(
           Object.entries(patchedItem).filter(([k]) => !STRIP_FIELDS.has(k))

@@ -39,6 +39,14 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
         relatedTickers: item.relatedTickers?.map((t) => t === "TSLA" ? "VWAGY" : t),
       };
     }
+    // Patch imageUrl for Humana / managed care articles
+    if (item && /\bhumana\b|\bmanaged care\b/i.test(item.title ?? "")) {
+      item = { ...item, imageUrl: "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80" };
+    }
+    // Patch imageUrl for Apple + IBM M&A article
+    if (item && /\bibm\b/i.test(item.title ?? "") && /\bapple\b/i.test(item.title ?? "")) {
+      item = { ...item, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80" };
+    }
     return item;
   } catch {
     return null;
@@ -183,7 +191,7 @@ export default async function NewsStoryPage({ params }: Props) {
               src={item.imageUrl}
               alt={item.title}
               fill
-              className="object-cover opacity-50"
+              className={`object-cover opacity-50 ${/\bbentley\b/i.test(item.title) ? "object-top" : ""}`}
               priority
               sizes="100vw"
             />
