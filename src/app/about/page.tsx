@@ -5,7 +5,7 @@ import Image from "next/image";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Trevor Carnovsky — CMU student, equity researcher, and founder of Market Mountain.",
+    "Trevor Carnovsky — equity researcher, investment analyst, and founder of Market Mountain. CFA Research Challenge champion, RBC Capital Markets, PwC.",
 };
 
 export default function AboutPage() {
@@ -38,27 +38,41 @@ export default function AboutPage() {
 
       {/* Bio */}
       <div className="prose prose-slate max-w-none">
+        <h2>Background</h2>
         <p>
-          I&apos;m Trevor Carnovsky, a student at Central Michigan University
-          with a strong interest in financial markets and long-term value
-          creation. Through Market Mountain, I share thoughtful perspectives on
-          market conditions, macroeconomic developments, and in-depth analysis
-          of individual equities.
+          I&apos;m Trevor Carnovsky, an equity researcher and investment analyst
+          with experience across capital markets, audit, and portfolio management.
+          I founded Market Mountain to publish independent equity research, macro
+          analysis, and automated daily market briefings built on institutional-grade
+          data pipelines.
         </p>
 
         <p>
-          My work emphasizes data-driven analysis, fundamental research, and
-          disciplined investment frameworks. The goal is to present clear,
-          well-reasoned insights that help readers better understand how market
-          forces, company fundamentals, and risk considerations interact in
-          real-world investing.
+          My professional experience spans{" "}
+          <strong>Royal Bank of Canada</strong> (Capital Markets operations) and{" "}
+          <strong>PwC</strong> (assurance), where I executed audit testing for a
+          $7B+ revenue energy and utility client under FERC and GAAP standards.
+          I also co-chair a <strong>$4M student-managed investment fund</strong>,
+          leading investment research across equities and fixed income and
+          presenting strategy to the Senior Alumni Advisory Board.
+        </p>
+
+        <h2>Investment Research</h2>
+        <p>
+          My research has been recognized in national competition. I led the{" "}
+          <strong>CFA Institute Research Challenge</strong> team that won the
+          Michigan championship, authoring a five-month equity research report
+          on Penske Automotive Group and presenting a Buy thesis to a CFA
+          charterholder panel. I also placed 2nd out of 60+ teams at the{" "}
+          <strong>University of Florida Stock Pitch Competition</strong>,
+          building a bull/base/bear valuation on First Solar using DCF and
+          trading multiples.
         </p>
 
         <p>
-          Whether exploring broader market trends or evaluating specific
-          investment opportunities, this platform is intended to serve as a
-          resource for those interested in disciplined, research-oriented
-          approaches to finance.
+          I hold the <strong>SIE</strong> and{" "}
+          <strong>Bloomberg Market Concepts</strong> certifications and am
+          currently pursuing <strong>CFA Level I</strong>.
         </p>
 
         <h2>Methodology</h2>
@@ -107,6 +121,18 @@ export default function AboutPage() {
             <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </Link>
+        <a
+          href="https://www.linkedin.com/in/trevor-carnovsky/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border hover:border-navy-300 text-text-muted hover:text-navy-900 font-medium text-sm transition-colors"
+          aria-label="Trevor Carnovsky on LinkedIn"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+          </svg>
+          Connect on LinkedIn
+        </a>
       </div>
     </div>
   );
