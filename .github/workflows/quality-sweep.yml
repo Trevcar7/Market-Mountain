@@ -30,7 +30,7 @@ jobs:
             --max-time 60 \
             -w "\n%{http_code}" \
             -X POST \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Authorization: Bearer ${{ secrets.FETCH_NEWS_SECRET }}" \
             -H "Content-Type: application/json" \
             "$SITE_URL/api/admin/quality-sweep")
 

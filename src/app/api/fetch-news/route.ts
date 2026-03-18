@@ -1337,27 +1337,37 @@ function hashContent(text: string): string {
 }
 
 /**
- * Merge new stories with existing, deduplicating by title+content AND topicKey.
- * New stories are passed first, so newest-first ordering means the first
- * story encountered per topicKey is always the most recent — older duplicates are dropped.
+ * Merge new stories with existing, deduplicating by title+content.
+ *
+ * topicKey dedup is ONLY applied within the same calendar day (UTC) so that
+ * two articles on the same topic from different days can coexist in the feed.
+ * Previously, topicKey dedup was global — a new "trade_policy" story would
+ * silently delete an older one even if they covered different events.
  */
 function mergeNewsWithDedup(stories: NewsItem[]): NewsItem[] {
   const seen = new Set<string>();
-  const seenTopicKeys = new Set<string>();
+  // Track topicKey per day — "trade_policy|2026-03-18" — so same-topic
+  // articles from different days are preserved
+  const seenTopicKeysByDay = new Set<string>();
   const merged: NewsItem[] = [];
 
   for (const story of stories) {
-    // Standard title + content hash dedup
+    // Standard title + content hash dedup (exact duplicates)
     const titleKey = story.title.toLowerCase();
     const contentHash = hashContent(story.story);
     const uniqueKey = `${titleKey}|${contentHash}`;
 
     if (seen.has(uniqueKey)) continue;
 
-    // topicKey dedup: first-encountered wins (newest first since new stories are prepended)
+    // topicKey dedup: only block duplicates from the SAME day
+    // Different days = different events on the same topic = keep both
     if (story.topicKey) {
-      if (seenTopicKeys.has(story.topicKey)) continue;
-      seenTopicKeys.add(story.topicKey);
+      const dayStr = story.publishedAt
+        ? new Date(story.publishedAt).toISOString().split("T")[0]
+        : "unknown";
+      const dayTopicKey = `${story.topicKey}|${dayStr}`;
+      if (seenTopicKeysByDay.has(dayTopicKey)) continue;
+      seenTopicKeysByDay.add(dayTopicKey);
     }
 
     seen.add(uniqueKey);

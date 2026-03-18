@@ -58,8 +58,8 @@ interface SweepReport {
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const validSecret = process.env.CRON_SECRET || process.env.FETCH_NEWS_SECRET;
+  if (validSecret && authHeader !== `Bearer ${validSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -309,8 +309,8 @@ export async function POST(req: NextRequest) {
 // ---------------------------------------------------------------------------
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const validSecret = process.env.CRON_SECRET || process.env.FETCH_NEWS_SECRET;
+  if (validSecret && authHeader !== `Bearer ${validSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
