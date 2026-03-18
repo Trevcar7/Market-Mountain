@@ -374,6 +374,53 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── Fix 16: Novartis article corrections ──
+      if (article.id === "news-1773857520034-1930") {
+        // 1. Fix bond timing: "in October" → "in March 2026" (October was announcement, bonds sold March 16-17)
+        if (article.story.includes("in October to acquire Avidity")) {
+          article.story = article.story.replace(
+            "in October to acquire Avidity",
+            "in March 2026 to fund its acquisition of Avidity"
+          );
+          fixes.push("story: fixed bond sale timing (October→March 2026)");
+        }
+
+        // 2. Fix Avidity therapeutic description — it's RNA/neuromuscular, not heart/kidney/metabolic/oncology
+        if (article.story.includes("heart, kidney, metabolic, immunology, neuroscience, and oncology")) {
+          article.story = article.story.replace(
+            "targets expansion across heart, kidney, metabolic, immunology, neuroscience, and oncology",
+            "targets Avidity's RNA therapeutics platform for neuromuscular diseases, strengthening Novartis's late-stage neuroscience pipeline"
+          );
+          fixes.push("story: corrected Avidity therapeutic focus (RNA/neuromuscular, not heart/kidney/oncology)");
+        }
+
+        // 3. Remove garbled fragment ", reflecting persistent rate pressure..."
+        const garbledFragment = ", reflecting persistent rate pressure that would typically constrain corporate debt issuance, yet Novartis proceeded with the offering, signaling that strategic value creation outweighs near-term financing costs for well-capitalized acquirers.";
+        if (article.story.includes(garbledFragment)) {
+          article.story = article.story.replace(garbledFragment, "");
+          fixes.push("story: removed garbled sentence fragment");
+        }
+
+        // 4. Fix tickers: add NVS (primary subject) and AVID
+        const nvsTickers = ["NVS", "AVID", "GS"];
+        if (JSON.stringify(article.relatedTickers) !== JSON.stringify(nvsTickers)) {
+          fixes.push(`tickers: [${(article.relatedTickers ?? []).join(",")}]→[${nvsTickers.join(",")}]`);
+          article.relatedTickers = nvsTickers;
+        }
+
+        // 5. Fix sentiment: neutral, not negative
+        if (article.sentiment === "negative") {
+          article.sentiment = "neutral";
+          fixes.push("sentiment: negative→neutral");
+        }
+
+        // 6. Clear false hallucination flag (10Y at 4.23% IS accurate per FRED)
+        if (article.hallucinations && article.hallucinations.length > 0) {
+          fixes.push(`hallucinations: cleared ${article.hallucinations.length} false positive(s)`);
+          article.hallucinations = [];
+        }
+      }
+
       // ── Fix 14: Clear hallucinations list from articles that have been patched ──
       if (article.hallucinations && article.hallucinations.length > 0) {
         // After removing hallucinated sentences from story + market impact entries
