@@ -1595,8 +1595,11 @@ export async function synthesizeGroupedArticles(
       // Track which topics are already charted to avoid duplicates in Phase 2.
       const articleChartedTopics = new Set<string>();
 
+      // For earnings articles, infer the primary ticker for a stock-specific chart
+      const earningsTicker = topicNorm === "earnings" ? inferTickerFromText(parsed.title, synthesizedText) : undefined;
+
       if (chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
-        const primary = await buildChartData(group.topic);
+        const primary = await buildChartData(group.topic, earningsTicker);
         if (primary) {
           chartCount++;
           articleChartCount++;
@@ -1877,8 +1880,8 @@ export async function synthesizeGroupedArticles(
  * (EIA for energy, BLS for labor/inflation, FRED for macro/bond).
  * Returns undefined if no API key is set or the topic has no chart mapping.
  */
-async function buildChartData(topicKey: string): Promise<ChartDataset | undefined> {
-  return buildNewsChartData(topicKey);
+async function buildChartData(topicKey: string, ticker?: string): Promise<ChartDataset | undefined> {
+  return buildNewsChartData(topicKey, ticker);
 }
 
 // ---------------------------------------------------------------------------
@@ -2261,6 +2264,58 @@ function cleanClaimForDisplay(claim: string): string {
 function generateId(topic: string): string {
   const hash = topic.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return `news-${Date.now()}-${hash}`;
+}
+
+// ---------------------------------------------------------------------------
+// Ticker inference — extracts primary company ticker from article text
+// ---------------------------------------------------------------------------
+
+/**
+ * Infer the primary stock ticker mentioned in an article title/body.
+ * Used to fetch stock-specific charts for earnings articles.
+ */
+function inferTickerFromText(title: string, body: string): string | undefined {
+  const text = `${title} ${body}`.toLowerCase();
+  const COMPANIES: [RegExp, string][] = [
+    [/\blululemon\b/, "LULU"],
+    [/\bnike\b/, "NKE"],
+    [/\bapple\b/, "AAPL"],
+    [/\btesla\b/, "TSLA"],
+    [/\bnvidia\b|\bnvda\b/, "NVDA"],
+    [/\bmeta\b.*\bplatform/, "META"],
+    [/\bgoogle\b|\balphabet\b/, "GOOGL"],
+    [/\bamazon\b/, "AMZN"],
+    [/\bmicrosoft\b/, "MSFT"],
+    [/\bhumana\b/, "HUM"],
+    [/\bfirst solar\b/, "FSLR"],
+    [/\bnextracker\b/, "NXT"],
+    [/\bpenske\b/, "PAG"],
+    [/\bsprouts\b/, "SFM"],
+    [/\bboeing\b/, "BA"],
+    [/\bjpmorgan\b|\bjp morgan\b/, "JPM"],
+    [/\bgoldman sachs\b/, "GS"],
+    [/\bwalmart\b/, "WMT"],
+    [/\bcostco\b/, "COST"],
+    [/\bunitedhealth\b/, "UNH"],
+    [/\bon holding\b/, "ONON"],
+    [/\bdelta air\b/, "DAL"],
+    [/\bunited airlines\b/, "UAL"],
+    [/\bcoinbase\b/, "COIN"],
+    [/\bpalantir\b/, "PLTR"],
+    [/\bcrowdstrike\b/, "CRWD"],
+    [/\bsnowflake\b/, "SNOW"],
+    [/\bibm\b/, "IBM"],
+  ];
+
+  for (const [regex, ticker] of COMPANIES) {
+    if (regex.test(text)) return ticker;
+  }
+
+  // Fallback: look for explicit ticker mentions like $LULU or (LULU)
+  const tickerMatch = text.match(/\$([A-Z]{1,5})\b|\(([A-Z]{1,5})\)/);
+  if (tickerMatch) return (tickerMatch[1] || tickerMatch[2]).toUpperCase();
+
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------

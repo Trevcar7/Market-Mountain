@@ -581,6 +581,51 @@ function fmpUrl(path: string, params: Record<string, string> = {}): string {
 }
 
 /**
+ * Fetch daily stock price history from FMP for chart display.
+ * Returns a chart-ready series with labels and closing prices.
+ * Used by earnings articles to show the stock's performance around announcements.
+ */
+export async function fetchFmpStockHistory(
+  symbol: string,
+  days = 90,
+): Promise<(ChartSeriesConfig & { labels: string[]; values: number[] }) | null> {
+  if (!process.env.FMP_API_KEY) return null;
+
+  try {
+    const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const to = new Date().toISOString().split("T")[0];
+
+    const res = await fetch(
+      fmpUrl(`/api/v3/historical-price-full/${symbol}`, { from, to }),
+      { signal: withTimeout() },
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const historical: Array<{ date: string; close: number }> = data?.historical ?? [];
+    if (historical.length < 5) return null;
+
+    // FMP returns newest-first — reverse to chronological
+    const sorted = [...historical].reverse();
+    const labels = sorted.map((d) => d.date);
+    const values = sorted.map((d) => d.close);
+
+    return {
+      title: `${symbol} Stock Price`,
+      unit: "$",
+      source: "FMP — Financial Modeling Prep",
+      timeRange: computeTimeRange(labels),
+      type: "line",
+      labels,
+      values,
+    };
+  } catch (err) {
+    console.error(`[market-data] FMP stock history failed for ${symbol}:`, err);
+    return null;
+  }
+}
+
+/**
  * Fetch company profile (market cap, price, P/E, sector, description).
  * Returns null if FMP_API_KEY is absent or request fails.
  */
@@ -1460,7 +1505,9 @@ function generateChartCaption(
  * Tries EIA first for energy topics, BLS for labor/inflation, FRED for macro.
  */
 export async function fetchChartSeriesForTopic(
-  topicKey: string
+  topicKey: string,
+  /** Optional ticker symbol for stock-specific charts (used by earnings articles) */
+  ticker?: string,
 ): Promise<(ChartSeriesConfig & { labels: string[]; values: number[] }) | null> {
 
   switch (topicKey) {
@@ -1552,7 +1599,12 @@ export async function fetchChartSeriesForTopic(
     }
 
     case "earnings": {
-      // Earnings articles get S&P 500 context — individual earnings drive the index
+      // If a specific ticker is provided, fetch its stock price chart from FMP
+      if (ticker && process.env.FMP_API_KEY) {
+        const stockChart = await fetchFmpStockHistory(ticker, 90);
+        if (stockChart) return stockChart;
+      }
+      // Fallback: S&P 500 index context
       const series = await fetchFredChartSeries("SP500", 90);
       if (!series) return null;
       return { ...series, title: "S&P 500 Index — Earnings Context", unit: "Points", source: "FRED — St. Louis Fed", timeRange: computeTimeRange(series.labels), type: "line" };
@@ -1602,7 +1654,7 @@ const CHART_METADATA: Record<string, { chartLabel: string; insertAfterParagraph:
   inflation:       { chartLabel: "INFLATION",        insertAfterParagraph: 1 },
   employment:      { chartLabel: "LABOR MARKET",     insertAfterParagraph: 1 },
   gdp:             { chartLabel: "GROWTH",           insertAfterParagraph: 1 },
-  earnings:        { chartLabel: "EARNINGS CONTEXT",  insertAfterParagraph: 1 },
+  earnings:        { chartLabel: "STOCK",              insertAfterParagraph: 1 },
   broad_market:    { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
   markets:         { chartLabel: "MARKET CONTEXT",   insertAfterParagraph: 1 },
   currency:        { chartLabel: "DOLLAR INDEX",     insertAfterParagraph: 2 },
@@ -1616,10 +1668,12 @@ const CHART_METADATA: Record<string, { chartLabel: string; insertAfterParagraph:
  * Returns undefined if no API key is set or the topic has no chart mapping.
  */
 export async function buildNewsChartData(
-  topicKey: string
+  topicKey: string,
+  /** Optional ticker for stock-specific earnings charts */
+  ticker?: string,
 ): Promise<ChartDataset | undefined> {
   try {
-    const result = await fetchChartSeriesForTopic(topicKey);
+    const result = await fetchChartSeriesForTopic(topicKey, ticker);
     if (!result || result.values.length < 3) return undefined;
 
     const meta = CHART_METADATA[topicKey];
