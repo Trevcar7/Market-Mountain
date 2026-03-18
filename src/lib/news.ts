@@ -430,6 +430,10 @@ export async function fetchNewsAPINews(
 export async function fetchNewsAPIMultiple(
   apiKey: string
 ): Promise<NewsAPIArticle[]> {
+  if (!apiKey) {
+    console.warn("[news] NEWSAPI_API_KEY not set — NewsAPI source disabled");
+    return [];
+  }
   const queries = [
     "federal reserve interest rate inflation",
     "stock earnings revenue quarterly results",
