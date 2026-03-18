@@ -6,6 +6,51 @@ import MacroBoard from "@/components/MacroBoard";
 import MarketStrip from "@/components/MarketStrip";
 import { MarketDataProvider } from "@/contexts/MarketDataContext";
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
+
+const homeJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "Market Mountain",
+      url: SITE_URL,
+      description:
+        "Data-driven equity research, macroeconomic analysis, and disciplined investment frameworks by Trevor Carnovsky.",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/articles?q={search_term_string}` },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "Market Mountain",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/icon.svg`,
+        width: 52,
+        height: 52,
+      },
+      sameAs: ["https://www.linkedin.com/in/trevor-carnovsky/"],
+    },
+    {
+      "@type": "Person",
+      "@id": `${SITE_URL}/#person`,
+      name: "Trevor Carnovsky",
+      url: `${SITE_URL}/about`,
+      jobTitle: "Equity Researcher & Investment Analyst",
+      worksFor: { "@id": `${SITE_URL}/#organization` },
+      sameAs: ["https://www.linkedin.com/in/trevor-carnovsky/"],
+    },
+  ],
+};
+
 export default function HomePage() {
   const articles = getAllArticles();
   const featured = articles[0];
@@ -13,6 +58,10 @@ export default function HomePage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
+      />
       {/* Hero */}
       <section className="bg-navy-900 text-white border-b border-white/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">

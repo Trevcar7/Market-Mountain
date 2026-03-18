@@ -21,6 +21,9 @@ export async function generateStaticParams() {
   return getAllArticleSlugs().map((slug) => ({ slug }));
 }
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const article = getArticle(slug);
@@ -28,15 +31,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: article.title,
     description: article.excerpt,
+    authors: [{ name: "Trevor Carnovsky", url: `${SITE_URL}/about` }],
     alternates: { canonical: `/post/${slug}` },
     openGraph: {
       title: article.title,
       description: article.excerpt,
       type: "article",
       publishedTime: article.date,
+      authors: ["Trevor Carnovsky"],
       ...(article.coverImage
         ? { images: [{ url: article.coverImage, width: 1200, height: 630 }] }
         : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description: article.excerpt,
+      creator: "@TrevorCarnovsky",
+      ...(article.coverImage ? { images: [article.coverImage] } : {}),
     },
   };
 }
@@ -52,8 +64,49 @@ export default async function ArticlePage({ params }: Props) {
 
   const tocHeadings = parseHeadings(article.content);
 
+  const articleUrl = `${SITE_URL}/post/${slug}`;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: article.title,
+    description: article.excerpt,
+    url: articleUrl,
+    datePublished: article.date,
+    ...(article.updated ? { dateModified: article.updated } : { dateModified: article.date }),
+    author: {
+      "@type": "Person",
+      name: "Trevor Carnovsky",
+      url: `${SITE_URL}/about`,
+      jobTitle: "Equity Researcher & Investment Analyst",
+      sameAs: ["https://www.linkedin.com/in/trevor-carnovsky/"],
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Market Mountain",
+      url: SITE_URL,
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/icon.svg` },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
+    ...(article.coverImage
+      ? {
+          image: {
+            "@type": "ImageObject",
+            url: article.coverImage.startsWith("http")
+              ? article.coverImage
+              : `${SITE_URL}${article.coverImage}`,
+            width: 1200,
+            height: 630,
+          },
+        }
+      : {}),
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ReadingProgress />
 
       {/* Article hero */}
