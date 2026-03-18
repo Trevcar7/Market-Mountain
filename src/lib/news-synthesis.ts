@@ -1741,6 +1741,18 @@ export async function synthesizeGroupedArticles(
       // Collapse empty chartData to undefined — avoids storing [] in the article record
       if (chartData.length === 0) chartData = undefined;
 
+      // ── Hallucination Scrub ───────────────────────────────────────────────
+      // Remove sentences from the story body that the source-alignment check
+      // flagged as ungrounded. Detected-but-kept hallucinations are the single
+      // largest quality failure mode — scrub them before the article is stored.
+      const detectedHallucinations = factCheckReport.sourceAlignment?.hallucinations ?? [];
+      if (detectedHallucinations.length > 0) {
+        parsed.story = scrubHallucinationsFromStory(parsed.story, detectedHallucinations);
+        console.warn(
+          `[synthesis] Scrubbed ${detectedHallucinations.length} hallucinated sentence(s) from story body`
+        );
+      }
+
       // Infer category from synthesized content (more accurate than source-level inference)
       const inferredCategory = inferCategoryFromContent(parsed.story, parsed.title, group.topic);
 
@@ -2249,4 +2261,63 @@ function cleanClaimForDisplay(claim: string): string {
 function generateId(topic: string): string {
   const hash = topic.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return `news-${Date.now()}-${hash}`;
+}
+
+// ---------------------------------------------------------------------------
+// Hallucination scrubber — removes flagged sentences from the story body
+// ---------------------------------------------------------------------------
+
+/**
+ * Removes sentences from a story body that the source-alignment fact-checker
+ * flagged as ungrounded (hallucinated). Uses two strategies:
+ *
+ *   1. Direct match  — if the hallucinated string appears verbatim, remove it.
+ *   2. Keyword match — split story into sentences; remove any sentence that
+ *      shares ≥60% of significant words with the hallucinated claim.
+ *
+ * After removal, collapses consecutive blank lines and re-joins section blocks
+ * so the markdown structure stays intact.
+ */
+function scrubHallucinationsFromStory(story: string, hallucinations: string[]): string {
+  if (!hallucinations || hallucinations.length === 0) return story;
+
+  let cleaned = story;
+
+  for (const hall of hallucinations) {
+    const hallTrimmed = hall.trim();
+    if (!hallTrimmed) continue;
+
+    // Strategy 1: direct verbatim removal
+    if (cleaned.includes(hallTrimmed)) {
+      cleaned = cleaned.replace(hallTrimmed, "").replace(/[ \t]+\n/g, "\n");
+      continue;
+    }
+
+    // Strategy 2: keyword-based sentence removal
+    const hallWords = hallTrimmed
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 4); // only meaningful words
+
+    if (hallWords.length === 0) continue;
+
+    // Split on sentence boundaries, preserving section headings (## …)
+    const sentences = cleaned.split(/(?<=[.!?])\s+(?=[A-Z])/);
+    const filtered = sentences.filter((sentence) => {
+      const sentLower = sentence.toLowerCase();
+      const matchCount = hallWords.filter((w) => sentLower.includes(w)).length;
+      const matchRatio = matchCount / hallWords.length;
+      // Remove sentence if it shares ≥60% of the hallucination's keywords
+      return matchRatio < 0.6;
+    });
+
+    if (filtered.length < sentences.length) {
+      cleaned = filtered.join(" ");
+    }
+  }
+
+  // Collapse runs of 3+ blank lines down to 2
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned;
 }

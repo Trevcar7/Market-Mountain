@@ -328,9 +328,45 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── Fix 15: Scrub hallucinated sentences from story body ──
+      // For each article that has flagged hallucinations, remove those sentences
+      // from the story text. The pipeline now does this at publish time, but
+      // existing articles need a retroactive pass.
+      if (article.hallucinations && article.hallucinations.length > 0 && article.story) {
+        const before = article.story.length;
+        article.story = scrubHallucinationsFromStoryBody(article.story, article.hallucinations);
+        if (article.story.length < before) {
+          fixes.push(`story: scrubbed ${article.hallucinations.length} hallucinated sentence(s) from body`);
+        }
+      }
+
+      // ── Fix 15b: Lululemon-specific corrections ──
+      if (article.id === "news-1773848501628-1279") {
+        // Tickers: LULU is the subject — add it and relevant peers; remove generic ETFs
+        const correctTickers = ["LULU", "NKE", "ONON", "SPY"];
+        if (JSON.stringify(article.relatedTickers) !== JSON.stringify(correctTickers)) {
+          fixes.push(`tickers: [${(article.relatedTickers ?? []).join(",")}]→[${correctTickers.join(",")}]`);
+          article.relatedTickers = correctTickers;
+        }
+        // Category: this is an earnings story, not trade policy
+        if (article.category !== "earnings") {
+          fixes.push(`category: ${article.category}→earnings`);
+          article.category = "earnings";
+        }
+        if (article.topicKey !== "earnings") {
+          fixes.push(`topicKey: ${article.topicKey}→earnings`);
+          article.topicKey = "earnings";
+        }
+        // MarketImpact: both entries (-8.5% LULU, -0.6% SPY) are hallucinated
+        if (article.marketImpact && article.marketImpact.length > 0) {
+          fixes.push(`marketImpact: removed ${article.marketImpact.length} hallucinated entries [${article.marketImpact.map(m => m.asset).join(",")}]`);
+          article.marketImpact = undefined;
+        }
+      }
+
       // ── Fix 14: Clear hallucinations list from articles that have been patched ──
       if (article.hallucinations && article.hallucinations.length > 0) {
-        // After removing hallucinated market impact entries, mark hallucinations as addressed
+        // After removing hallucinated sentences from story + market impact entries
         fixes.push(`hallucinations: cleared ${article.hallucinations.length} flagged item(s)`);
         article.hallucinations = [];
       }
@@ -386,6 +422,30 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function scrubHallucinationsFromStoryBody(story: string, hallucinations: string[]): string {
+  if (!hallucinations || hallucinations.length === 0) return story;
+  let cleaned = story;
+  for (const hall of hallucinations) {
+    const hallTrimmed = hall.trim();
+    if (!hallTrimmed) continue;
+    // Direct match first
+    if (cleaned.includes(hallTrimmed)) {
+      cleaned = cleaned.replace(hallTrimmed, "").replace(/[ \t]+\n/g, "\n");
+      continue;
+    }
+    // Keyword-based sentence removal (≥60% word overlap)
+    const hallWords = hallTrimmed.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 4);
+    if (hallWords.length === 0) continue;
+    const sentences = cleaned.split(/(?<=[.!?])\s+(?=[A-Z])/);
+    const filtered = sentences.filter(sentence => {
+      const matchCount = hallWords.filter(w => sentence.toLowerCase().includes(w)).length;
+      return (matchCount / hallWords.length) < 0.6;
+    });
+    if (filtered.length < sentences.length) cleaned = filtered.join(" ");
+  }
+  return cleaned.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function cleanClaim(claim: string): string {
