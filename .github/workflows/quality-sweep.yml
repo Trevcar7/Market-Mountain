@@ -10,6 +10,9 @@ on:
   # Manual trigger for testing
   workflow_dispatch:
 
+permissions:
+  issues: write
+
 jobs:
   quality-sweep:
     runs-on: ubuntu-latest
