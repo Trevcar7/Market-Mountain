@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const forceFactCheck = searchParams.get("force") === "true";
+
   const kv = getRedisClient();
   if (!kv) {
     return NextResponse.json({ error: "Redis not configured" }, { status: 500 });
@@ -64,7 +67,7 @@ export async function POST(req: NextRequest) {
           (c) => c.length < 15 || /^\d+[.,]\d/.test(c) || /^[a-z]/.test(c)
         );
 
-        if (hasGarbledClaims || oldClaims.length === 0) {
+        if (forceFactCheck || hasGarbledClaims || oldClaims.length === 0) {
           article.verifiedClaims = newClaims;
           article.factCheckScore = overallScore;
           fixes.push(`claims: ${oldClaims.length}→${newClaims.length} (score: ${article.factCheckScore}→${overallScore})`);
