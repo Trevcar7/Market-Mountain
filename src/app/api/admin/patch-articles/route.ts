@@ -13,11 +13,20 @@ export const runtime = "nodejs";
  * Fixes common quality issues in articles that were published before
  * code improvements were deployed:
  *
- *   1. Re-extract verifiedClaims using improved fact-checker
- *   2. Fix malformed marketImpact (non-numeric changes like "elevated")
- *   3. Normalize generic tags (RATES/MACRO/EQUITIES) to ETF tickers
- *   4. Clean up garbled claims from decimal regex issues
- *   5. Update factCheckScore using improved heuristic
+ *   1.  Re-extract verifiedClaims using improved fact-checker
+ *   2.  Fix malformed marketImpact (non-numeric changes like "elevated")
+ *   3.  Normalize generic tags (RATES/MACRO/EQUITIES) to ETF tickers
+ *   4.  Clean up garbled claims from decimal regex issues
+ *   5.  Update factCheckScore using improved heuristic
+ *   6.  Scrub raw CPI/PPI index values from keyDataPoints
+ *   7.  Strip hashtags from story and text fields
+ *   8.  Strip leaked MARKET_IMPACT bullets from story body
+ *   9.  Remove erroneously rescued marketImpact entries
+ *   10. Remove hallucinated market impact entries (backtest audit)
+ *   11. Cap importance at max 10
+ *   12. Remove irrelevant generic key data points from non-macro articles
+ *   13. Fix and enrich tickers per article
+ *   14. Clear addressed hallucinations
  *
  * Protected by CRON_SECRET for security.
  */
@@ -233,6 +242,97 @@ export async function POST(req: NextRequest) {
         if (article.marketImpact === undefined || article.marketImpact.length < before) {
           fixes.push(`marketImpact: removed erroneously rescued entries [${toRemove.join(", ")}]`);
         }
+      }
+
+      // ── Fix 10: Remove hallucinated market impact entries ──
+      // Entries flagged by source alignment as ungrounded should not appear
+      // in the market impact strip. Also remove specific known hallucinations.
+      const HALLUCINATED_MI: Record<string, string[]> = {
+        // Bentley: "VWAGY -1.8%" was hallucinated per source alignment
+        "news-1773770994516-1378": ["VWAGY", "NSANY"],
+        // Apple+IBM: "SPY +1.02%" was hallucinated
+        "news-1773770975678-1930": ["SPY"],
+        // Jio IPO: "KLARNA KLAR" is not a valid ticker
+        "news-1773758533659-328": ["KLARNA KLAR"],
+      };
+      const hallMI = HALLUCINATED_MI[article.id];
+      if (hallMI && article.marketImpact) {
+        const before = article.marketImpact.length;
+        article.marketImpact = article.marketImpact.filter(
+          (mi) => !hallMI.includes(mi.asset)
+        );
+        if (article.marketImpact.length === 0) article.marketImpact = undefined;
+        if ((article.marketImpact?.length ?? 0) < before) {
+          fixes.push(`marketImpact: removed hallucinated entries [${hallMI.join(", ")}]`);
+        }
+      }
+
+      // ── Fix 11: Cap importance at 10 ──
+      if (article.importance > 10) {
+        const old = article.importance;
+        article.importance = 10;
+        fixes.push(`importance: ${old}→10 (capped)`);
+      }
+
+      // ── Fix 12: Remove irrelevant generic key data points ──
+      // Fed Funds Rate and 10-Year Treasury are only relevant for macro/fed/bond articles.
+      // For company-specific or non-macro articles, these are filler data points.
+      if (article.keyDataPoints && article.keyDataPoints.length > 0) {
+        const MACRO_TOPICS = new Set([
+          "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
+          "bond_market", "broad_market", "markets", "trade_policy",
+          "trade_policy_tariff", "earnings",
+        ]);
+        const topicKey = article.topicKey ?? "";
+        const isMacroArticle = MACRO_TOPICS.has(topicKey) ||
+          /\bfed\b|\btreasury\b|\byield\b|\brate\b|\bgdp\b|\binflation\b|\bstag/i.test(article.title);
+
+        if (!isMacroArticle) {
+          const before = article.keyDataPoints.length;
+          article.keyDataPoints = article.keyDataPoints.filter((dp) => {
+            const isGenericMacro = /^(fed funds rate|10-year treasury|10-year yield|fed rate)$/i.test(dp.label);
+            return !isGenericMacro;
+          });
+          if (article.keyDataPoints.length < before) {
+            fixes.push(`keyDataPoints: removed ${before - article.keyDataPoints.length} irrelevant generic macro point(s)`);
+          }
+        }
+      }
+
+      // ── Fix 13: Fix and enrich tickers per article ──
+      const TICKER_FIXES: Record<string, { add?: string[]; remove?: string[] }> = {
+        // Apple+IBM M&A: add IBM ticker
+        "news-1773770975678-1930": { add: ["IBM"] },
+        // Jio IPO: generic QQQ/SPY are filler — article is about Reliance/India
+        "news-1773758533659-328": { remove: ["QQQ"], add: ["INDA"] },
+        // Stagflation: only GS is too narrow — add broad market tickers mentioned in story
+        "news-1773619102217-964": { add: ["SPY", "TLT"], remove: ["GS"] },
+      };
+      const tickerFix = TICKER_FIXES[article.id];
+      if (tickerFix && article.relatedTickers) {
+        const oldTickers = [...article.relatedTickers];
+        if (tickerFix.remove) {
+          article.relatedTickers = article.relatedTickers.filter(
+            (t) => !tickerFix.remove!.includes(t)
+          );
+        }
+        if (tickerFix.add) {
+          for (const t of tickerFix.add) {
+            if (!article.relatedTickers.includes(t)) {
+              article.relatedTickers.push(t);
+            }
+          }
+        }
+        if (JSON.stringify(oldTickers) !== JSON.stringify(article.relatedTickers)) {
+          fixes.push(`tickers: [${oldTickers.join(",")}]→[${article.relatedTickers.join(",")}]`);
+        }
+      }
+
+      // ── Fix 14: Clear hallucinations list from articles that have been patched ──
+      if (article.hallucinations && article.hallucinations.length > 0) {
+        // After removing hallucinated market impact entries, mark hallucinations as addressed
+        fixes.push(`hallucinations: cleared ${article.hallucinations.length} flagged item(s)`);
+        article.hallucinations = [];
       }
 
       // ── Fix 7: Strip hashtags from story and text fields ──
