@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import NewsSection from "@/components/NewsSection";
 
 export const metadata: Metadata = {
-  title: "Market News | Market Mountain",
+  title: "Market News",
   description:
     "Daily financial market news and analysis. Stay updated on Federal Reserve decisions, earnings reports, market trends, and economic events affecting your portfolio.",
   keywords: [

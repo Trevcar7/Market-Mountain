@@ -21,8 +21,10 @@ export default function AboutPage() {
             <Image
               src="/images/trevor.jpg"
               alt="Trevor Carnovsky"
-              width={128}
-              height={128}
+              width={256}
+              height={256}
+              quality={90}
+              priority
               className="object-cover w-full h-full"
             />
           </div>

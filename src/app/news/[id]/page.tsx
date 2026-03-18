@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const item = await getNewsItem(id);
   if (!item) return {};
   return {
-    title: `${item.title} | Market Mountain`,
+    title: item.title,
     description: item.whyThisMatters ?? item.story.split(".")[0] + ".",
     alternates: { canonical: `/news/${id}` },
     openGraph: {

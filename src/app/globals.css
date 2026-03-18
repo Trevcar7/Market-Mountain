@@ -26,7 +26,9 @@
   --color-accent-500: #22C55E;
   --color-accent-400: #4ADE80;
   --color-accent-300: #86EFAC;
+  --color-accent-200: #BBF7D0;
   --color-accent-100: #DCFCE7;
+  --color-accent-50:  #F0FDF4;
 
   /* Surface / neutral */
   --color-surface:   #F8F9FA;
