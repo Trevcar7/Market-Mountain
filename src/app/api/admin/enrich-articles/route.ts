@@ -107,11 +107,15 @@ export async function POST(req: NextRequest) {
         );
 
         if (hasGenericChart) {
+          console.log(`[enrich] Fetching stock data for ${ticker} (FMP_API_KEY set: ${!!process.env.FMP_API_KEY})`);
+
           // Fetch stock chart + comparison chart
           const [stockChart, comparisonChart] = await Promise.allSettled([
             fetchFmpStockHistory(ticker, 90),
             buildComparisonChart(ticker, 90),
           ]);
+
+          console.log(`[enrich] ${ticker} results: stock=${stockChart.status}${stockChart.status === 'rejected' ? ' err=' + String(stockChart.reason) : stockChart.value ? ' pts=' + stockChart.value.values.length : ' null'}, comparison=${comparisonChart.status}${comparisonChart.status === 'rejected' ? ' err=' + String(comparisonChart.reason) : comparisonChart.value ? ' series' : ' null'}`);
 
           const newCharts: ChartDataset[] = [];
 
