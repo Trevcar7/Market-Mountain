@@ -608,24 +608,51 @@ export async function fetchFmpStockHistory(
       historical = Array.isArray(stableData) ? stableData : (stableData?.historical ?? []);
     }
 
+    // Fallback to Alpha Vantage if FMP returns no data (premium-only tickers)
+    if (historical.length < 5 && process.env.ALPHAVANTAGE_API_KEY) {
+      const avUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${process.env.ALPHAVANTAGE_API_KEY}`;
+      const avRes = await fetch(avUrl, { signal: withTimeout(15000) }).catch(() => null);
+      if (avRes?.ok) {
+        const avData = await avRes.json();
+        const timeSeries = avData?.["Time Series (Daily)"] ?? {};
+        const entries = Object.entries(timeSeries)
+          .map(([date, vals]) => ({
+            date,
+            close: parseFloat((vals as Record<string, string>)["4. close"] ?? "0"),
+          }))
+          .filter((e) => e.close > 0)
+          .sort((a, b) => a.date.localeCompare(b.date)); // chronological
+
+        // Filter to requested time range
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        historical = entries.filter((e) => e.date >= cutoff);
+      }
+    }
+
     if (historical.length < 5) return null;
 
-    // FMP returns newest-first — reverse to chronological
-    const sorted = [...historical].reverse();
+    // Ensure chronological order
+    const sorted = historical[0].date < historical[historical.length - 1].date
+      ? historical
+      : [...historical].reverse();
     const labels = sorted.map((d) => d.date);
     const values = sorted.map((d) => d.close);
+
+    const source = historical.length > 0 && process.env.FMP_API_KEY
+      ? "FMP — Financial Modeling Prep"
+      : "Alpha Vantage";
 
     return {
       title: `${symbol} Stock Price`,
       unit: "$",
-      source: "FMP — Financial Modeling Prep",
+      source,
       timeRange: computeTimeRange(labels),
       type: "line",
       labels,
       values,
     };
   } catch (err) {
-    console.error(`[market-data] FMP stock history failed for ${symbol}:`, err);
+    console.error(`[market-data] Stock history failed for ${symbol}:`, err);
     return null;
   }
 }
@@ -640,21 +667,41 @@ export async function buildComparisonChart(
   ticker: string,
   days = 90,
 ): Promise<ChartDataset | null> {
-  if (!process.env.FMP_API_KEY) return null;
+  if (!process.env.FMP_API_KEY && !process.env.ALPHAVANTAGE_API_KEY) return null;
 
   try {
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const to = new Date().toISOString().split("T")[0];
 
-    // Fetch historical data from FMP stable API
+    // Fetch historical data: FMP stable API first, Alpha Vantage fallback
     async function fetchHistory(symbol: string): Promise<Array<{ date: string; close: number }>> {
-      const res = await fetch(
-        fmpUrl(`/stable/historical-price-eod/full`, { symbol, from, to }),
-        { signal: withTimeout(15000) },
-      ).catch(() => null);
-      if (res?.ok) {
-        const d = await res.json();
-        return Array.isArray(d) ? d : (d?.historical ?? []);
+      // Try FMP first
+      if (process.env.FMP_API_KEY) {
+        const res = await fetch(
+          fmpUrl(`/stable/historical-price-eod/full`, { symbol, from, to }),
+          { signal: withTimeout(15000) },
+        ).catch(() => null);
+        if (res?.ok) {
+          const d = await res.json();
+          const hist = Array.isArray(d) ? d : (d?.historical ?? []);
+          if (hist.length >= 10) return hist;
+        }
+      }
+      // Alpha Vantage fallback
+      if (process.env.ALPHAVANTAGE_API_KEY) {
+        const avUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${process.env.ALPHAVANTAGE_API_KEY}`;
+        const avRes = await fetch(avUrl, { signal: withTimeout(15000) }).catch(() => null);
+        if (avRes?.ok) {
+          const avData = await avRes.json();
+          const ts = avData?.["Time Series (Daily)"] ?? {};
+          return Object.entries(ts)
+            .map(([date, vals]) => ({
+              date,
+              close: parseFloat((vals as Record<string, string>)["4. close"] ?? "0"),
+            }))
+            .filter((e) => e.close > 0 && e.date >= from)
+            .sort((a, b) => a.date.localeCompare(b.date));
+        }
       }
       return [];
     }
