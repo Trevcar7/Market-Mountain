@@ -247,6 +247,20 @@ export async function POST(req: NextRequest) {
       await kv.set("news", collection);
     }
 
+    // Raw FMP test — diagnose why stock history returns null
+    let fmpTest = "not tested";
+    if (process.env.FMP_API_KEY) {
+      try {
+        const testUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/AAPL?from=2025-12-01&to=2026-03-18&apikey=${process.env.FMP_API_KEY}`;
+        const testRes = await fetch(testUrl, { signal: AbortSignal.timeout(10000) });
+        const testStatus = testRes.status;
+        const testBody = await testRes.text();
+        fmpTest = `status=${testStatus} body=${testBody.slice(0, 200)}`;
+      } catch (err) {
+        fmpTest = `error: ${String(err).slice(0, 200)}`;
+      }
+    }
+
     // Diagnostic: return skipped article reasons
     const diagnostics: Array<{ id: string; title: string; ticker: string | null; isMacro: boolean; hasGenericChart: boolean; fmpKey: boolean }> = [];
     for (const article of collection.news) {
@@ -270,6 +284,7 @@ export async function POST(req: NextRequest) {
       enriched: enrichLog.length,
       details: enrichLog,
       diagnostics,
+      fmpTest,
     });
   } catch (error) {
     console.error("[enrich-articles] Error:", error);
