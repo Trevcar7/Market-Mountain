@@ -54,6 +54,45 @@ export async function POST(req: NextRequest) {
       const headings = headingMatches.map((h) => h.slice(3));
       const genericCount = headings.filter((h) => GENERIC_HEADINGS.has(h)).length;
 
+      // Fetch inline image BEFORE the heading check so articles with
+      // already-custom headings still get images
+      if (!article.inlineImageUrl) {
+        try {
+          const apiKey = process.env.UNSPLASH_ACCESS_KEY;
+          if (apiKey) {
+            const titleWords = article.title
+              .replace(/[^a-zA-Z\s]/g, " ")
+              .split(/\s+/)
+              .filter((w) => w.length > 4)
+              .slice(0, 3)
+              .join(" ");
+            const query = titleWords || article.title.slice(0, 30);
+            const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=landscape&content_filter=high`;
+            const res = await fetch(url, {
+              headers: { Authorization: `Client-ID ${apiKey}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const photos = data?.results ?? [];
+              const heroBase = article.imageUrl?.split("?")[0] ?? "";
+              const suitable = photos.find(
+                (p: { urls?: { regular?: string } }) => {
+                  const photoUrl = p.urls?.regular;
+                  return photoUrl && !photoUrl.startsWith(heroBase);
+                }
+              );
+              if (suitable?.urls?.regular) {
+                const base = suitable.urls.regular.split("?")[0];
+                article.inlineImageUrl = `${base}?w=1200&q=80`;
+                article.inlineImageCaption = article.title.split(/[:\—,]/)[0].trim();
+                article.inlineImagePosition = 5;
+                results.push({ title: article.title, headings: ["+ inline image added"] });
+              }
+            }
+          }
+        } catch { /* non-blocking */ }
+      }
+
       if (genericCount < 3) continue; // Already has custom headings
 
       // Build the prompt for Claude
@@ -115,49 +154,6 @@ Examples of GOOD headings:
         console.error(`[rewrite-headings] Claude failed for "${article.title}":`, err);
       }
 
-      // Fetch inline image if missing
-      if (!article.inlineImageUrl) {
-        try {
-          const apiKey = process.env.UNSPLASH_ACCESS_KEY;
-          if (apiKey) {
-            // Extract key nouns from title for a specific query
-            const titleWords = article.title
-              .replace(/[^a-zA-Z\s]/g, " ")
-              .split(/\s+/)
-              .filter((w) => w.length > 4)
-              .slice(0, 3)
-              .join(" ");
-
-            const query = titleWords || article.title.slice(0, 30);
-            const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=landscape&content_filter=high`;
-            const res = await fetch(url, {
-              headers: { Authorization: `Client-ID ${apiKey}` },
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              const photos = data?.results ?? [];
-              // Pick a different image than the hero
-              const heroBase = article.imageUrl?.split("?")[0] ?? "";
-              const suitable = photos.find(
-                (p: { urls?: { regular?: string } }) => {
-                  const photoUrl = p.urls?.regular;
-                  return photoUrl && !photoUrl.startsWith(heroBase);
-                }
-              );
-              if (suitable?.urls?.regular) {
-                const base = suitable.urls.regular.split("?")[0];
-                article.inlineImageUrl = `${base}?w=1200&q=80`;
-                article.inlineImageCaption = article.title.split(/[:\—,]/)[0].trim();
-                article.inlineImagePosition = 5; // After "Why It Matters" section
-                results.push({ title: article.title, headings: ["+ inline image added"] });
-              }
-            }
-          }
-        } catch {
-          // Non-blocking
-        }
-      }
     }
 
     // Save
