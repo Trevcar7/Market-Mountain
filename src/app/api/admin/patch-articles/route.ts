@@ -349,7 +349,8 @@ export async function POST(req: NextRequest) {
         const MACRO_TOPICS = new Set([
           "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
           "bond_market", "broad_market", "markets", "trade_policy",
-          "trade_policy_tariff", "earnings",
+          "trade_policy_tariff",
+          // "earnings" removed — company earnings articles like LULU don't need generic 10Y data
         ]);
         const topicKey = article.topicKey ?? "";
         const isMacroArticle = MACRO_TOPICS.has(topicKey) ||
