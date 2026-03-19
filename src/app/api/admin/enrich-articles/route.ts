@@ -247,17 +247,25 @@ export async function POST(req: NextRequest) {
       await kv.set("news", collection);
     }
 
-    // Raw FMP test — diagnose why stock history returns null
-    let fmpTest = "not tested";
+    // Raw FMP test — try multiple endpoint formats to find working one
+    const fmpTests: Record<string, string> = {};
     if (process.env.FMP_API_KEY) {
-      try {
-        const testUrl = `https://financialmodelingprep.com/stable/historical-price-full?symbol=AAPL&from=2025-12-01&to=2026-03-18&apikey=${process.env.FMP_API_KEY}`;
-        const testRes = await fetch(testUrl, { signal: AbortSignal.timeout(10000) });
-        const testStatus = testRes.status;
-        const testBody = await testRes.text();
-        fmpTest = `status=${testStatus} body=${testBody.slice(0, 200)}`;
-      } catch (err) {
-        fmpTest = `error: ${String(err).slice(0, 200)}`;
+      const key = process.env.FMP_API_KEY;
+      const urls: Record<string, string> = {
+        "stable-query": `https://financialmodelingprep.com/stable/historical-price-full?symbol=AAPL&from=2026-01-01&to=2026-03-18&apikey=${key}`,
+        "stable-path": `https://financialmodelingprep.com/stable/historical-price-full/AAPL?from=2026-01-01&to=2026-03-18&apikey=${key}`,
+        "v4": `https://financialmodelingprep.com/api/v4/historical-price-full/AAPL?from=2026-01-01&to=2026-03-18&apikey=${key}`,
+        "stable-eod": `https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=AAPL&from=2026-01-01&to=2026-03-18&apikey=${key}`,
+        "profile-test": `https://financialmodelingprep.com/stable/profile?symbol=AAPL&apikey=${key}`,
+      };
+      for (const [name, url] of Object.entries(urls)) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+          const body = await res.text();
+          fmpTests[name] = `${res.status}: ${body.slice(0, 120)}`;
+        } catch (err) {
+          fmpTests[name] = `ERR: ${String(err).slice(0, 100)}`;
+        }
       }
     }
 
@@ -284,7 +292,7 @@ export async function POST(req: NextRequest) {
       enriched: enrichLog.length,
       details: enrichLog,
       diagnostics,
-      fmpTest,
+      fmpTests,
     });
   } catch (error) {
     console.error("[enrich-articles] Error:", error);
