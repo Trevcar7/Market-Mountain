@@ -256,17 +256,25 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
                     strokeDasharray={isPrimary ? undefined : "6 3"}
                   />
 
-                  {/* Endpoint dot + value */}
+                  {/* Endpoint dot + value with white halo for legibility */}
                   <circle cx={lastPt.x} cy={lastPt.y} r={4} fill="white" stroke={color} strokeWidth="2" />
                   <circle cx={lastPt.x} cy={lastPt.y} r={2} fill={color} />
-                  <text
-                    x={lastPt.x - (si === 0 ? 4 : -4)}
-                    y={lastPt.y - 10}
-                    textAnchor={si === 0 ? "end" : "start"}
-                    fontSize="10" fontWeight="700" fill={color}
-                  >
-                    {formatValue(lastVal)}
-                  </text>
+                  {(() => {
+                    const lx = lastPt.x - (si === 0 ? 4 : -4);
+                    const ly = lastPt.y - 14;
+                    const anchor = si === 0 ? "end" : "start";
+                    return (
+                      <>
+                        <text x={lx} y={ly} textAnchor={anchor} fontSize="10" fontWeight="700"
+                          stroke="white" strokeWidth="4" strokeLinejoin="round" paintOrder="stroke">
+                          {formatValue(lastVal)}
+                        </text>
+                        <text x={lx} y={ly} textAnchor={anchor} fontSize="10" fontWeight="700" fill={color}>
+                          {formatValue(lastVal)}
+                        </text>
+                      </>
+                    );
+                  })()}
                 </g>
               );
             })}
@@ -342,7 +350,12 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             <circle cx={lastPt.x} cy={lastPt.y} r={5.5} fill="white" stroke={ACCENT} strokeWidth="2" />
             <circle cx={lastPt.x} cy={lastPt.y} r={2.5} fill={ACCENT} />
 
-            <text x={labelX} y={lastPt.y - 13} textAnchor={labelAnchor} fontSize="11" fontWeight="700" fill={ACCENT}>
+            {/* White halo behind label so trendline never cuts through text */}
+            <text x={labelX} y={lastPt.y - 14} textAnchor={labelAnchor} fontSize="11" fontWeight="700"
+              stroke="white" strokeWidth="4" strokeLinejoin="round" paintOrder="stroke">
+              ● {formatValue(lastVal)}
+            </text>
+            <text x={labelX} y={lastPt.y - 14} textAnchor={labelAnchor} fontSize="11" fontWeight="700" fill={ACCENT}>
               ● {formatValue(lastVal)}
             </text>
           </svg>
