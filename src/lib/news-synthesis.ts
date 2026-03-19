@@ -84,9 +84,9 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
 
   // Federal Reserve / monetary policy → Fed building
   federal_reserve:
-    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
+    "https://images.unsplash.com/photo-1621944190310-e3cca1564bd7?w=1200&q=80",
   fed_macro:
-    "https://images.unsplash.com/photo-1569025591598-35bcd6438bda?w=1200&q=80",
+    "https://images.unsplash.com/photo-1621944190310-e3cca1564bd7?w=1200&q=80",
 
   // Inflation → financial data / CPI context (NOT the Fed building — avoid duplication)
   inflation:
@@ -122,7 +122,7 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
 
   // Bond market → U.S. Treasury / government finance building (unique image)
   bond_market:
-    "https://images.unsplash.com/photo-1604594849809-dfedff58e37f?w=1200&q=80",
+    "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1200&q=80",
 
   // Energy → OIL PLATFORM / offshore drilling rig (NOT wind turbines, NOT solar panels)
   energy:
@@ -155,7 +155,7 @@ const FALLBACK_IMAGE_MAP: Record<string, string> = {
   markets:
     "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",   // Trading screens
   policy:
-    "https://images.unsplash.com/photo-1604594849809-dfedff58e37f?w=1200&q=80",   // Government finance building
+    "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1200&q=80",   // Government finance building
   earnings_cat:
     "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",   // Financial bar chart
   other:
