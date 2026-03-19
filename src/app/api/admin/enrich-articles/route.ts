@@ -233,10 +233,29 @@ export async function POST(req: NextRequest) {
       await kv.set("news", collection);
     }
 
+    // Diagnostic: return skipped article reasons
+    const diagnostics: Array<{ id: string; title: string; ticker: string | null; isMacro: boolean; hasGenericChart: boolean; fmpKey: boolean }> = [];
+    for (const article of collection.news) {
+      const t = inferTicker(article.title, article.story);
+      const im = MACRO_TOPICS.has(article.topicKey ?? "");
+      const gc = (article.chartData ?? []).some(
+        (c: ChartDataset) => c.title.includes("Treasury") || c.title.includes("S&P 500")
+      );
+      diagnostics.push({
+        id: article.id.slice(0, 20),
+        title: article.title.slice(0, 40),
+        ticker: t,
+        isMacro: im,
+        hasGenericChart: gc,
+        fmpKey: !!process.env.FMP_API_KEY,
+      });
+    }
+
     return NextResponse.json({
       message: `Enriched ${enrichLog.length} of ${collection.news.length} articles`,
       enriched: enrichLog.length,
       details: enrichLog,
+      diagnostics,
     });
   } catch (error) {
     console.error("[enrich-articles] Error:", error);
