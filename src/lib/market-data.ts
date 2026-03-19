@@ -595,33 +595,17 @@ export async function fetchFmpStockHistory(
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const to = new Date().toISOString().split("T")[0];
 
-    // Try stable API first (required for accounts created after Aug 2025),
-    // fall back to legacy v3 endpoint for older accounts
+    // Stable API: /stable/historical-price-eod/full (required for accounts after Aug 2025)
     let historical: Array<{ date: string; close: number }> = [];
 
-    // Stable API: /stable/historical-price-full
     const stableRes = await fetch(
-      fmpUrl(`/stable/historical-price-full`, { symbol, from, to }),
+      fmpUrl(`/stable/historical-price-eod/full`, { symbol, from, to }),
       { signal: withTimeout(15000) },
     ).catch(() => null);
 
     if (stableRes?.ok) {
       const stableData = await stableRes.json();
-      // Stable API may return array directly or { historical: [...] }
       historical = Array.isArray(stableData) ? stableData : (stableData?.historical ?? []);
-    }
-
-    // Fallback: legacy v3 API
-    if (historical.length < 5) {
-      const legacyRes = await fetch(
-        fmpUrl(`/api/v3/historical-price-full/${symbol}`, { from, to }),
-        { signal: withTimeout(15000) },
-      ).catch(() => null);
-
-      if (legacyRes?.ok) {
-        const legacyData = await legacyRes.json();
-        historical = legacyData?.historical ?? [];
-      }
     }
 
     if (historical.length < 5) return null;
@@ -662,26 +646,15 @@ export async function buildComparisonChart(
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const to = new Date().toISOString().split("T")[0];
 
-    // Helper to fetch historical data from FMP (stable API first, legacy fallback)
+    // Fetch historical data from FMP stable API
     async function fetchHistory(symbol: string): Promise<Array<{ date: string; close: number }>> {
-      // Try stable API first
-      const stableRes = await fetch(
-        fmpUrl(`/stable/historical-price-full`, { symbol, from, to }),
+      const res = await fetch(
+        fmpUrl(`/stable/historical-price-eod/full`, { symbol, from, to }),
         { signal: withTimeout(15000) },
       ).catch(() => null);
-      if (stableRes?.ok) {
-        const d = await stableRes.json();
-        const hist = Array.isArray(d) ? d : (d?.historical ?? []);
-        if (hist.length >= 10) return hist;
-      }
-      // Fallback: legacy v3
-      const legacyRes = await fetch(
-        fmpUrl(`/api/v3/historical-price-full/${symbol}`, { from, to }),
-        { signal: withTimeout(15000) },
-      ).catch(() => null);
-      if (legacyRes?.ok) {
-        const d = await legacyRes.json();
-        return d?.historical ?? [];
+      if (res?.ok) {
+        const d = await res.json();
+        return Array.isArray(d) ? d : (d?.historical ?? []);
       }
       return [];
     }
