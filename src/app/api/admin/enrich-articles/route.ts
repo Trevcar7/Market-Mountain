@@ -247,24 +247,21 @@ export async function POST(req: NextRequest) {
       await kv.set("news", collection);
     }
 
-    // Raw FMP test — try multiple endpoint formats to find working one
+    // Test which tickers are available on FMP stable historical endpoint
     const fmpTests: Record<string, string> = {};
     if (process.env.FMP_API_KEY) {
       const key = process.env.FMP_API_KEY;
-      const urls: Record<string, string> = {
-        "stable-query": `https://financialmodelingprep.com/stable/historical-price-full?symbol=AAPL&from=2026-01-01&to=2026-03-18&apikey=${key}`,
-        "stable-path": `https://financialmodelingprep.com/stable/historical-price-full/AAPL?from=2026-01-01&to=2026-03-18&apikey=${key}`,
-        "v4": `https://financialmodelingprep.com/api/v4/historical-price-full/AAPL?from=2026-01-01&to=2026-03-18&apikey=${key}`,
-        "stable-eod": `https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=AAPL&from=2026-01-01&to=2026-03-18&apikey=${key}`,
-        "profile-test": `https://financialmodelingprep.com/stable/profile?symbol=AAPL&apikey=${key}`,
-      };
-      for (const [name, url] of Object.entries(urls)) {
+      const testTickers = ["NVS", "LULU", "HUM", "INDA", "BNTGY", "AAPL"];
+      for (const sym of testTickers) {
         try {
+          const url = `https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${sym}&from=2026-01-01&to=2026-03-18&apikey=${key}`;
           const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
           const body = await res.text();
-          fmpTests[name] = `${res.status}: ${body.slice(0, 120)}`;
+          const parsed = JSON.parse(body);
+          const count = Array.isArray(parsed) ? parsed.length : 0;
+          fmpTests[sym] = `${res.status}: ${count} records${count > 0 ? ` (first: ${JSON.stringify(parsed[0]).slice(0, 80)})` : ` body=${body.slice(0, 80)}`}`;
         } catch (err) {
-          fmpTests[name] = `ERR: ${String(err).slice(0, 100)}`;
+          fmpTests[sym] = `ERR: ${String(err).slice(0, 100)}`;
         }
       }
     }
