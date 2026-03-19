@@ -626,6 +626,97 @@ export async function fetchFmpStockHistory(
 }
 
 /**
+ * Build a multi-series comparison chart: subject stock vs S&P 500 (SPY).
+ * Both series are normalized to percentage change from the start date,
+ * so a $100 stock and a 5000-point index can be meaningfully compared.
+ * Returns a ChartDataset with `series` field for multi-line rendering.
+ */
+export async function buildComparisonChart(
+  ticker: string,
+  days = 90,
+): Promise<ChartDataset | null> {
+  if (!process.env.FMP_API_KEY) return null;
+
+  try {
+    const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const to = new Date().toISOString().split("T")[0];
+
+    // Fetch both in parallel
+    const [stockRes, spyRes] = await Promise.allSettled([
+      fetch(fmpUrl(`/api/v3/historical-price-full/${ticker}`, { from, to }), { signal: withTimeout() }),
+      fetch(fmpUrl(`/api/v3/historical-price-full/SPY`, { from, to }), { signal: withTimeout() }),
+    ]);
+
+    if (stockRes.status !== "fulfilled" || !stockRes.value.ok) return null;
+    if (spyRes.status !== "fulfilled" || !spyRes.value.ok) return null;
+
+    const stockData = await stockRes.value.json();
+    const spyData = await spyRes.value.json();
+
+    const stockHist: Array<{ date: string; close: number }> = stockData?.historical ?? [];
+    const spyHist: Array<{ date: string; close: number }> = spyData?.historical ?? [];
+
+    if (stockHist.length < 10 || spyHist.length < 10) return null;
+
+    // Reverse to chronological (oldest first)
+    const stockSorted = [...stockHist].reverse();
+    const spySorted = [...spyHist].reverse();
+
+    // Build a date → close map for SPY for alignment
+    const spyMap = new Map(spySorted.map((d) => [d.date, d.close]));
+
+    // Align: only include dates where BOTH have data
+    const aligned: { date: string; stock: number; spy: number }[] = [];
+    for (const pt of stockSorted) {
+      const spyClose = spyMap.get(pt.date);
+      if (spyClose !== undefined) {
+        aligned.push({ date: pt.date, stock: pt.close, spy: spyClose });
+      }
+    }
+
+    if (aligned.length < 10) return null;
+
+    // Normalize to % change from first point
+    const stockBase = aligned[0].stock;
+    const spyBase = aligned[0].spy;
+
+    const labels = aligned.map((d) => d.date);
+    const stockPctChange = aligned.map((d) => ((d.stock - stockBase) / stockBase) * 100);
+    const spyPctChange = aligned.map((d) => ((d.spy - spyBase) / spyBase) * 100);
+
+    const lastStockPct = stockPctChange[stockPctChange.length - 1];
+    const lastSpyPct = spyPctChange[spyPctChange.length - 1];
+
+    const outperformance = lastStockPct - lastSpyPct;
+    const outStr = outperformance >= 0
+      ? `outperforming the S&P 500 by ${outperformance.toFixed(1)}pp`
+      : `underperforming the S&P 500 by ${Math.abs(outperformance).toFixed(1)}pp`;
+
+    return {
+      title: `${ticker} vs S&P 500 — Relative Performance`,
+      type: "line",
+      labels,
+      values: stockPctChange, // backward-compat primary
+      unit: "pp",
+      source: "FMP — Financial Modeling Prep",
+      timeRange: computeTimeRange(labels),
+      chartLabel: "PERFORMANCE",
+      insertAfterParagraph: 1,
+      caption: `${ticker} ${lastStockPct >= 0 ? "+" : ""}${lastStockPct.toFixed(1)}% vs S&P 500 ${lastSpyPct >= 0 ? "+" : ""}${lastSpyPct.toFixed(1)}% over the period, ${outStr}.`,
+      referenceValue: 0,
+      referenceLabel: "Start",
+      series: [
+        { name: ticker, values: stockPctChange, color: "#22C55E" },
+        { name: "S&P 500", values: spyPctChange, color: "#64748b" },
+      ],
+    };
+  } catch (err) {
+    console.error(`[market-data] Comparison chart failed for ${ticker}:`, err);
+    return null;
+  }
+}
+
+/**
  * Fetch company profile (market cap, price, P/E, sector, description).
  * Returns null if FMP_API_KEY is absent or request fails.
  */

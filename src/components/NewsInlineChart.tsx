@@ -1,4 +1,4 @@
-import { ChartDataset, KeyDataPoint } from "@/lib/news-types";
+import { ChartDataset, ChartSeries, KeyDataPoint } from "@/lib/news-types";
 
 // ---------------------------------------------------------------------------
 // NewsInlineChart
@@ -6,15 +6,10 @@ import { ChartDataset, KeyDataPoint } from "@/lib/news-types";
 // Pure SVG — no external charting library required.
 //
 // Design standard (institutional, March 2026):
-//   • chartLabel rendered as a small category header above the chart title
-//     (e.g., "ENERGY MARKETS", "RATES", "MARKET CONTEXT")
-//   • Tight y-axis anchored to data range for line charts (macro scale)
-//   • Zero-based y-axis for bar charts
-//   • 2px stroke — clean and lightweight
-//   • Subtle gradient area fill beneath the line
-//   • Final data point: larger dot with white ring + bold value callout
-//   • Optional reference line (e.g., Fed 2% target, $100 threshold)
-//   • YYYY-MM-DD date labels formatted as "Mar '25"
+//   • Single-series: green accent line with gradient fill + endpoint callout
+//   • Multi-series: multiple colored lines with legend (no area fill)
+//     — used for stock vs index comparisons (normalized to % change)
+//   • Reference lines, bar charts, and editorial captions as before
 // ---------------------------------------------------------------------------
 
 interface NewsInlineChartProps {
@@ -23,7 +18,9 @@ interface NewsInlineChartProps {
 
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-/** Format a single label into a base display string (month + year). */
+// Palette for multi-series charts — institutional, high contrast
+const SERIES_COLORS = ["#22C55E", "#64748b", "#f59e0b", "#8b5cf6", "#ef4444"];
+
 function baseFormatLabel(label: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
     const [year, month] = label.split("-");
@@ -40,52 +37,45 @@ function baseFormatLabel(label: string): string {
   return label;
 }
 
-/**
- * Pre-compute deduplicated x-axis display labels for visible ticks.
- *
- * Problem: 90 daily DGS10 points spanning 4 months produce many dates in the
- * same month, all formatting to "Mar '26" — creating 5+ identical tick labels.
- *
- * Fix: first occurrence of each "Mon 'YY" gets the full label; any subsequent
- * tick that maps to the same month label is silently omitted. This gives clean
- * month-boundary labels (e.g. "Dec '25", "Jan '26", "Feb '26", "Mar '26")
- * with no floating day numbers.
- */
 function buildDisplayLabels(
   labels: string[],
   showLabel: (i: number) => boolean
 ): Map<number, string> {
   const seen = new Set<string>();
   const result = new Map<number, string>();
-
   for (let i = 0; i < labels.length; i++) {
     if (!showLabel(i)) continue;
-
     const base = baseFormatLabel(labels[i]);
-
     if (!seen.has(base)) {
       seen.add(base);
       result.set(i, base);
     }
-    // Duplicate month label: skip entirely — no floating day numbers
   }
-
   return result;
 }
 
 
 export function NewsInlineChart({ chart }: NewsInlineChartProps) {
+  const isMultiSeries = chart.series && chart.series.length > 1;
+
   const W = 600;
-  const H = 220;
+  const H = isMultiSeries ? 250 : 220; // Taller for legend
   const PADDING = { top: 28, right: 20, bottom: 44, left: 52 };
   const plotW = W - PADDING.left - PADDING.right;
-  const plotH = H - PADDING.top - PADDING.bottom;
+  const plotH = H - PADDING.top - PADDING.bottom - (isMultiSeries ? 20 : 0);
 
-  const dataMin = Math.min(...chart.values);
-  const dataMax = Math.max(...chart.values);
+  // ── Determine data bounds ─────────────────────────────────────────────────
+  let allValues: number[];
+  if (isMultiSeries && chart.series) {
+    allValues = chart.series.flatMap((s) => s.values);
+  } else {
+    allValues = chart.values;
+  }
+
+  const dataMin = Math.min(...allValues);
+  const dataMax = Math.max(...allValues);
   const dataRange = dataMax - dataMin || 1;
 
-  // ── Y-axis bounds ──────────────────────────────────────────────────────────
   let axisMin: number;
   let axisMax: number;
 
@@ -94,7 +84,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     axisMax = Math.max(0, dataMax) + dataRange * 0.15;
   } else {
     const pad = dataRange * 0.22;
-    axisMin = Math.max(0, dataMin - pad);
+    axisMin = Math.max(dataMin < 0 ? dataMin - pad : 0, dataMin - pad);
     axisMax = dataMax + pad;
 
     if (chart.referenceValue !== undefined) {
@@ -112,6 +102,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const formatValue = (v: number) => {
     const unit = chart.unit ?? "";
     if (unit === "%") return `${v.toFixed(2)}%`;
+    if (unit === "pp") return `${v >= 0 ? "+" : ""}${v.toFixed(1)}pp`;
     if (unit === "Points") return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0);
     if (unit === "$/bbl") return `$${v.toFixed(0)}`;
     if (unit === "$B") return `$${v.toFixed(1)}B`;
@@ -125,16 +116,185 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const TEXT = "#64748b";
   const REF_COLOR = "#94a3b8";
 
-  // Show max 7 labels, evenly spaced. For 90 daily points: step=15, ~6 labels + endpoints.
   const maxLabels = 7;
   const labelStep = chart.labels.length > maxLabels ? Math.ceil(chart.labels.length / maxLabels) : 1;
   const showLabel = (i: number) =>
     i === 0 || i === chart.labels.length - 1 || i % labelStep === 0;
 
-  // Gradient fill ID — unique per chart to avoid SVG conflicts when multiple charts on page
   const gradientId = `fill-${chart.title.replace(/\W/g, "")}`;
 
-  // ── LINE CHART ─────────────────────────────────────────────────────────────
+  // ── Shared chart chrome (grid, x-axis labels, reference line) ─────────────
+  const renderGrid = () => (
+    <>
+      {[0, 0.25, 0.5, 0.75, 1].map((f) => {
+        const y = PADDING.top + f * plotH;
+        const v = axisMax - f * axisRange;
+        return (
+          <g key={f}>
+            <line x1={PADDING.left} y1={y} x2={W - PADDING.right} y2={y} stroke={GRID} strokeWidth="1" />
+            <text x={PADDING.left - 6} y={y + 4} textAnchor="end" fontSize="10" fill={AXIS}>
+              {formatValue(v)}
+            </text>
+          </g>
+        );
+      })}
+    </>
+  );
+
+  const renderXLabels = () => {
+    const displayLabels = buildDisplayLabels(chart.labels, showLabel);
+    return chart.labels.map((_, i) => {
+      const txt = displayLabels.get(i);
+      if (txt === undefined) return null;
+      const x = PADDING.left + i * xStep;
+      return (
+        <text key={i} x={x} y={H - (isMultiSeries ? 30 : 10)} textAnchor="middle" fontSize="10" fill={TEXT}>
+          {txt}
+        </text>
+      );
+    });
+  };
+
+  const renderRefLine = () => {
+    if (chart.referenceValue === undefined) return null;
+    const refY = PADDING.top + toY(chart.referenceValue);
+    if (refY < PADDING.top || refY > PADDING.top + plotH) return null;
+    return (
+      <g>
+        <line x1={PADDING.left} y1={refY} x2={W - PADDING.right} y2={refY}
+          stroke={REF_COLOR} strokeWidth="1.5" strokeDasharray="5 4" />
+        {chart.referenceLabel && (
+          <text x={PADDING.left + 6} y={refY - 5} fontSize="9" fill={REF_COLOR}>
+            {chart.referenceLabel}
+          </text>
+        )}
+      </g>
+    );
+  };
+
+  const renderChartHeader = () => (
+    <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+      {chart.chartLabel && (
+        <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
+          {chart.chartLabel}
+        </p>
+      )}
+      <p className="text-sm font-semibold text-slate-800">{chart.title}</p>
+      {chart.timeRange && (
+        <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
+      )}
+    </div>
+  );
+
+  const renderChartFooter = () => {
+    if (!chart.source && !chart.caption) return null;
+    return (
+      <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 space-y-0.5">
+        {chart.caption && (
+          <p className="text-xs text-slate-600 italic leading-relaxed">{chart.caption}</p>
+        )}
+        {chart.source && (
+          <p className="text-[10px] text-slate-400">Source: {chart.source}</p>
+        )}
+      </div>
+    );
+  };
+
+  // ── MULTI-SERIES LINE CHART ───────────────────────────────────────────────
+  if (chart.type === "line" && isMultiSeries && chart.series) {
+    const legendY = H - 14;
+
+    return (
+      <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        {renderChartHeader()}
+        <div className="bg-white px-4 py-4">
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 280 }} aria-label={chart.title}>
+            {renderGrid()}
+            {renderRefLine()}
+            {renderXLabels()}
+
+            {/* Render each series */}
+            {chart.series.map((series, si) => {
+              const color = series.color ?? SERIES_COLORS[si % SERIES_COLORS.length];
+              const points = series.values.map((v, i) => ({
+                x: PADDING.left + i * xStep,
+                y: PADDING.top + toY(v),
+              }));
+              const pathD = points
+                .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+                .join(" ");
+
+              const lastPt = points[points.length - 1];
+              const lastVal = series.values[series.values.length - 1];
+
+              // Primary series (first) gets area fill
+              const isPrimary = si === 0;
+
+              return (
+                <g key={si}>
+                  {/* Area fill for primary series only */}
+                  {isPrimary && (
+                    <>
+                      <defs>
+                        <linearGradient id={`${gradientId}-${si}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={color} stopOpacity="0.10" />
+                          <stop offset="100%" stopColor={color} stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <path
+                        d={`${pathD} L ${lastPt.x.toFixed(1)} ${PADDING.top + plotH} L ${points[0].x.toFixed(1)} ${PADDING.top + plotH} Z`}
+                        fill={`url(#${gradientId}-${si})`}
+                      />
+                    </>
+                  )}
+
+                  {/* Line */}
+                  <path
+                    d={pathD} fill="none"
+                    stroke={color} strokeWidth={isPrimary ? 2.5 : 1.5}
+                    strokeLinecap="round" strokeLinejoin="round"
+                    strokeDasharray={isPrimary ? undefined : "6 3"}
+                  />
+
+                  {/* Endpoint dot + value */}
+                  <circle cx={lastPt.x} cy={lastPt.y} r={4} fill="white" stroke={color} strokeWidth="2" />
+                  <circle cx={lastPt.x} cy={lastPt.y} r={2} fill={color} />
+                  <text
+                    x={lastPt.x - (si === 0 ? 4 : -4)}
+                    y={lastPt.y - 10}
+                    textAnchor={si === 0 ? "end" : "start"}
+                    fontSize="10" fontWeight="700" fill={color}
+                  >
+                    {formatValue(lastVal)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Legend */}
+            {chart.series.map((series, si) => {
+              const color = series.color ?? SERIES_COLORS[si % SERIES_COLORS.length];
+              const legendSpacing = W / (chart.series!.length + 1);
+              const cx = legendSpacing * (si + 1);
+              return (
+                <g key={`legend-${si}`}>
+                  <line x1={cx - 18} y1={legendY} x2={cx - 6} y2={legendY}
+                    stroke={color} strokeWidth="2" strokeDasharray={si === 0 ? undefined : "4 2"} />
+                  <circle cx={cx - 2} cy={legendY} r={2.5} fill={color} />
+                  <text x={cx + 4} y={legendY + 3.5} fontSize="10" fill={TEXT} fontWeight="500">
+                    {series.name}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        {renderChartFooter()}
+      </figure>
+    );
+  }
+
+  // ── SINGLE-SERIES LINE CHART ──────────────────────────────────────────────
   if (chart.type === "line") {
     const points = chart.values.map((v, i) => ({
       x: PADDING.left + i * xStep,
@@ -144,7 +304,6 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
       .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
       .join(" ");
 
-    // Area fill path: line + close down to baseline
     const baselineY = PADDING.top + plotH;
     const areaD =
       pathD +
@@ -154,38 +313,14 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     const lastPt = points[points.length - 1];
     const lastVal = chart.values[chart.values.length - 1];
 
-    const refY =
-      chart.referenceValue !== undefined
-        ? PADDING.top + toY(chart.referenceValue)
-        : null;
-    const refInBounds =
-      refY !== null && refY >= PADDING.top && refY <= PADDING.top + plotH;
-
-    // Label anchor: shift left if near right edge
     const labelAnchor = lastPt.x > W * 0.75 ? "end" : "middle";
     const labelX = labelAnchor === "end" ? lastPt.x - 2 : lastPt.x;
 
     return (
       <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        {/* Chart header */}
-        <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
-          {chart.chartLabel && (
-            <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
-              {chart.chartLabel}
-            </p>
-          )}
-          <p className="text-sm font-semibold text-slate-800">{chart.title}</p>
-          {chart.timeRange && (
-            <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
-          )}
-        </div>
+        {renderChartHeader()}
         <div className="bg-white px-4 py-4">
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            className="w-full"
-            style={{ maxHeight: 240 }}
-            aria-label={chart.title}
-          >
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }} aria-label={chart.title}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={ACCENT} stopOpacity="0.12" />
@@ -193,100 +328,26 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
               </linearGradient>
             </defs>
 
-            {/* Grid lines */}
-            {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-              const y = PADDING.top + f * plotH;
-              const v = axisMax - f * axisRange;
-              return (
-                <g key={f}>
-                  <line
-                    x1={PADDING.left} y1={y}
-                    x2={W - PADDING.right} y2={y}
-                    stroke={GRID} strokeWidth="1"
-                  />
-                  <text x={PADDING.left - 6} y={y + 4} textAnchor="end" fontSize="10" fill={AXIS}>
-                    {formatValue(v)}
-                  </text>
-                </g>
-              );
-            })}
+            {renderGrid()}
+            {renderRefLine()}
+            {renderXLabels()}
 
-            {/* Reference line (e.g., Fed 2% inflation target) */}
-            {refInBounds && refY !== null && (
-              <g>
-                <line
-                  x1={PADDING.left} y1={refY}
-                  x2={W - PADDING.right} y2={refY}
-                  stroke={REF_COLOR} strokeWidth="1.5" strokeDasharray="5 4"
-                />
-                {chart.referenceLabel && (
-                  <text x={PADDING.left + 6} y={refY - 5} fontSize="9" fill={REF_COLOR}>
-                    {chart.referenceLabel}
-                  </text>
-                )}
-              </g>
-            )}
-
-            {/* X axis labels — deduplicated via buildDisplayLabels */}
-            {(() => {
-              const displayLabels = buildDisplayLabels(chart.labels, showLabel);
-              return chart.labels.map((label, i) => {
-                const txt = displayLabels.get(i);
-                if (txt === undefined) return null;
-                const x = PADDING.left + i * xStep;
-                return (
-                  <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
-                    {txt}
-                  </text>
-                );
-              });
-            })()}
-
-            {/* Gradient area fill */}
             <path d={areaD} fill={`url(#${gradientId})`} />
+            <path d={pathD} fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 
-            {/* Line — 2px stroke */}
-            <path
-              d={pathD} fill="none"
-              stroke={ACCENT} strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round"
-            />
-
-            {/* Intermediate data points — small dots */}
             {points.slice(0, -1).map((p, i) => (
-              <circle
-                key={i} cx={p.x} cy={p.y}
-                r={2} fill={ACCENT} opacity="0.5"
-              />
+              <circle key={i} cx={p.x} cy={p.y} r={2} fill={ACCENT} opacity="0.5" />
             ))}
 
-            {/* Final data point — emphasized with white ring */}
-            <circle
-              cx={lastPt.x} cy={lastPt.y}
-              r={5.5} fill="white" stroke={ACCENT} strokeWidth="2"
-            />
+            <circle cx={lastPt.x} cy={lastPt.y} r={5.5} fill="white" stroke={ACCENT} strokeWidth="2" />
             <circle cx={lastPt.x} cy={lastPt.y} r={2.5} fill={ACCENT} />
 
-            {/* Latest value callout — anchored to final point */}
-            <text
-              x={labelX} y={lastPt.y - 13}
-              textAnchor={labelAnchor}
-              fontSize="11" fontWeight="700" fill={ACCENT}
-            >
+            <text x={labelX} y={lastPt.y - 13} textAnchor={labelAnchor} fontSize="11" fontWeight="700" fill={ACCENT}>
               ● {formatValue(lastVal)}
             </text>
           </svg>
         </div>
-        {(chart.source || chart.caption) && (
-          <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 space-y-0.5">
-            {chart.caption && (
-              <p className="text-xs text-slate-600 italic leading-relaxed">{chart.caption}</p>
-            )}
-            {chart.source && (
-              <p className="text-[10px] text-slate-400">Source: {chart.source}</p>
-            )}
-          </div>
-        )}
+        {renderChartFooter()}
       </figure>
     );
   }
@@ -298,40 +359,15 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
 
   return (
     <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-      <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
-        {chart.chartLabel && (
-          <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
-            {chart.chartLabel}
-          </p>
-        )}
-        <p className="text-sm font-semibold text-slate-800">{chart.title}</p>
-        {chart.timeRange && (
-          <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
-        )}
-      </div>
+      {renderChartHeader()}
       <div className="bg-white px-4 py-4">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }} aria-label={chart.title}>
-          {/* Grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-            const y = PADDING.top + f * plotH;
-            const v = axisMax - f * axisRange;
-            return (
-              <g key={f}>
-                <line x1={PADDING.left} y1={y} x2={W - PADDING.right} y2={y} stroke={GRID} strokeWidth="1" />
-                <text x={PADDING.left - 6} y={y + 4} textAnchor="end" fontSize="10" fill={AXIS}>
-                  {formatValue(v)}
-                </text>
-              </g>
-            );
-          })}
+          {renderGrid()}
 
-          {/* Zero baseline */}
           {axisMin < 0 && (
-            <line x1={PADDING.left} y1={zeroY} x2={W - PADDING.right} y2={zeroY}
-              stroke={AXIS} strokeWidth="1.5" />
+            <line x1={PADDING.left} y1={zeroY} x2={W - PADDING.right} y2={zeroY} stroke={AXIS} strokeWidth="1.5" />
           )}
 
-          {/* Bars */}
           {chart.values.map((v, i) => {
             const barTop = PADDING.top + toY(Math.max(0, v));
             const barBot = PADDING.top + toY(Math.min(0, v));
@@ -339,48 +375,31 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
             const x = PADDING.left + i * barGap + (barGap - barW) / 2;
             const isNeg = v < 0;
             return (
-              <rect
-                key={i} x={x} y={barTop}
-                width={barW} height={bH}
-                fill={isNeg ? "#f87171" : ACCENT}
-                rx="2" opacity="0.85"
-              />
+              <rect key={i} x={x} y={barTop} width={barW} height={bH}
+                fill={isNeg ? "#f87171" : ACCENT} rx="2" opacity="0.85" />
             );
           })}
 
-          {/* X labels — deduplicated via buildDisplayLabels */}
           {(() => {
             const displayLabels = buildDisplayLabels(chart.labels, showLabel);
-            return chart.labels.map((label, i) => {
+            return chart.labels.map((_, i) => {
               const txt = displayLabels.get(i);
               if (txt === undefined) return null;
               const x = PADDING.left + i * barGap + barGap / 2;
               return (
-                <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>
-                  {txt}
-                </text>
+                <text key={i} x={x} y={H - 10} textAnchor="middle" fontSize="10" fill={TEXT}>{txt}</text>
               );
             });
           })()}
         </svg>
       </div>
-      {(chart.source || chart.caption) && (
-        <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 space-y-0.5">
-          {chart.caption && (
-            <p className="text-xs text-slate-600 italic leading-relaxed">{chart.caption}</p>
-          )}
-          {chart.source && (
-            <p className="text-[10px] text-slate-400">Source: {chart.source}</p>
-          )}
-        </div>
-      )}
+      {renderChartFooter()}
     </figure>
   );
 }
 
 // ---------------------------------------------------------------------------
 // NewsKeyDataInline
-// Renders KeyDataPoints as an inline grid within the article body.
 // ---------------------------------------------------------------------------
 
 interface NewsKeyDataInlineProps {

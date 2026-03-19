@@ -11,7 +11,7 @@ import {
   runComprehensiveFactCheck,
 } from "./fact-checker";
 import { formatNewsForStorage, hasQualitySource } from "./news";
-import { fetchContextualData, buildNewsChartData, sanitizeKeyDataPoints } from "./market-data";
+import { fetchContextualData, buildNewsChartData, buildComparisonChart, sanitizeKeyDataPoints } from "./market-data";
 import { runEditorialQA, logQAResult, QA_PASS_THRESHOLD } from "./editorial-qa";
 
 let cachedToneProfile: ToneProfile | null = null;
@@ -1616,22 +1616,39 @@ export async function synthesizeGroupedArticles(
           articleChartedTopics.add(topicNorm);
           chartData = [primary];
 
-          // Companion chart routing — topic-aware secondary pairing
-          const secondaryTopic =
-            topicNorm === "energy" || topicNorm === "trade_policy" ? "bond_market" :
-            topicNorm === "bond_market" || topicNorm === "federal_reserve" || topicNorm === "fed_macro" ? "broad_market" :
-            null;
-
-          if (secondaryTopic && chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
-            const secondary = await buildChartData(secondaryTopic);
-            if (secondary) {
+          // Companion chart routing — two strategies:
+          //   A. Company article with ticker → comparison chart (stock vs S&P 500)
+          //   B. Macro article → topic-aware secondary pairing
+          if (subjectTicker && chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
+            // Strategy A: stock vs S&P 500 comparison (multi-series)
+            const comparison = await buildComparisonChart(subjectTicker);
+            if (comparison) {
               const primaryPos = primary.insertAfterParagraph ?? 0;
-              secondary.insertAfterParagraph = Math.max(primaryPos + 2, 2);
-              if (!secondary.chartLabel) secondary.chartLabel = "MARKET CONTEXT";
+              comparison.insertAfterParagraph = Math.max(primaryPos + 2, 3);
               chartCount++;
               articleChartCount++;
-              articleChartedTopics.add(secondaryTopic);
-              chartData.push(secondary);
+              chartData.push(comparison);
+            }
+          }
+
+          // Strategy B: topic-based companion for macro articles
+          if (!subjectTicker && chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
+            const secondaryTopic =
+              topicNorm === "energy" || topicNorm === "trade_policy" ? "bond_market" :
+              topicNorm === "bond_market" || topicNorm === "federal_reserve" || topicNorm === "fed_macro" ? "broad_market" :
+              null;
+
+            if (secondaryTopic) {
+              const secondary = await buildChartData(secondaryTopic);
+              if (secondary) {
+                const primaryPos = primary.insertAfterParagraph ?? 0;
+                secondary.insertAfterParagraph = Math.max(primaryPos + 2, 2);
+                if (!secondary.chartLabel) secondary.chartLabel = "MARKET CONTEXT";
+                chartCount++;
+                articleChartCount++;
+                articleChartedTopics.add(secondaryTopic);
+                chartData.push(secondary);
+              }
             }
           }
 

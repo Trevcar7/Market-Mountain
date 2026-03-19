@@ -15,11 +15,18 @@ export interface KeyDataPoint {
   source?: string;  // e.g., "FRED", "Bloomberg"
 }
 
+/** A single named data series for multi-line/multi-bar charts */
+export interface ChartSeries {
+  name: string;                  // Legend label (e.g., "LULU", "S&P 500")
+  values: number[];              // Same length as parent labels[]
+  color?: string;                // Hex color override (auto-assigned if omitted)
+}
+
 export interface ChartDataset {
   title: string;
   type: "bar" | "line";
   labels: string[];              // x-axis labels (dates, tickers, etc.)
-  values: number[];              // y-axis values
+  values: number[];              // y-axis values (primary series — backward compatible)
   unit?: string;                 // e.g., "%" or "$B" or "bps"
   source: string;                // Data source attribution
   timeRange?: string;            // e.g., "Jan 2024 – Mar 2026"
@@ -28,6 +35,9 @@ export interface ChartDataset {
   insertAfterParagraph?: number; // 0-indexed paragraph after which this chart is injected
   referenceValue?: number;       // Optional benchmark line (e.g., 2.0 for Fed 2% target)
   referenceLabel?: string;       // Label for reference line (e.g., "Fed 2% Target")
+  /** Multi-series data — when present, renders multiple lines/bars with a legend.
+   *  The primary `values` field is ignored when `series` is set. */
+  series?: ChartSeries[];
 }
 
 // ---------------------------------------------------------------------------
