@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
     let fmpTest = "not tested";
     if (process.env.FMP_API_KEY) {
       try {
-        const testUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/AAPL?from=2025-12-01&to=2026-03-18&apikey=${process.env.FMP_API_KEY}`;
+        const testUrl = `https://financialmodelingprep.com/stable/historical-price-full?symbol=AAPL&from=2025-12-01&to=2026-03-18&apikey=${process.env.FMP_API_KEY}`;
         const testRes = await fetch(testUrl, { signal: AbortSignal.timeout(10000) });
         const testStatus = testRes.status;
         const testBody = await testRes.text();
