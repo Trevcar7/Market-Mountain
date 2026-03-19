@@ -75,8 +75,8 @@ const CATEGORY_OVERRIDES: Record<string, { category: "macro" | "earnings" | "mar
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
-  const validSecret = process.env.CRON_SECRET || process.env.FETCH_NEWS_SECRET;
-  if (validSecret && authHeader !== `Bearer ${validSecret}`) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
