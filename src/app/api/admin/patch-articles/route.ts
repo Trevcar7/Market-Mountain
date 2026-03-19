@@ -267,6 +267,36 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── Fix 20: Add inline images to articles missing them ──
+      if (!article.inlineImageUrl) {
+        // Curated inline images per article for visual variety
+        const INLINE_IMAGES: Record<string, { url: string; caption: string }> = {
+          "news-1773857520034-1930": { // Novartis
+            url: "https://images.unsplash.com/photo-1585435557343-3b092031a831?w=1200&q=80",
+            caption: "Novartis headquarters in Basel, Switzerland",
+          },
+          "news-1773758556411-940": { // NVIDIA
+            url: "https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=1200&q=80",
+            caption: "AI data center infrastructure powering Blackwell demand",
+          },
+          "news-1773619085446-1582": { // Fed/Iran
+            url: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1200&q=80",
+            caption: "Federal Reserve building in Washington, D.C.",
+          },
+          "news-1773598101820-952": { // Humana
+            url: "https://images.unsplash.com/photo-1631815589968-fdb09a223b1e?w=1200&q=80",
+            caption: "Rising healthcare costs pressure managed care margins",
+          },
+        };
+        const inlineImg = INLINE_IMAGES[article.id];
+        if (inlineImg) {
+          article.inlineImageUrl = inlineImg.url;
+          article.inlineImageCaption = inlineImg.caption;
+          article.inlineImagePosition = 5;
+          fixes.push(`inlineImage: added "${inlineImg.caption}"`);
+        }
+      }
+
       // ── Fix 19: Remove irrelevant charts from specific articles ──
       // Jio IPO article: INDA vs S&P 500 comparison is not relevant to an IPO story
       if (article.id === "news-1773758533659-328") {
