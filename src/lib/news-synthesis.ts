@@ -720,15 +720,29 @@ CRITICAL: Every MARKET_IMPACT line MUST use the exact format: ASSET +/-N.N% dire
 [blank line]
 [story body — 5 sections, 500–800 words total]
 
+SINGLE-STORY FOCUS (CRITICAL)
+If your sources cover multiple unrelated events (e.g., an Apple acquisition AND an IBM deal AND a German banking dispute), do NOT write a roundup. Instead:
+- Pick the SINGLE most impactful story as your lead and thesis
+- Use other stories ONLY as brief supporting context (1-2 sentences max) to illustrate a broader trend
+- The headline and thesis must be about ONE event, ONE company, ONE consequence
+- NEVER give equal weight to 3+ unrelated deals/events in one article
+Test: If your article has 3+ company names in the opening paragraph, you are writing a roundup. Stop and refocus on the most newsworthy single story.
+
 STORY RULES
 
 1 Target 500–800 words across five sections — no single section may be less than 60 words
-2 Section 1 (Event Summary): Open with the single most important fact. Inverted pyramid. Most impactful number first. Write in the style of a Reuters flash or FT front-page lede: one sentence, one number, one consequence.
-3 Section 2 (Market Reaction): How markets responded in price terms. Specific index, sector, or asset moves with percentages or basis points. Name at least 2 specific assets or indices. Bloomberg Markets standard: "The S&P 500 fell 1.2%, led by energy names including Exxon (down 3.1%) and Chevron (down 2.8%)."
-4 Section 3 (Macro Analysis): Why this happened. Economic context, precedent, and the broader macro narrative. Include a historical comparison or prior-period reference (e.g., "the largest single-day move since March 2023" or "the third consecutive month above the Fed's 2% target"). Bloomberg/FT standard: connect the event to the macro cycle, not just the headline.
-5 Section 4 (Investor Implications): Which sectors, tickers, or strategies benefit or suffer. Name specific assets. Barron's standard: name at least one ETF, sector, or strategy that benefits and one that faces headwinds. Include a specific price level, valuation multiple, or spread that supports the call.
-6 Section 5 (What to Watch Next): The most important catalyst or data point to monitor over the next 1–4 weeks. CNBC/Reuters standard: name the specific date, event, or data release (e.g., "March 19 FOMC statement" or "April 10 CPI print"). Do not write vague catalysts like "upcoming data releases" or "future Fed decisions."
-7 Begin each section with a section heading on its own line, prefixed with "## ". Example headings: "## Event Summary", "## Market Reaction", "## Macro Context", "## Investor Implications", "## What to Watch". Each heading must be descriptive and specific to the article — e.g., "## How Oil Markets Responded" instead of a generic label. Separate each section with a blank line after the heading.
+2 Section 1 (The News): Open with the single most important fact. Inverted pyramid. Most impactful number first. Write in the style of a Reuters flash or FT front-page lede: one sentence, one number, one consequence.
+3 Section 2 (Market Response): How markets responded in price terms. Specific index, sector, or asset moves with percentages or basis points. Name at least 2 specific assets or indices. Bloomberg Markets standard: "The S&P 500 fell 1.2%, led by energy names including Exxon (down 3.1%) and Chevron (down 2.8%)."
+4 Section 3 (Why It Matters): Why this happened. Economic context, precedent, and the broader macro narrative. Include a historical comparison or prior-period reference (e.g., "the largest single-day move since March 2023" or "the third consecutive month above the Fed's 2% target"). Bloomberg/FT standard: connect the event to the macro cycle, not just the headline.
+5 Section 4 (Investment Case): Which sectors, tickers, or strategies benefit or suffer. Name specific assets. Barron's standard: name at least one ETF, sector, or strategy that benefits and one that faces headwinds. Include a specific price level, valuation multiple, or spread that supports the call.
+6 Section 5 (What to Watch): The most important catalyst or data point to monitor over the next 1–4 weeks. CNBC/Reuters standard: name the specific date, event, or data release (e.g., "March 19 FOMC statement" or "April 10 CPI print"). Do not write vague catalysts like "upcoming data releases" or "future Fed decisions."
+7 EVERY section heading MUST be unique and specific to THIS article. NEVER use generic headings like "Event Summary", "Market Reaction", "Macro Context", or "Investor Implications". Instead write article-specific headings that tell the reader what this section is about. Examples:
+  - "## Novartis Deploys $11 Billion to Acquire Avidity" (not "## Event Summary")
+  - "## Athletic Retail Stocks Slide on Tariff Fears" (not "## Market Reaction")
+  - "## The Stagflation Signal: GDP and Oil Collide" (not "## Macro Context")
+  - "## Short Duration Bonds Over Discretionary" (not "## Investor Implications")
+  - "## March FOMC and April CPI Are the Next Tests" (not "## What to Watch")
+  Begin each heading with "## " on its own line. Separate sections with a blank line.
 8 Use specific numbers, company names, dates, and percentage figures from the sources
 9 Include at least FIVE numerical data points distributed across the story body (not clustered in one paragraph)
 10 Synthesize — do not repeat the same fact in multiple sections
@@ -1811,6 +1825,26 @@ export async function synthesizeGroupedArticles(
         keyDataPoints: contextualData.length > 0 ? sanitizeKeyDataPoints(contextualData) : undefined,
         chartData,
         keyTakeaways: parsed.keyTakeaways.length > 0 ? parsed.keyTakeaways : undefined,
+        // Inline image — fetch a secondary image with different keywords for visual variety
+        ...(await (async () => {
+          try {
+            // Use the parsed title to get a different, more specific image
+            const inlineImg = await fetchUnsplashImage(
+              `${group.topic}_inline`,
+              runImageCache,
+              usedImageBaseUrls,
+              parsed.title,
+            );
+            if (inlineImg && inlineImg !== imageUrl) {
+              return {
+                inlineImageUrl: inlineImg,
+                inlineImageCaption: `${parsed.title.split(/[:\—,]/)[0].trim()}`,
+                inlineImagePosition: 5, // after the 3rd text paragraph (Why It Matters)
+              };
+            }
+          } catch { /* non-blocking */ }
+          return {};
+        })()),
         confidenceScore,
         // Multi-layer fact-check results
         dataVerificationScore: factCheckReport.dataVerification?.score,

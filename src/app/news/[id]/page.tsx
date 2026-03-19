@@ -299,6 +299,25 @@ export default async function NewsStoryPage({ params }: Props) {
                     ))}
                   </div>
                 )}
+                {/* Inline image — visual break mid-article */}
+                {item.inlineImageUrl && (item.inlineImagePosition ?? 5) === i && (
+                  <figure className="not-prose my-8 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+                    <div className="relative h-48 sm:h-64">
+                      <Image
+                        src={item.inlineImageUrl}
+                        alt={item.inlineImageCaption ?? item.title}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 720px"
+                      />
+                    </div>
+                    {item.inlineImageCaption && (
+                      <div className="bg-slate-50 px-5 py-2.5 border-t border-slate-200">
+                        <p className="text-xs text-slate-500 italic">{item.inlineImageCaption}</p>
+                      </div>
+                    )}
+                  </figure>
+                )}
               </React.Fragment>
             ))}
           </div>

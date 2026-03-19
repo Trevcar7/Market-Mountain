@@ -102,6 +102,10 @@ export interface NewsItem {
   eventId?: string;                // Links article to a NewsEvent (optional)
   marketImpact?: MarketImpactItem[]; // Asset-level impact strip (e.g., OIL +4.1%, S&P -1.2%)
   wordCount?: number;              // Approximate word count of story body
+  /** Optional inline image inserted mid-article for visual variety */
+  inlineImageUrl?: string;
+  inlineImageCaption?: string;
+  inlineImagePosition?: number;    // insertAfterParagraph index
 }
 
 export interface NewsCollection {
