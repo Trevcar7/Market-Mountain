@@ -267,6 +267,16 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── Fix 19: Remove irrelevant charts from specific articles ──
+      // Jio IPO article: INDA vs S&P 500 comparison is not relevant to an IPO story
+      if (article.id === "news-1773758533659-328") {
+        if (article.chartData && article.chartData.some(c => c.title.includes("INDA"))) {
+          article.chartData = article.chartData.filter(c => !c.title.includes("INDA"));
+          if (article.chartData.length === 0) article.chartData = undefined;
+          fixes.push("chartData: removed irrelevant INDA vs S&P comparison from Jio IPO article");
+        }
+      }
+
       // ── Fix 17: Deduplicate charts (same title = duplicate from multiple enrichment runs) ──
       if (article.chartData && article.chartData.length > 1) {
         const seenTitles = new Set<string>();
