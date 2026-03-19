@@ -44,9 +44,17 @@ const COMPANY_TICKERS: [RegExp, string][] = [
 ];
 
 function inferTicker(title: string, story: string): string | null {
-  const text = `${title} ${story}`.toLowerCase();
+  // Check TITLE ONLY first — the subject of the article is in the title.
+  // Checking combined title+story causes secondary mentions to override
+  // (e.g., "Goldman Sachs" in a Novartis story → returns GS instead of NVS)
+  const titleLower = title.toLowerCase();
   for (const [regex, ticker] of COMPANY_TICKERS) {
-    if (regex.test(text)) return ticker;
+    if (regex.test(titleLower)) return ticker;
+  }
+  // Fallback: check story body if no title match
+  const storyLower = story.toLowerCase();
+  for (const [regex, ticker] of COMPANY_TICKERS) {
+    if (regex.test(storyLower)) return ticker;
   }
   return null;
 }
@@ -115,7 +123,13 @@ export async function POST(req: NextRequest) {
             buildComparisonChart(ticker, 90),
           ]);
 
-          console.log(`[enrich] ${ticker} results: stock=${stockChart.status}${stockChart.status === 'rejected' ? ' err=' + String(stockChart.reason) : stockChart.value ? ' pts=' + stockChart.value.values.length : ' null'}, comparison=${comparisonChart.status}${comparisonChart.status === 'rejected' ? ' err=' + String(comparisonChart.reason) : comparisonChart.value ? ' series' : ' null'}`);
+          const stockResult = stockChart.status === 'fulfilled'
+            ? (stockChart.value ? `${stockChart.value.values.length} pts` : 'null (no data)')
+            : `FAILED: ${String((stockChart as PromiseRejectedResult).reason).slice(0, 80)}`;
+          const compResult = comparisonChart.status === 'fulfilled'
+            ? (comparisonChart.value ? 'OK' : 'null (no data)')
+            : `FAILED: ${String((comparisonChart as PromiseRejectedResult).reason).slice(0, 80)}`;
+          changes.push(`[diag] FMP stock=${stockResult}, comparison=${compResult}`);
 
           const newCharts: ChartDataset[] = [];
 
