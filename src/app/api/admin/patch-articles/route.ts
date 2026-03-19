@@ -267,6 +267,34 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── Fix 17: Deduplicate charts (same title = duplicate from multiple enrichment runs) ──
+      if (article.chartData && article.chartData.length > 1) {
+        const seenTitles = new Set<string>();
+        const before = article.chartData.length;
+        article.chartData = article.chartData.filter((c) => {
+          if (seenTitles.has(c.title)) return false;
+          seenTitles.add(c.title);
+          return true;
+        });
+        if (article.chartData.length < before) {
+          fixes.push(`chartData: removed ${before - article.chartData.length} duplicate chart(s)`);
+        }
+      }
+
+      // ── Fix 18: Ensure charts are positioned after text paragraphs, not headings ──
+      // In the 5-section structure: P0=heading, P1=text, P2=heading, P3=text, ...
+      // Charts at P0 or P2 (headings) should move to the next text paragraph
+      if (article.chartData && article.chartData.length > 0) {
+        for (const chart of article.chartData) {
+          const pos = chart.insertAfterParagraph;
+          if (pos !== undefined && pos % 2 === 0 && pos < 8) {
+            // Even positions are headings in 5-section structure — move to next text para
+            chart.insertAfterParagraph = pos + 1;
+            fixes.push(`chartData: moved "${chart.title.slice(0, 30)}" from P${pos} (heading) to P${pos + 1} (text)`);
+          }
+        }
+      }
+
       // ── Fix 11: Cap importance at 10 ──
       if (article.importance > 10) {
         const old = article.importance;

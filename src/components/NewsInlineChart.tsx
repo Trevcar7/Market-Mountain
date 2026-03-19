@@ -106,7 +106,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     if (unit === "Points") return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0);
     if (unit === "$/bbl") return `$${v.toFixed(0)}`;
     if (unit === "$B") return `$${v.toFixed(1)}B`;
-    if (unit === "$") return `$${v.toLocaleString()}`;
+    if (unit === "$") return `$${v.toFixed(2)}`;
     return `${v.toFixed(2)}`;
   };
 
