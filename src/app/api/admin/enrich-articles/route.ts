@@ -111,10 +111,14 @@ export async function POST(req: NextRequest) {
       // ── 1. Replace generic 10Y Treasury charts with stock-specific ones ──
       if (ticker && !isMacro && article.chartData && article.chartData.length > 0) {
         const hasGenericChart = article.chartData.some(
-          (c) => c.title.includes("Treasury") || c.title.includes("S&P 500")
+          (c) => c.title.includes("Treasury") || c.title.includes("S&P 500 Index")
+        );
+        // Skip if article already has a stock-specific chart (avoid wasteful re-enrichment)
+        const alreadyHasStockChart = article.chartData.some(
+          (c) => c.chartLabel === "STOCK" || c.chartLabel === "PERFORMANCE" || c.title.includes("Stock Price")
         );
 
-        if (hasGenericChart) {
+        if (hasGenericChart && !alreadyHasStockChart) {
           console.log(`[enrich] Fetching stock data for ${ticker} (FMP_API_KEY set: ${!!process.env.FMP_API_KEY})`);
 
           // Fetch stock chart + comparison chart
