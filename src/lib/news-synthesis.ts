@@ -748,7 +748,7 @@ STORY RULES
 10 Synthesize — do not repeat the same fact in multiple sections
 11 Write with analytical depth and measured tone — not sensationalism
 12 Do not invent any facts not present in the provided sources or the MARKET DATA section
-13 No markdown formatting except ## section headings — no bullet points, bold, italic, or horizontal rules
+13 No markdown formatting except ## section headings and > blockquotes — no bullet points, bold, italic, or horizontal rules. Use > blockquotes sparingly (at most 1 per article) to highlight a direct quote from a named official, CEO, or analyst that is central to the thesis. Example: "> Fed Chair Powell noted that 'the committee remains attentive to inflation risks.'" Do NOT use blockquotes for your own analysis.
 14 No dashes of any kind (em dash or hyphen used as punctuation)
 15 Write in third person only — never use "I" or first-person perspective
 16 Write in plain prose paragraphs only

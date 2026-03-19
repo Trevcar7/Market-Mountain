@@ -42,3 +42,22 @@ export const categoryColors: Record<string, string> = {
   crypto: "bg-orange-100 text-orange-800",
   other: "bg-slate-100 text-slate-700",
 };
+
+/** Category-specific accent for pull quotes and section dividers. */
+export const categoryAccentBorder: Record<string, string> = {
+  macro: "border-blue-500",
+  earnings: "border-purple-500",
+  markets: "border-amber-500",
+  policy: "border-teal-500",
+  crypto: "border-orange-500",
+  other: "border-accent-500",
+};
+
+export const categoryAccentText: Record<string, string> = {
+  macro: "text-blue-600",
+  earnings: "text-purple-600",
+  markets: "text-amber-600",
+  policy: "text-teal-600",
+  crypto: "text-orange-600",
+  other: "text-accent-600",
+};

@@ -141,6 +141,37 @@ function extractLeadParagraph(story: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Active geopolitical themes — ongoing market-moving situations
+// ---------------------------------------------------------------------------
+
+/**
+ * Detects active geopolitical themes from published stories that should
+ * surface in "What to Watch" even when not the day's lead story.
+ * Returns human-readable theme descriptions for the Claude prompt.
+ */
+function detectActiveGeoThemes(stories: NewsItem[]): string[] {
+  const themes: string[] = [];
+  const allText = stories.map((s) => `${s.title} ${s.story}`).join(" ").toLowerCase();
+
+  // Oil / Iran / Middle East supply risk
+  if (/\biran\b|\bstrait of hormuz\b|\bmiddle east.*oil\b|\boil.*iran\b|\bsanctions.*iran\b|\bopec\b/.test(allText)) {
+    themes.push("Iran/Middle East oil supply risk: U.S. sanctions on Iranian crude and Strait of Hormuz tensions — monitor WTI crude above $70, Brent-WTI spread, and energy sector ETFs (XLE)");
+  }
+
+  // U.S.-China trade / tariffs
+  if (/\btariff\b.*\bchina\b|\bchina\b.*\btariff\b|\btrade war\b|\bu\.?s\.?\s*china\b/i.test(allText)) {
+    themes.push("U.S.-China trade escalation: tariff announcements and retaliatory measures — monitor USD/CNY, semiconductor supply chains (SMH), and container shipping rates");
+  }
+
+  // European energy / Russia
+  if (/\brussia\b.*\benergy\b|\benergy\b.*\brussia\b|\bnord stream\b|\beuropean gas\b/.test(allText)) {
+    themes.push("European energy security: Russian gas supply dynamics — monitor TTF natural gas futures, EUR/USD, and European industrial production");
+  }
+
+  return themes;
+}
+
+// ---------------------------------------------------------------------------
 // Lead story ranking — multi-factor sort for briefing prominence
 // ---------------------------------------------------------------------------
 
@@ -317,6 +348,13 @@ Summary: ${extractLeadParagraph(s.story)}`
     ? `\n\nUPCOMING MACRO CALENDAR (this week):\n${upcomingMacroEvents.map((e) => `- ${e.event} (${e.date})`).join("\n")}\n\nIMPORTANT: Your first 1-2 "whatToWatch" items MUST reference these actual scheduled macro events. Only use story-derived themes for the 3rd item if all calendar slots are filled.`
     : "";
 
+  // Build active geopolitical themes block — ongoing market-moving situations
+  // that should be considered for What to Watch even if not in today's stories
+  const activeGeoThemes = detectActiveGeoThemes(stories);
+  const geoThemesBlock = activeGeoThemes.length > 0
+    ? `\n\nACTIVE GEOPOLITICAL THEMES (consider for 3rd whatToWatch slot if relevant to today's stories):\n${activeGeoThemes.map((t) => `- ${t}`).join("\n")}`
+    : "";
+
   const prompt = `You are a macro strategist generating a Daily Markets Briefing for Market Mountain, a financial publication read by institutional investors, macro traders, and portfolio managers.
 This briefing publishes at 8:00 AM Eastern each trading day. Your tone must match Bloomberg, the Financial Times, or sell-side macro research notes.
 
@@ -338,7 +376,7 @@ WHAT TO WATCH RULES:
 
 Today's published stories:
 
-${storyContext}${macroCalendarBlock}
+${storyContext}${macroCalendarBlock}${geoThemesBlock}
 
 Generate a concise editorial briefing with this exact JSON structure. Return ONLY valid JSON — no markdown, no explanation.
 CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MUST have exactly 3 items. No more, no fewer.

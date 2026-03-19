@@ -172,6 +172,51 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── 1b. Add comparison chart to articles with NO charts (or only 1) ──
+      // Some articles were published when API keys were missing — they have a
+      // ticker but zero charts. Add stock + comparison charts to fill the gap.
+      if (ticker && !isMacro && (!article.chartData || article.chartData.length < 2)) {
+        const alreadyHasComparison = (article.chartData ?? []).some(
+          (c) => c.chartLabel === "PERFORMANCE" || c.title.includes("vs S&P")
+        );
+        if (!alreadyHasComparison) {
+          const [stockChart, comparisonChart] = await Promise.allSettled([
+            fetchFmpStockHistory(ticker, 90),
+            buildComparisonChart(ticker, 90),
+          ]);
+
+          const newCharts: ChartDataset[] = [...(article.chartData ?? [])];
+
+          if (stockChart.status === "fulfilled" && stockChart.value && newCharts.length === 0) {
+            const sc = stockChart.value;
+            newCharts.push({
+              title: `${sc.title} (${sc.timeRange ?? "90-Day"})`,
+              type: "line",
+              labels: sc.labels,
+              values: sc.values,
+              unit: "$",
+              source: sc.source,
+              timeRange: sc.timeRange,
+              chartLabel: "STOCK",
+              insertAfterParagraph: 1,
+              caption: `${ticker} stock price over the past ${sc.timeRange?.toLowerCase().replace("last ", "") ?? "90 days"}.`,
+            });
+            changes.push(`chart: added ${ticker} stock price (was missing)`);
+          }
+
+          if (comparisonChart.status === "fulfilled" && comparisonChart.value) {
+            const cc = comparisonChart.value;
+            cc.insertAfterParagraph = 3;
+            newCharts.push(cc);
+            changes.push(`chart: added ${ticker} vs S&P 500 comparison (was missing)`);
+          }
+
+          if (newCharts.length > (article.chartData?.length ?? 0)) {
+            article.chartData = newCharts.slice(0, 3);
+          }
+        }
+      }
+
       // ── 2. Add missing company key data points from FMP ──
       if (ticker && !isMacro) {
         const hasCompanyData = (article.keyDataPoints ?? []).some(

@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getRedisClient } from "@/lib/redis";
 import { NewsCollection, NewsItem, MarketImpactItem, ChartDataset } from "@/lib/news-types";
-import { categoryLabels, categoryGradients } from "@/lib/category-config";
+import { categoryLabels, categoryGradients, categoryAccentBorder, categoryAccentText } from "@/lib/category-config";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { BLOCKED_SOURCES } from "@/lib/news";
@@ -155,6 +155,36 @@ export default async function NewsStoryPage({ params }: Props) {
     .map((p) => p.trim().replace(/(?<!\w)#([A-Za-z]\w*)/g, "$1"))
     .filter(Boolean);
 
+  // Category-specific accent for pull quotes and dividers
+  const accentBorder = categoryAccentBorder[item.category] ?? categoryAccentBorder.other;
+  const accentText = categoryAccentText[item.category] ?? categoryAccentText.other;
+
+  // Auto-extract a pull quote from the story for visual variety.
+  // Pick a strong declarative sentence from the middle third of the article.
+  // Only show if article has no inline image (avoids visual overload).
+  const textParagraphs = paragraphs.filter((p) => !p.startsWith("## ") && !p.startsWith("> "));
+  let pullQuote: string | null = null;
+  let pullQuoteAfterParagraph = -1;
+  if (!item.inlineImageUrl && textParagraphs.length >= 5) {
+    const midStart = Math.floor(textParagraphs.length * 0.3);
+    const midEnd = Math.floor(textParagraphs.length * 0.7);
+    const candidates = textParagraphs.slice(midStart, midEnd);
+    for (const para of candidates) {
+      // Find a strong sentence (contains a number or key phrase, 15-40 words)
+      const sentences = para.split(/(?<=[.!?])\s+/);
+      const strong = sentences.find((s) => {
+        const wordCount = s.split(/\s+/).length;
+        return wordCount >= 15 && wordCount <= 40 && /\d/.test(s);
+      });
+      if (strong) {
+        pullQuote = strong;
+        // Place it after the 4th text paragraph
+        pullQuoteAfterParagraph = paragraphs.indexOf(textParagraphs[3]);
+        break;
+      }
+    }
+  }
+
   // Normalize chartData to array (backward-compatible: handles both legacy single-object and new array)
   const charts: ChartDataset[] = !item.chartData ? [] :
     Array.isArray(item.chartData) ? item.chartData : [item.chartData as unknown as ChartDataset];
@@ -281,15 +311,41 @@ export default async function NewsStoryPage({ params }: Props) {
       <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
         <article>
           <div className="prose prose-slate max-w-none">
-            {paragraphs.map((para, i) => (
+            {paragraphs.map((para, i) => {
+              // Track which text paragraph index this is (skip headings and blockquotes)
+              const isHeading = para.startsWith("## ");
+              const isBlockquote = para.startsWith("> ");
+              const isFirstTextPara = !isHeading && !isBlockquote &&
+                paragraphs.slice(0, i).every((p) => p.startsWith("## ") || p.startsWith("> "));
+
+              return (
               <React.Fragment key={i}>
                 {/* Render ## headings as styled <h2> section dividers */}
-                {para.startsWith("## ") ? (
+                {isHeading ? (
                   <h2 className="text-lg font-bold text-navy-900 mt-8 mb-3 font-playfair tracking-tight">
                     {para.slice(3)}
                   </h2>
+                ) : isBlockquote ? (
+                  /* Render > lines as category-accented blockquotes */
+                  <blockquote className={`not-prose my-6 pl-4 border-l-3 ${accentBorder}`}>
+                    <p className={`text-sm italic leading-relaxed ${accentText}`}>
+                      {para.slice(2)}
+                    </p>
+                  </blockquote>
+                ) : isFirstTextPara ? (
+                  /* Lead paragraph — slightly larger for editorial weight */
+                  <p className="text-base leading-relaxed text-navy-800 font-medium">{para}</p>
                 ) : (
                   <p>{para}</p>
+                )}
+
+                {/* Pull quote — visual break for longer articles without inline images */}
+                {pullQuote && pullQuoteAfterParagraph === i && (
+                  <div className={`not-prose my-8 py-4 pl-5 border-l-3 ${accentBorder} bg-slate-50 rounded-r-lg`}>
+                    <p className="text-base font-medium text-navy-900 leading-relaxed italic">
+                      &ldquo;{pullQuote}&rdquo;
+                    </p>
+                  </div>
                 )}
                 {/* Inject charts assigned to this paragraph index */}
                 {chartsByParagraph.has(i) && (
@@ -319,7 +375,8 @@ export default async function NewsStoryPage({ params }: Props) {
                   </figure>
                 )}
               </React.Fragment>
-            ))}
+              );
+            })}
           </div>
 
           {/* Market Impact Box — shows asset-level impact when present */}

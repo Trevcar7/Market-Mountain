@@ -267,6 +267,32 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── Fix 21: Force-replace bad auto-fetched inline images ──
+      // Some articles got irrelevant inline images from the Unsplash auto-fetch.
+      // These curated overrides replace whatever image was fetched.
+      const FORCE_INLINE_IMAGES: Record<string, { url: string; caption: string; position?: number }> = {
+        // Jio IPO: auto-fetch grabbed irrelevant image; replace with Mumbai/India business
+        "news-1773758533659-328": {
+          url: "https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=1200&q=80",
+          caption: "Mumbai skyline — Reliance's Jio IPO could be India's largest public offering",
+          position: 5,
+        },
+        // Apple+IBM M&A: needs curated tech/corporate image
+        "news-1773770975678-1930": {
+          url: "https://images.unsplash.com/photo-1531973576160-7125cd663d86?w=1200&q=80",
+          caption: "Apple's enterprise ambitions signal a strategic pivot beyond consumer hardware",
+          position: 5,
+        },
+      };
+      const forceImg = FORCE_INLINE_IMAGES[article.id];
+      if (forceImg) {
+        const wasReplacement = !!article.inlineImageUrl;
+        article.inlineImageUrl = forceImg.url;
+        article.inlineImageCaption = forceImg.caption;
+        article.inlineImagePosition = forceImg.position ?? 5;
+        fixes.push(`inlineImage: ${wasReplacement ? "replaced" : "added"} "${forceImg.caption}"`);
+      }
+
       // ── Fix 20: Add inline images to articles missing them ──
       if (!article.inlineImageUrl) {
         // Curated inline images per article for visual variety
