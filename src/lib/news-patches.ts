@@ -41,8 +41,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\biran\b.*\b(?:lng|qatar|crude|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80" },
   // Iran (general / Fed / inflation) → oil refinery at night; strip money inline image
   { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80", clearInlineImage: true },
-  // Lululemon / athletic retail → yoga fitness class
-  { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80" },
+  // Lululemon / athletic retail → yoga fitness class; strip inline image
+  { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80", clearInlineImage: true },
   // Stagflation / GDP collapse → stock market crash / red tape; strip foreign market inline image
   { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=1200&q=80", clearInlineImage: true },
   // Novartis → keep existing image, strip out-of-place pill inline image
