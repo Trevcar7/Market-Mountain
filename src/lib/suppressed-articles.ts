@@ -68,4 +68,10 @@ export const SUPPRESSED_ARTICLE_IDS = new Set<string>([
 
   "news-1773590264851-650",   // "Iran Crisis Lifts Oil, Strains Refiners and Reshapes Energy Supply Chains" (update article — same event since Mar 12)
 
+  // ── March 19, 2026 — Fabricated Apple+IBM deal ────────────────────────
+  // Pipeline merged two unrelated M&A stories (Apple acquiring MotionVFX +
+  // IBM acquiring Confluent) and hallucinated a $70B Apple acquisition of
+  // IBM Global Services that was never announced or reported.
+  "news-1773770975678-1930",  // "Apple and IBM Lead M&A Wave as Tech Giants Pursue Creator Tools and Enterprise Integration"
+
 ]);

@@ -542,6 +542,10 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
   });
   result.story = sanitizedStoryLines.join("\n").replace(/^\n+/, "").replace(/\n{3,}/g, "\n\n");
 
+  // ── Strip leading horizontal rules ────────────────────────────────────
+  // Claude sometimes emits a stray "---" at the start of the story body.
+  result.story = result.story.replace(/^---\s*\n+/, "");
+
   // ── Hashtag sanitization ───────────────────────────────────────────────
   // Strip social-media-style #Hashtags from all text fields.
   // e.g., "#Stagflation" → "Stagflation", "#Fed" → "Fed"
@@ -1239,14 +1243,60 @@ export async function synthesizeGroupedArticles(
       .map((a) => a.imageUrl!.split("?")[0])
   );
 
-  // In-run topic dedup — skip groups whose topic is too similar to one already queued
+  // ── Cross-feed chart deduplication ─────────────────────────────────────────
+  // Prevents the same chart series (e.g. CPI Inflation, S&P 500) from appearing
+  // on multiple articles. Seeded from existing articles, grows during this run.
+  const usedChartSeries = new Set<string>(
+    existingArticles
+      .filter((a) => a.chartData)
+      .flatMap((a) => {
+        const charts = Array.isArray(a.chartData) ? a.chartData : [a.chartData];
+        return charts.filter((c): c is ChartDataset => c != null).map((c) =>
+          `${c.source ?? ""}|${c.title ?? ""}`
+        );
+      })
+  );
+
+  // In-run topic dedup — skip groups whose topic is too similar to one already queued.
+  // Also rejects groups whose theme fingerprint (significant title keywords) overlaps
+  // >50% with an existing article or an already-accepted group in this run.
+  const STOP_WORDS = new Set(["the","a","an","and","or","of","in","on","to","for","as","is","at","by","with","from","its","it","that","this","are","was","were","be","been","has","have","had","will","may","can","not","but","if","how","what","why","which","all","their","our","into","out","up","than","more","most","very","new","also","just","about","over","after","before","between","each","other","some","so","only","no","s"]);
+  function themeFingerprint(text: string): Set<string> {
+    return new Set(
+      text.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/)
+        .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+    );
+  }
+  function keywordOverlap(a: Set<string>, b: Set<string>): number {
+    if (a.size === 0 || b.size === 0) return 0;
+    let shared = 0;
+    for (const w of a) if (b.has(w)) shared++;
+    return shared / Math.min(a.size, b.size);
+  }
+
+  // Seed theme fingerprints from existing feed articles
+  const existingFingerprints = existingArticles.map((a) => themeFingerprint(a.title ?? ""));
+
   const seenTopics = new Set<string>();
+  const seenFingerprints: Set<string>[] = [];
   const groupsToProcess = groupedNews.filter((group) => {
     const key = group.topic.toLowerCase().replace(/[_\s]+/g, "_");
     for (const seen of seenTopics) {
       if (key === seen || key.startsWith(seen) || seen.startsWith(key)) return false;
     }
+
+    // Theme fingerprint check: extract keywords from group article titles
+    const groupTitleText = group.articles.map((a) => ("title" in a ? a.title : "headline" in a ? a.headline : "") ?? "").join(" ");
+    const fp = themeFingerprint(groupTitleText);
+    for (const existing of [...existingFingerprints, ...seenFingerprints]) {
+      if (keywordOverlap(fp, existing) > 0.5) {
+        console.log(`[synthesis] Theme dedup: "${group.topic}" overlaps >50% with existing article — skipping`);
+        return false;
+      }
+    }
+
     seenTopics.add(key);
+    seenFingerprints.push(fp);
     return true;
   });
 
@@ -1625,9 +1675,14 @@ export async function synthesizeGroupedArticles(
       if (chartCount < MAX_CHARTS_PER_RUN && articleChartCount < MAX_CHARTS_PER_ARTICLE) {
         const primary = await buildChartData(group.topic, subjectTicker);
         if (primary) {
+          const chartKey = `${primary.source ?? ""}|${primary.title ?? ""}`;
+          if (usedChartSeries.has(chartKey)) {
+            console.log(`[synthesis] Chart dedup: "${primary.title}" already in feed — skipping`);
+          } else {
           chartCount++;
           articleChartCount++;
           articleChartedTopics.add(topicNorm);
+          usedChartSeries.add(chartKey);
           chartData = [primary];
 
           // Companion chart routing — two strategies:
@@ -1681,6 +1736,7 @@ export async function synthesizeGroupedArticles(
               chartData.push(dxy);
             }
           }
+          } // close else (chart not a duplicate)
         }
       }
 
@@ -1766,6 +1822,13 @@ export async function synthesizeGroupedArticles(
         const chart = await buildChartData(candidate.topic);
         if (!chart) continue;
 
+        // Cross-feed chart dedup: skip if this exact series already appears on another article
+        const chartKey = `${chart.source ?? ""}|${chart.title ?? ""}`;
+        if (usedChartSeries.has(chartKey)) {
+          console.log(`[synthesis] Chart dedup: content-detected "${chart.title}" already in feed — skipping`);
+          continue;
+        }
+
         // Space charts evenly across the 5-paragraph article body (positions 1–4)
         const lastPos = chartData.length > 0
           ? (chartData[chartData.length - 1].insertAfterParagraph ?? 0)
@@ -1775,6 +1838,7 @@ export async function synthesizeGroupedArticles(
         chartCount++;
         articleChartCount++;
         articleChartedTopics.add(candidate.topic);
+        usedChartSeries.add(chartKey);
         chartData.push(chart);
         console.log(
           `[synthesis] Content chart "${candidate.label}" → "${group.topic}" ` +
@@ -1808,7 +1872,17 @@ export async function synthesizeGroupedArticles(
         topicKey: group.topic,
         imageUrl,
         publishedAt: new Date().toISOString(),
-        importance: group.importance,
+        importance: (() => {
+          // Cap importance by category to prevent score inflation.
+          // Macro-moving events (Fed, GDP, CPI, FOMC, geopolitical shocks): up to 10
+          // Company earnings/M&A: cap at 8
+          // Operational changes, niche regulatory: cap at 7
+          const isMacroMoving = /\b(fed|fomc|gdp|cpi|employment|stagflation|recession|iran|tariff)\b/i.test(parsed.title);
+          if (inferredCategory === "macro" && isMacroMoving) return Math.min(group.importance, 10);
+          if (inferredCategory === "earnings") return Math.min(group.importance, 8);
+          if (inferredCategory === "markets") return Math.min(group.importance, 8);
+          return Math.min(group.importance, 7);
+        })(),
         sentiment: inferSentiment(synthesizedText),
         relatedTickers: generateTags(group.topic, synthesizedText, group.category),
         sourcesUsed: filterRelevantSources(group.articles, parsed.story, parsed.title),
@@ -2310,7 +2384,13 @@ function generateTags(
     return [...new Set(mentionedTickers)].slice(0, 3);
   }
 
-  const combined = [...new Set([...topicTags, ...textAssets, ...catTags])];
+  // 4. Filter out SPY/QQQ from non-macro topics — these are noise on company-specific stories
+  const BROAD_MARKET_TOPICS = new Set(["broad_market", "markets", "gdp", "employment", "federal_reserve", "fed_macro", "trade_policy", "trade_policy_tariff"]);
+  const allowBroadTickers = BROAD_MARKET_TOPICS.has(topicNorm) || category === "macro";
+  const filteredTopicTags = allowBroadTickers ? topicTags : topicTags.filter((t) => t !== "SPY" && t !== "QQQ");
+  const filteredCatTags = allowBroadTickers ? catTags : catTags.filter((t) => t !== "SPY" && t !== "QQQ");
+
+  const combined = [...new Set([...filteredTopicTags, ...textAssets, ...filteredCatTags])];
   const valid = combined.filter((t) => ALLOWED_TAGS.has(t));
   return valid.slice(0, 3);
 }

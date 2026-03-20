@@ -23,8 +23,8 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
-  // NVIDIA → official NVIDIA logo (green eye + wordmark); strip bad AMD inline image
-  { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", clearInlineImage: true },
+  // NVIDIA → official NVIDIA logo (green eye + wordmark); fix category to markets; strip bad AMD inline image
+  { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", category: "markets", clearInlineImage: true },
   // Bentley → luxury car (Continental GT logo)
   { test: /\bbentley\b/i, imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80", relatedTickers: { TSLA: "VWAGY" } },
   // Humana / managed care → healthcare
