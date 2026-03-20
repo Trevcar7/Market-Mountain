@@ -12,20 +12,27 @@ import type { NewsItem } from "@/lib/news-types";
  * still missing an imageUrl.
  */
 
+interface MarketImpactOverride {
+  asset: string;
+  change: string;
+  direction: "up" | "down" | "flat";
+}
+
 interface ArticlePatch {
   test: RegExp;
   imageUrl: string;
   title?: string;
   category?: string;
   relatedTickers?: Record<string, string>;
+  marketImpactOverrides?: MarketImpactOverride[];
   clearChart?: boolean;
   clearKeyData?: boolean;
   clearInlineImage?: boolean;
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
-  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data (SMCI is the subject, not NVIDIA)
-  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", clearChart: true, clearKeyData: true },
+  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%
+  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", clearChart: true, clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
   // NVIDIA → official NVIDIA logo (green eye + wordmark); fix category to markets; strip bad AMD inline image
   { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", category: "markets", clearInlineImage: true },
   // Bentley → luxury car (Continental GT logo)
@@ -92,6 +99,17 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
       }
       if (patch.clearInlineImage) {
         patched.inlineImageUrl = undefined;
+      }
+      if (patch.marketImpactOverrides && patched.marketImpact) {
+        for (const override of patch.marketImpactOverrides) {
+          const idx = patched.marketImpact.findIndex((mi) => mi.asset === override.asset);
+          if (idx >= 0) {
+            patched.marketImpact = [...patched.marketImpact];
+            patched.marketImpact[idx] = { ...patched.marketImpact[idx], change: override.change, direction: override.direction };
+          } else {
+            patched.marketImpact = [...patched.marketImpact, { asset: override.asset, change: override.change, direction: override.direction }];
+          }
+        }
       }
       break;
     }
