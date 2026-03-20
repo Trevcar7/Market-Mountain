@@ -53,7 +53,7 @@ export const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
   policy:   "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1200&q=80",
 };
 
-/** Apply all article patches to a single NewsItem. Returns a new object. */
+/** Apply all article patches to a single NewsItem (mutates nothing). */
 export function applyArticlePatches(item: NewsItem): NewsItem {
   let patched = { ...item };
   const title = patched.title ?? "";
