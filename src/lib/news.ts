@@ -680,7 +680,9 @@ export function groupRelatedArticles(articles: (FinnhubArticle | NewsAPIArticle)
       "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
       "broad_market", "markets", "bond_market", "energy", "trade_policy",
       "trade_policy_tariff", "crypto", "geopolitics", "earnings",
-      "merger_acquisition", "bankruptcy", "ipo", "layoffs",
+      // NOTE: merger_acquisition, bankruptcy, ipo, layoffs intentionally
+      // excluded — these are company-specific events that must pass
+      // coherence filtering to prevent merging unrelated company stories.
     ].includes(topic);
     if (isBroadMacro) continue;
 
@@ -697,6 +699,50 @@ export function groupRelatedArticles(articles: (FinnhubArticle | NewsAPIArticle)
       // Require at least 2 meaningful shared words (beyond stopwords)
       const shared = coreWords.filter((w) => words.includes(w));
       if (shared.length >= 2) {
+        coherent.push(groupArticles[i]);
+      }
+    }
+    groups.set(topic, coherent);
+  }
+
+  // ── Corporate event proper-noun filter ──────────────────────────────────
+  // For M&A, IPO, bankruptcy, layoffs: require at least one shared proper
+  // noun (company name) between grouped headlines. This prevents merging
+  // "Apple acquires MotionVFX" with "IBM acquires Confluent" into one group.
+  const CORPORATE_EVENT_TOPICS = new Set([
+    "merger_acquisition", "bankruptcy", "ipo", "layoffs",
+  ]);
+  for (const [topic, groupArticles] of groups) {
+    if (groupArticles.length <= 1) continue;
+    if (!CORPORATE_EVENT_TOPICS.has(topic)) continue;
+
+    const getHeadline = (a: FinnhubArticle | NewsAPIArticle): string =>
+      (isFinnhub(a) ? (a as FinnhubArticle).headline ?? "" : (a as NewsAPIArticle).title ?? "");
+
+    // Extract proper nouns: capitalized words (3+ chars) that aren't at sentence start
+    const extractProperNouns = (text: string): Set<string> => {
+      const words = text.split(/\s+/);
+      const nouns = new Set<string>();
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i].replace(/[^A-Za-z]/g, "");
+        // Accept capitalized words (skip index 0 — sentence start) and ALL-CAPS tickers
+        if (w.length >= 3 && (/^[A-Z][a-z]/.test(w) && i > 0 || /^[A-Z]{2,5}$/.test(w))) {
+          nouns.add(w.toLowerCase());
+        }
+      }
+      return nouns;
+    };
+
+    const baseHeadline = getHeadline(groupArticles[0]);
+    const baseNouns = extractProperNouns(baseHeadline);
+
+    const coherent: typeof groupArticles = [groupArticles[0]];
+    for (let i = 1; i < groupArticles.length; i++) {
+      const h = getHeadline(groupArticles[i]);
+      const nouns = extractProperNouns(h);
+      // Require at least 1 shared proper noun (company/ticker)
+      const hasShared = [...nouns].some((n) => baseNouns.has(n));
+      if (hasShared) {
         coherent.push(groupArticles[i]);
       }
     }

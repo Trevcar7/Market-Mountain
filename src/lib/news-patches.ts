@@ -47,6 +47,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=1200&q=80", clearInlineImage: true },
   // Novartis → keep existing image, strip out-of-place pill inline image
   { test: /\bnovartis\b/i, imageUrl: "https://images.unsplash.com/photo-1752159684779-0639174cdfac?w=1200&q=80", clearInlineImage: true },
+  // Amazon → e-commerce/logistics; fix category to markets (not macro)
+  { test: /\bamazon\b|\bAMZN\b/i, imageUrl: "https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=1200&q=80", category: "markets" },
   // Jio / Reliance IPO → India / emerging market
   { test: /\bjio\b|\breliance\b/i, imageUrl: "https://images.unsplash.com/photo-1468254095679-bbcba94a7066?w=1200&q=80" },
 ];

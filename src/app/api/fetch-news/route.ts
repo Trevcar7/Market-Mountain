@@ -66,7 +66,7 @@ const DEFAULT_DEDUP_HOURS = 8; // was 6
 // ---------------------------------------------------------------------------
 const ONGOING_EVENT_WINDOW_HOURS = 72;
 const ENTITY_OVERLAP_THRESHOLD = 0.45; // 45% shared entities = same ongoing story (was 0.55)
-const HEADLINE_SIMILARITY_THRESHOLD = 0.50; // 50% word overlap = likely same story
+const HEADLINE_SIMILARITY_THRESHOLD = 0.40; // 40% word overlap = likely same story (lowered from 0.50 to catch paraphrased duplicates)
 
 // ---------------------------------------------------------------------------
 // Causal-chain topic groups — topic keys that frequently surface the same
@@ -213,6 +213,12 @@ function computeEntityOverlap(a: Set<string>, b: Set<string>): number {
  *
  * This catches near-duplicate headlines that entity matching may miss
  * (e.g. "Oil Prices Rise on Iran Tensions" vs "Iran Tensions Push Oil Higher").
+ *
+ * Two-pass comparison:
+ *   1. Raw Jaccard on content words (catches exact rewording)
+ *   2. Synonym-normalized Jaccard (catches paraphrased duplicates like
+ *      "MLB Secures CFTC Approval" vs "Baseball Gains CFTC Blessing")
+ * Returns the higher of the two scores.
  */
 const STOP_WORDS = new Set([
   "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
@@ -225,17 +231,82 @@ const STOP_WORDS = new Set([
   "before", "between", "during", "into", "over", "under", "about",
 ]);
 
+/**
+ * Headline synonym map — maps paraphrases/aliases to canonical forms.
+ * Enables detection of duplicates where the same event is described with
+ * different words (e.g., "acquires" vs "buys", "MLB" vs "baseball").
+ */
+const HEADLINE_SYNONYMS: Record<string, string> = {
+  // Sports / entertainment
+  "mlb": "baseball", "nfl": "football", "nba": "basketball", "nhl": "hockey",
+  // M&A verbs
+  "acquires": "buys", "acquisition": "buys", "acquired": "buys", "purchase": "buys",
+  "purchased": "buys", "takeover": "buys", "buyout": "buys",
+  // Approval / regulatory
+  "approval": "approves", "approved": "approves", "blessing": "approves",
+  "greenlight": "approves", "greenlights": "approves", "authorizes": "approves",
+  "authorization": "approves", "clearance": "approves", "clears": "approves",
+  // Achieves / secures
+  "secures": "gains", "obtains": "gains", "wins": "gains", "earns": "gains",
+  "clinches": "gains", "lands": "gains",
+  // Partnership
+  "partnership": "deal", "alliance": "deal", "collaboration": "deal",
+  "venture": "deal", "pact": "deal", "agreement": "deal",
+  // Price moves
+  "surges": "rises", "jumps": "rises", "soars": "rises", "climbs": "rises",
+  "rallies": "rises", "spikes": "rises", "advances": "rises",
+  "plunges": "falls", "tumbles": "falls", "drops": "falls", "slides": "falls",
+  "sinks": "falls", "declines": "falls", "crashes": "falls", "dips": "falls",
+  // Cuts
+  "slashes": "cuts", "reduces": "cuts", "lowers": "cuts", "trims": "cuts",
+  // Raises
+  "hikes": "raises", "lifts": "raises", "boosts": "raises", "increases": "raises",
+  // Forecasting
+  "predicts": "forecasts", "projects": "forecasts", "expects": "forecasts",
+  "anticipates": "forecasts", "signals": "forecasts",
+  // Legitimacy
+  "legitimizing": "validates", "legitimizes": "validates", "validates": "validates",
+  "endorses": "validates", "affirms": "validates",
+  // Betting
+  "wagering": "betting", "gambling": "betting", "prediction": "betting",
+};
+
 function computeHeadlineSimilarity(headline1: string, headline2: string): number {
   const tokenize = (s: string): Set<string> => {
     const words = s.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
     return new Set(words.filter((w) => !STOP_WORDS.has(w) && w.length > 1));
   };
+
+  const tokenizeNormalized = (s: string): Set<string> => {
+    const words = s.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+    return new Set(
+      words
+        .filter((w) => !STOP_WORDS.has(w) && w.length > 1)
+        .map((w) => HEADLINE_SYNONYMS[w] ?? w)
+    );
+  };
+
+  // Pass 1: raw Jaccard
   const a = tokenize(headline1);
   const b = tokenize(headline2);
-  if (a.size === 0 || b.size === 0) return 0;
-  const intersection = [...a].filter((w) => b.has(w)).length;
-  const union = new Set([...a, ...b]).size;
-  return union > 0 ? intersection / union : 0;
+  let rawScore = 0;
+  if (a.size > 0 && b.size > 0) {
+    const intersection = [...a].filter((w) => b.has(w)).length;
+    const union = new Set([...a, ...b]).size;
+    rawScore = union > 0 ? intersection / union : 0;
+  }
+
+  // Pass 2: synonym-normalized Jaccard
+  const aN = tokenizeNormalized(headline1);
+  const bN = tokenizeNormalized(headline2);
+  let normScore = 0;
+  if (aN.size > 0 && bN.size > 0) {
+    const intersection = [...aN].filter((w) => bN.has(w)).length;
+    const union = new Set([...aN, ...bN]).size;
+    normScore = union > 0 ? intersection / union : 0;
+  }
+
+  return Math.max(rawScore, normScore);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { FactCheckResult, NewsSource } from "./news-types";
 import { runDataFactCheck, DataFactCheckReport } from "./data-fact-checker";
-import { runSourceAlignment, SourceAlignmentReport } from "./source-alignment";
+import { runSourceAlignment, SourceAlignmentReport, checkEntityRelationships, EntityRelationshipReport } from "./source-alignment";
 
 // ---------------------------------------------------------------------------
 // Comprehensive Fact Check Report — combines all verification layers
@@ -16,6 +16,9 @@ export interface ComprehensiveFactCheckReport {
 
   /** Layer 3: Source-alignment check (synthesis vs. sources) */
   sourceAlignment: SourceAlignmentReport | null;
+
+  /** Layer 4: Entity relationship verification (fabrication detection) */
+  entityRelationships: EntityRelationshipReport | null;
 
   /** Combined weighted score (0–100) */
   compositeScore: number;
@@ -371,12 +374,17 @@ export async function runComprehensiveFactCheck(
   const { results: heuristicResults, overallScore: heuristicScore } =
     await verifyClaims(claims);
 
-  // Layer 2 — Data Verification (runs in parallel with Layer 3)
-  // Layer 3 — Source Alignment (runs in parallel with Layer 2)
-  const [dataResult, sourceResult] = await Promise.allSettled([
+  // Layer 2 — Data Verification (runs in parallel with Layer 3 & 4)
+  // Layer 3 — Source Alignment (runs in parallel with Layer 2 & 4)
+  // Layer 4 — Entity Relationship Verification (runs in parallel with Layer 2 & 3)
+  const hasSources = sources.length > 0 && sourceTexts.length > 0;
+  const [dataResult, sourceResult, entityResult] = await Promise.allSettled([
     runDataFactCheck(story, title),
-    sources.length > 0 && sourceTexts.length > 0
+    hasSources
       ? runSourceAlignment(story, title, sources, sourceTexts)
+      : Promise.resolve(null),
+    hasSources
+      ? checkEntityRelationships(story, title, sources, sourceTexts)
       : Promise.resolve(null),
   ]);
 
@@ -384,6 +392,8 @@ export async function runComprehensiveFactCheck(
     dataResult.status === "fulfilled" ? dataResult.value : null;
   const sourceAlignment: SourceAlignmentReport | null =
     sourceResult.status === "fulfilled" ? sourceResult.value : null;
+  const entityRelationships: EntityRelationshipReport | null =
+    entityResult.status === "fulfilled" ? entityResult.value : null;
 
   // Compute composite score with dynamic weighting
   let compositeScore: number;
@@ -448,6 +458,14 @@ export async function runComprehensiveFactCheck(
     breakdown.push(`HALLUCINATION_CAP=50`);
   }
 
+  // Hard penalty: if ANY entity relationship is fabricated, cap at 30
+  // This is the most aggressive cap because fabricated entity relationships
+  // (e.g., "Apple acquires IBM") are the highest-risk hallucination type.
+  if (entityRelationships && entityRelationships.fabricatedCount > 0) {
+    compositeScore = Math.min(compositeScore, 30);
+    breakdown.push(`FABRICATED_RELATIONSHIP_CAP=30 (${entityRelationships.fabricatedCount} fabricated)`);
+  }
+
   const breakdownStr = breakdown.join(", ");
   console.log(`[fact-check] Composite=${compositeScore}: ${breakdownStr}`);
 
@@ -456,6 +474,7 @@ export async function runComprehensiveFactCheck(
     heuristicResults,
     dataVerification,
     sourceAlignment,
+    entityRelationships,
     compositeScore,
     breakdown: breakdownStr,
   };

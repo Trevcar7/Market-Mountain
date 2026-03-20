@@ -74,4 +74,11 @@ export const SUPPRESSED_ARTICLE_IDS = new Set<string>([
   // IBM Global Services that was never announced or reported.
   "news-1773770975678-1930",  // "Apple and IBM Lead M&A Wave as Tech Giants Pursue Creator Tools and Enterprise Integration"
 
+  // ── March 20, 2026 — Duplicate MLB/CFTC sports betting article ───────
+  // Same event (MLB + CFTC + Polymarket) was synthesized twice ~8h apart
+  // with different wording ("MLB Secures…" vs "Baseball Gains…") — Jaccard
+  // similarity 29% fell below the 50% headline-dedup threshold.
+  // Keep the newer article (news-1773983327353-2050); suppress the older.
+  "news-1773954083167-2050",  // "MLB Secures CFTC Approval for Polymarket Sports Betting Partnership"
+
 ]);

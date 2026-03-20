@@ -1059,7 +1059,7 @@ From: ${article.source}`
     ? `\nIMPORTANT: The source summaries are brief. Lean heavily on the MARKET DATA section above to write a substantive, data-grounded analysis. Do NOT refuse to write — always produce a complete article in the required format. The SOURCES provide the event; the MARKET DATA provides the numbers; your analysis connects them. Do NOT invent numbers or facts not present in the SOURCES or MARKET DATA.`
     : "";
 
-  return `Write one cohesive financial news story about "${group.topic}"
+  let prompt = `Write one cohesive financial news story about "${group.topic}"
 
 SOURCES (synthesize all — do not simply summarize one):
 ${articleTexts}
@@ -1072,6 +1072,13 @@ SECTOR COHERENCE (CRITICAL): If the sources span different sectors or industries
 - Never characterize a company as belonging to a sector it does not belong to (e.g., do not call an IT services company a "healthcare play")
 - If a source is about a company in a different sector, IGNORE it completely
 - The article must be about ONE coherent sector or theme
+
+ENTITY RELATIONSHIP INTEGRITY (CRITICAL — HARD RULE):
+- NEVER create a business relationship (acquisition, merger, partnership, investment, joint venture) between two entities unless that EXACT relationship is explicitly described in a SINGLE source article.
+- If Source 1 says "Apple acquires Company X" and Source 2 says "IBM acquires Company Y", these are TWO SEPARATE stories. Do NOT combine them into "Apple acquires IBM" or any other fabricated transaction.
+- When multiple M&A deals or corporate events appear in the sources, write about the SINGLE most important one. Ignore the others completely.
+- If you cannot verify that a specific business transaction between two named entities exists in the source articles, do NOT mention it. Omission is always better than fabrication.
+- This rule applies to ALL corporate events: acquisitions, mergers, partnerships, investments, lawsuits, analyst actions, executive appointments.
 
 Editorial angle: ${angle}
 
@@ -1090,6 +1097,103 @@ MARKET_IMPACT RULES:
 - Only list assets that appear in your story or MARKET DATA
 
 Output HEADLINE, KEY_TAKEAWAYS (3 bullets), WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, MARKET_IMPACT (1–3 asset bullets) first, then one blank line, then the 5-section story (500–800 words). Each section MUST begin with a "## " heading on its own line (e.g., "## Event Summary", "## Market Reaction", "## Macro Context", "## Investor Implications", "## What to Watch"). The heading must be descriptive and specific to the article content.`;
+
+  // Dynamic warning: if sources mention many different companies, warn Claude
+  const CORPORATE_EVENT_TOPICS = ["merger_acquisition", "bankruptcy", "ipo", "layoffs"];
+  if (CORPORATE_EVENT_TOPICS.includes(group.topic)) {
+    const companyNames = new Set<string>();
+    for (const article of formattedArticles) {
+      const matches = article.title.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g);
+      if (matches) matches.forEach((m) => companyNames.add(m.toLowerCase()));
+    }
+    if (companyNames.size > 3) {
+      prompt += `\n\nWARNING: The sources above mention multiple different companies. Write about ONE company or ONE deal only. Do NOT merge separate corporate events into a single narrative.`;
+    }
+  }
+
+  return prompt;
+}
+
+// ---------------------------------------------------------------------------
+// Post-synthesis headline entity co-occurrence check (zero API cost)
+// ---------------------------------------------------------------------------
+
+/** Common English words that appear capitalized in headlines but aren't entities. */
+const HEADLINE_COMMON_WORDS = new Set([
+  "the", "and", "for", "but", "with", "from", "that", "this", "after",
+  "into", "over", "under", "about", "between", "during", "before",
+  "markets", "market", "wall", "street", "global", "services", "new",
+  "price", "target", "rate", "rates", "oil", "gold", "dollar",
+  "earnings", "revenue", "billion", "million", "trillion",
+  "monday", "tuesday", "wednesday", "thursday", "friday",
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+  "amid", "despite", "near", "above", "below", "toward", "warns",
+  "first", "second", "third", "quarter", "annual", "monthly",
+  "higher", "lower", "rising", "falling", "pushing", "breaking",
+  "record", "report", "data", "index", "fund", "funds",
+  "stock", "stocks", "bond", "bonds", "yield", "yields", "wave",
+  "fed", "treasury", "senate", "house", "congress", "white",
+  "lead", "leads", "pursue", "creator", "tools", "enterprise",
+  "integration", "projects", "orders", "cuts", "lifts", "hits",
+]);
+
+/** Transactional verbs that signal a corporate event headline. */
+const TRANSACTIONAL_RE = /\b(acquir|merger|merg|buy|bought|purchase|takeover|partner|invest|deal|launch|bid)\b/i;
+
+/**
+ * Checks that major entity pairs in the synthesized headline actually
+ * co-occur in at least one source headline/summary.
+ *
+ * Catches fabricated relationships like "Apple acquires IBM" when sources
+ * separately discuss Apple/MotionVFX and IBM/Confluent.
+ *
+ * Returns null if check passes, or a rejection reason string if it fails.
+ */
+function checkHeadlineEntityCoOccurrence(
+  synthesizedTitle: string,
+  sourceArticles: { title: string; summary?: string | null }[]
+): string | null {
+  // Extract capitalized words (3+ chars) from headline
+  const titleWords = synthesizedTitle.match(/\b[A-Z][A-Za-z]{2,}\b/g) ?? [];
+
+  // Filter to likely entity names
+  const entities = [
+    ...new Set(
+      titleWords
+        .filter((w) => !HEADLINE_COMMON_WORDS.has(w.toLowerCase()))
+        .map((w) => w)
+    ),
+  ];
+
+  // Need at least 2 entities to check co-occurrence
+  if (entities.length < 2) return null;
+
+  // Only hard-reject transactional headlines (M&A, partnerships, deals)
+  if (!TRANSACTIONAL_RE.test(synthesizedTitle)) return null;
+
+  // Check each entity pair: do both appear in the same source?
+  for (let i = 0; i < entities.length; i++) {
+    for (let j = i + 1; j < entities.length; j++) {
+      const a = entities[i].toLowerCase();
+      const b = entities[j].toLowerCase();
+      if (a === b) continue;
+
+      const coOccurs = sourceArticles.some((article) => {
+        const text = `${article.title} ${article.summary ?? ""}`.toLowerCase();
+        return text.includes(a) && text.includes(b);
+      });
+
+      if (!coOccurs) {
+        return (
+          `Headline entity pair "${entities[i]}" + "${entities[j]}" never ` +
+          `co-occur in any source article — possible fabricated relationship`
+        );
+      }
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1455,6 +1559,23 @@ export async function synthesizeGroupedArticles(
         continue;
       }
 
+      // ── Entity co-occurrence check (fast, no API call) ────────────────
+      // Catches fabricated entity relationships in transactional headlines
+      // (e.g., "Apple Acquires IBM" when sources separately discuss Apple
+      // and IBM in unrelated deals).
+      const entityCoOccurrenceFailure = checkHeadlineEntityCoOccurrence(
+        parsed.title,
+        formattedArticles
+      );
+      if (entityCoOccurrenceFailure) {
+        stats.rejected++;
+        const reason = `"${group.topic}" ENTITY_FABRICATION — ${entityCoOccurrenceFailure}`;
+        stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
+        console.warn(`[synthesis] HARD REJECT — ${reason}`);
+        continue;
+      }
+
       // ── Multi-Layer Fact Check ──────────────────────────────────────────
       // Layer 1: Heuristic/Google keyword check (original — always runs)
       // Layer 2: Data-backed verification (cross-refs claims vs FRED/BLS/EIA)
@@ -1502,6 +1623,20 @@ export async function synthesizeGroupedArticles(
           );
           for (const h of factCheckReport.sourceAlignment.hallucinations) {
             console.warn(`    → "${h.substring(0, 80)}..."`);
+          }
+        }
+      }
+      if (factCheckReport.entityRelationships && factCheckReport.entityRelationships.relationships.length > 0) {
+        const er = factCheckReport.entityRelationships;
+        console.log(
+          `  [entity-relationships] ${er.relationships.length - er.fabricatedCount}/${er.relationships.length} relationships grounded`
+        );
+        if (er.fabricatedCount > 0) {
+          console.warn(
+            `  [entity-relationships] ⚠ ${er.fabricatedCount} FABRICATED relationships detected:`
+          );
+          for (const r of er.relationships.filter((r) => !r.grounded)) {
+            console.warn(`    → "${r.entityA}" ↔ "${r.entityB}" (${r.relationship})`);
           }
         }
       }
