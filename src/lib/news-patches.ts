@@ -20,8 +20,8 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
-  // NVIDIA → GPU render
-  { test: /\bnvidia\b|\bNVDA\b/i, imageUrl: "https://images.unsplash.com/photo-1617854818583-09e7f077a156?w=1200&q=80" },
+  // NVIDIA → green NVIDIA logo
+  { test: /\bnvidia\b|\bNVDA\b/i, imageUrl: "https://images.unsplash.com/photo-1716967318503-05b7064afa41?w=1200&q=80" },
   // Bentley → luxury car (Continental GT logo)
   { test: /\bbentley\b/i, imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80", relatedTickers: { TSLA: "VWAGY" } },
   // Humana / managed care → healthcare
@@ -30,14 +30,14 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bibm\b.*\bapple\b|\bapple\b.*\bibm\b/i, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80" },
   // MLB / baseball / sports betting → baseball stadium
   { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", category: "markets" },
-  // Meta content moderation / AI → Meta HQ exterior
-  { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1633419461186-7d40a38105ec?w=1200&q=80", category: "markets" },
-  // OpenAI / AI acquisition → AI neural visualization
-  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677756119517-756a188d2d94?w=1200&q=80", category: "markets" },
-  // Iran strike / LNG / crude → oil refinery at night
-  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80" },
-  // Lululemon / athletic retail → retail store interior
-  { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80" },
+  // Meta content moderation / AI → Facebook + Messenger 3D icons
+  { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets" },
+  // OpenAI / AI acquisition → AI visualization
+  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets" },
+  // Iran strike / LNG / crude → oil refinery at night (golden glow)
+  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80" },
+  // Lululemon / athletic retail → yoga fitness class
+  { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80" },
   // Stagflation / GDP collapse → stock market crash / red tape
   { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=1200&q=80" },
   // Jio / Reliance IPO → India / emerging market
