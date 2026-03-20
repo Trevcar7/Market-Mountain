@@ -32,12 +32,13 @@ const DISPLAY_LABEL: Record<string, string> = {
   "2-Year Yield":  "2Y Treasury",
   "Yield Curve":   "Yield Curve (10Y–2Y)",
   Unemployment:    "Unemployment Rate",
+  "DXY":                     "USD Index",
   "Broad U.S. Dollar Index": "USD Index",
   BTC: "Bitcoin",
 };
 
 // Which snapshot items go into the "Market Prices" group
-const SNAPSHOT_MKT_ORDER = ["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar Index"];
+const SNAPSHOT_MKT_ORDER = ["S&P 500", "VIX", "WTI Oil", "DXY", "Broad U.S. Dollar Index"];
 // Macro-board indicator groups (same sets as MacroBoard.tsx)
 const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", "Yield Curve"]);
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);

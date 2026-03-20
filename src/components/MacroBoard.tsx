@@ -13,6 +13,7 @@ const DISPLAY_LABEL: Record<string, string> = {
   Unemployment:    "Unemployment Rate",
   // Snapshot label → human-readable Market Prices name
   BTC:                      "Bitcoin",
+  "DXY":                     "USD Index",
   "Broad U.S. Dollar Index": "USD Index",
 };
 
@@ -21,10 +22,10 @@ const RATE_LABELS = new Set(["Fed Funds Rate", "10-Year Yield", "2-Year Yield", 
 const ECON_LABELS = new Set(["CPI (YoY)", "Core CPI (YoY)", "Unemployment", "Nonfarm Payrolls"]);
 
 // Snapshot items to include in Market Prices section (10Y Yield excluded — lives in Rates)
-const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar Index"]);
+const SNAPSHOT_MKT = new Set(["S&P 500", "VIX", "WTI Oil", "DXY", "Broad U.S. Dollar Index"]);
 
 // Preferred display order for Market Prices
-const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "Broad U.S. Dollar Index"];
+const MARKET_ORDER = ["S&P 500", "VIX", "WTI Oil", "DXY", "Broad U.S. Dollar Index"];
 
 
 // Static border class maps — written out in full so Tailwind includes them
@@ -273,11 +274,11 @@ function buildSignalTags(
     }
   }
 
-  // ── Broad USD Index ───────────────────────────────────────────────────────
-  const dxySnap = snap("Broad U.S. Dollar Index");
+  // ── USD / DXY ───────────────────────────────────────────────────────
+  const dxySnap = snap("DXY") ?? snap("Broad U.S. Dollar Index");
   if (dxySnap) {
     const v = parseFloat(dxySnap.value);
-    if (!isNaN(v) && v >= 120)
+    if (!isNaN(v) && v >= 103)
       candidates.push({ label: `Dollar Strength Rising (DXY ${v.toFixed(1)})`, colorClass: "bg-slate-500/15 text-slate-300 border-slate-500/25", priority: 40 });
   }
 

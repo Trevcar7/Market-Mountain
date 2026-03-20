@@ -20,7 +20,7 @@ const SPARKLINE_SYMBOLS: Array<{ symbol: string; label: string }> = [
   { symbol: "SPY",  label: "S&P 500" },
   { symbol: "UVXY", label: "VIX" },    // 2× VIX short-term futures — shows VIX direction; free-tier compatible
   { symbol: "USO",  label: "WTI Oil" },
-  { symbol: "UUP",  label: "Broad U.S. Dollar Index" },
+  { symbol: "UUP",  label: "DXY" },
 ];
 
 /**

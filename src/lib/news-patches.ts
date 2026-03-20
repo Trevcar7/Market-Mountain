@@ -15,6 +15,7 @@ import type { NewsItem } from "@/lib/news-types";
 interface ArticlePatch {
   test: RegExp;
   imageUrl: string;
+  title?: string;
   category?: string;
   relatedTickers?: Record<string, string>;
   clearChart?: boolean;
@@ -23,6 +24,8 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
+  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data (SMCI is the subject, not NVIDIA)
+  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", clearChart: true, clearKeyData: true },
   // NVIDIA → official NVIDIA logo (green eye + wordmark); fix category to markets; strip bad AMD inline image
   { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", category: "markets", clearInlineImage: true },
   // Bentley → luxury car (Continental GT logo)
@@ -32,7 +35,7 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   // Apple + IBM M&A → tech corporate; strip inline image
   { test: /\bibm\b.*\bapple\b|\bapple\b.*\bibm\b/i, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80", clearInlineImage: true },
   // MLB / baseball / sports betting → baseball stadium (strip irrelevant macro data + inline image)
-  { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
+  { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", title: "Baseball Gains CFTC Approval for Polymarket Prediction Deals, Legitimizing Sports Betting", category: "markets", clearKeyData: true, clearInlineImage: true },
   // Meta content moderation / AI → Facebook + Messenger 3D icons (strip irrelevant macro data + wall street inline image)
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
   // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data)
@@ -70,6 +73,9 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
   for (const patch of ARTICLE_PATCHES) {
     if (patch.test.test(title)) {
       patched.imageUrl = patch.imageUrl;
+      if (patch.title) {
+        patched.title = patch.title;
+      }
       if (patch.category) {
         patched.category = patch.category as NewsItem["category"];
       }

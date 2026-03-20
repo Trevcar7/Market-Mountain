@@ -2574,6 +2574,7 @@ function inferTickerFromText(title: string, body: string): string | undefined {
     [/\bnike\b/, "NKE"],
     [/\bapple\b/, "AAPL"],
     [/\btesla\b/, "TSLA"],
+    [/\bsuper micro\b|\bsmci\b|\bsupermicro\b/, "SMCI"],
     [/\bnvidia\b|\bnvda\b/, "NVDA"],
     [/\bmeta\b.*\bplatform/, "META"],
     [/\bgoogle\b|\balphabet\b/, "GOOGL"],

@@ -7,6 +7,7 @@ import { useMarketData } from "@/contexts/MarketDataContext";
 const STRIP_LABEL: Record<string, string> = {
   BTC:                       "BTC",
   "10Y Yield":               "10Y",
+  "DXY":                     "DXY",
   "Broad U.S. Dollar Index": "DXY",
 };
 
