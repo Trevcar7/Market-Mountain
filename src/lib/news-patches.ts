@@ -29,8 +29,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bbentley\b/i, imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80", relatedTickers: { TSLA: "VWAGY" } },
   // Humana / managed care → healthcare
   { test: /\bhumana\b|\bmanaged care\b/i, imageUrl: "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80" },
-  // Apple + IBM M&A → tech corporate
-  { test: /\bibm\b.*\bapple\b|\bapple\b.*\bibm\b/i, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80" },
+  // Apple + IBM M&A → tech corporate; strip inline image
+  { test: /\bibm\b.*\bapple\b|\bapple\b.*\bibm\b/i, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80", clearInlineImage: true },
   // MLB / baseball / sports betting → baseball stadium (strip irrelevant macro data + inline image)
   { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
   // Meta content moderation / AI → Facebook + Messenger 3D icons (strip irrelevant macro data + wall street inline image)
