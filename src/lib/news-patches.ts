@@ -39,8 +39,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true },
   // Iran + LNG / Qatar / crude strike → oil tanks with storm clouds
   { test: /\biran\b.*\b(?:lng|qatar|crude|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80" },
-  // Iran (general / Fed / inflation) → oil refinery at night
-  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80" },
+  // Iran (general / Fed / inflation) → oil refinery at night; strip money inline image
+  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80", clearInlineImage: true },
   // Lululemon / athletic retail → yoga fitness class
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80" },
   // Stagflation / GDP collapse → stock market crash / red tape; strip foreign market inline image
