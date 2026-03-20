@@ -5,6 +5,7 @@ import NewsSection from "@/components/NewsSection";
 import MacroBoard from "@/components/MacroBoard";
 import MarketStrip from "@/components/MarketStrip";
 import { MarketDataProvider } from "@/contexts/MarketDataContext";
+import SubscribeCTA from "@/components/SubscribeCTA";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
@@ -258,6 +259,9 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* ── Email Subscribe CTA ──────────────────────────────────────── */}
+      <SubscribeCTA />
     </>
   );
 }
