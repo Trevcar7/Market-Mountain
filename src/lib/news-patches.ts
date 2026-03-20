@@ -17,31 +17,36 @@ interface ArticlePatch {
   imageUrl: string;
   category?: string;
   relatedTickers?: Record<string, string>;
+  clearChart?: boolean;
+  clearKeyData?: boolean;
+  clearInlineImage?: boolean;
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
-  // NVIDIA → official NVIDIA logo (green eye + wordmark)
-  { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png" },
+  // NVIDIA → official NVIDIA logo (green eye + wordmark); strip bad AMD inline image
+  { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", clearInlineImage: true },
   // Bentley → luxury car (Continental GT logo)
   { test: /\bbentley\b/i, imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80", relatedTickers: { TSLA: "VWAGY" } },
   // Humana / managed care → healthcare
   { test: /\bhumana\b|\bmanaged care\b/i, imageUrl: "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80" },
   // Apple + IBM M&A → tech corporate
   { test: /\bibm\b.*\bapple\b|\bapple\b.*\bibm\b/i, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80" },
-  // MLB / baseball / sports betting → baseball stadium
-  { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", category: "markets" },
-  // Meta content moderation / AI → Facebook + Messenger 3D icons
-  { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets" },
-  // OpenAI / AI acquisition → AI visualization
-  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets" },
+  // MLB / baseball / sports betting → baseball stadium (strip irrelevant macro data + inline image)
+  { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
+  // Meta content moderation / AI → Facebook + Messenger 3D icons (strip irrelevant macro data)
+  { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true },
+  // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data)
+  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true },
   // Iran + LNG / Qatar / crude strike → oil tanks with storm clouds
   { test: /\biran\b.*\b(?:lng|qatar|crude|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80" },
   // Iran (general / Fed / inflation) → oil refinery at night
   { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80" },
   // Lululemon / athletic retail → yoga fitness class
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80" },
-  // Stagflation / GDP collapse → stock market crash / red tape
-  { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=1200&q=80" },
+  // Stagflation / GDP collapse → stock market crash / red tape; strip foreign market inline image
+  { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=1200&q=80", clearInlineImage: true },
+  // Novartis → keep existing image, strip out-of-place pill inline image
+  { test: /\bnovartis\b/i, imageUrl: "https://images.unsplash.com/photo-1752159684779-0639174cdfac?w=1200&q=80", clearInlineImage: true },
   // Jio / Reliance IPO → India / emerging market
   { test: /\bjio\b|\breliance\b/i, imageUrl: "https://images.unsplash.com/photo-1468254095679-bbcba94a7066?w=1200&q=80" },
 ];
@@ -70,6 +75,15 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
         patched.relatedTickers = patched.relatedTickers.map(
           (t) => patch.relatedTickers![t] ?? t
         );
+      }
+      if (patch.clearChart) {
+        patched.chartData = undefined;
+      }
+      if (patch.clearKeyData) {
+        patched.keyDataPoints = undefined;
+      }
+      if (patch.clearInlineImage) {
+        patched.inlineImageUrl = undefined;
       }
       break;
     }
