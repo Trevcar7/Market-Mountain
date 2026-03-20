@@ -3,6 +3,7 @@ import { getRedisClient } from "@/lib/redis";
 import { NewsCollection } from "@/lib/news-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
+import { applyArticlePatches } from "@/lib/news-patches";
 
 /**
  * GET /api/news
@@ -64,46 +65,6 @@ export async function GET() {
     // Filter out suppressed articles and all March 12 content (pre-March 13 batch)
     const STRIP_FIELDS = new Set(["synthesizedBy", "toneMatch"]);
 
-    // ── Article patches: override bad/missing images and miscategorized articles ──
-    const ARTICLE_PATCHES: Array<{
-      test: RegExp;
-      imageUrl: string;
-      category?: string;
-      relatedTickers?: Record<string, string>;
-    }> = [
-      // NVIDIA → GPU close-up
-      { test: /\bnvidia\b|\bNVDA\b/i, imageUrl: "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80" },
-      // Bentley → luxury car
-      { test: /\bbentley\b/i, imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80", relatedTickers: { TSLA: "VWAGY" } },
-      // Humana / managed care → healthcare
-      { test: /\bhumana\b|\bmanaged care\b/i, imageUrl: "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80" },
-      // Apple + IBM M&A → tech corporate
-      { test: /\bibm\b.*\bapple\b|\bapple\b.*\bibm\b/i, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80" },
-      // MLB / baseball / sports betting → baseball stadium (not earnings)
-      { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", category: "markets" },
-      // Meta / Facebook content moderation → social media tech (not earnings)
-      { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1200&q=80", category: "markets" },
-      // OpenAI / AI acquisition → AI tech (not earnings, it's M&A)
-      { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets" },
-      // Iran / geopolitical conflict + energy → oil refinery
-      { test: /\biran\b.*\bstrike\b|\biran\b.*\bcrude\b|\biran\b.*\boil\b/i, imageUrl: "https://images.unsplash.com/photo-1513828583688-c52646db42da?w=1200&q=80" },
-      // Lululemon / athletic retail → retail store
-      { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80" },
-      // Stagflation / GDP collapse → trading screens
-      { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80" },
-      // Jio / Reliance IPO → India market
-      { test: /\bjio\b|\breliance\b/i, imageUrl: "https://images.unsplash.com/photo-1468254095679-bbcba94a7066?w=1200&q=80" },
-    ];
-
-    // Category-level fallbacks for any article still missing an image after patches
-    const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
-      macro: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",
-      earnings: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",
-      markets: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
-      crypto: "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80",
-      policy: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1200&q=80",
-    };
-
     const filteredNews = newsData.news
       .filter(
         (item) =>
@@ -111,32 +72,9 @@ export async function GET() {
           new Date(item.publishedAt).getTime() >= MARCH_13_CUTOFF_MS
       )
       .map((item) => {
-        let patchedItem = { ...item };
-        const title = patchedItem.title ?? "";
-
-        // Apply keyword-based patches (image, category, tickers)
-        for (const patch of ARTICLE_PATCHES) {
-          if (patch.test.test(title)) {
-            patchedItem.imageUrl = patch.imageUrl;
-            if (patch.category) {
-              patchedItem.category = patch.category as typeof patchedItem.category;
-            }
-            if (patch.relatedTickers && patchedItem.relatedTickers) {
-              patchedItem.relatedTickers = patchedItem.relatedTickers.map(
-                (t) => patch.relatedTickers![t] ?? t
-              );
-            }
-            break;
-          }
-        }
-
-        // Category fallback: if still no image, use a category-appropriate one
-        if (!patchedItem.imageUrl) {
-          patchedItem.imageUrl = CATEGORY_FALLBACK_IMAGES[patchedItem.category] ?? CATEGORY_FALLBACK_IMAGES.macro;
-        }
-
+        const patched = applyArticlePatches(item);
         return Object.fromEntries(
-          Object.entries(patchedItem).filter(([k]) => !STRIP_FIELDS.has(k))
+          Object.entries(patched).filter(([k]) => !STRIP_FIELDS.has(k))
         ) as unknown as typeof item;
       });
     const filtered = { ...newsData, news: filteredNews, meta: { ...newsData.meta, totalCount: filteredNews.length } };

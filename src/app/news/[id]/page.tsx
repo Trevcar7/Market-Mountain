@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getRedisClient } from "@/lib/redis";
 import { NewsCollection, NewsItem, MarketImpactItem, ChartDataset } from "@/lib/news-types";
+import { applyArticlePatches } from "@/lib/news-patches";
 import { categoryLabels, categoryGradients, categoryAccentBorder, categoryAccentText } from "@/lib/category-config";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
@@ -24,30 +25,10 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
 
   try {
     const data = await kv.get<NewsCollection>("news");
-    let item = data?.news.find((n) => n.id === id) ?? null;
+    const raw = data?.news.find((n) => n.id === id) ?? null;
     // Block direct URL access to March 12 articles
-    if (item && new Date(item.publishedAt).getTime() < MARCH_13_CUTOFF_MS) return null;
-    // Patch imageUrl for NVIDIA articles cached before the NVIDIA image override
-    if (item && /\bnvidia\b|\bNVDA\b/i.test(item.title ?? "")) {
-      item = { ...item, imageUrl: "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=1200&q=80" };
-    }
-    // Patch imageUrl and relatedTickers for Bentley articles
-    if (item && /\bbentley\b/i.test(item.title ?? "")) {
-      item = {
-        ...item,
-        // Continental GT close-up logo — logo naturally centered
-        imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80",
-        relatedTickers: item.relatedTickers?.map((t) => t === "TSLA" ? "VWAGY" : t),
-      };
-    }
-    // Patch imageUrl for Humana / managed care articles
-    if (item && /\bhumana\b|\bmanaged care\b/i.test(item.title ?? "")) {
-      item = { ...item, imageUrl: "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80" };
-    }
-    // Patch imageUrl for Apple + IBM M&A article
-    if (item && /\bibm\b/i.test(item.title ?? "") && /\bapple\b/i.test(item.title ?? "")) {
-      item = { ...item, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80" };
-    }
+    if (raw && new Date(raw.publishedAt).getTime() < MARCH_13_CUTOFF_MS) return null;
+    const item = raw ? applyArticlePatches(raw) : null;
     return item;
   } catch {
     return null;
