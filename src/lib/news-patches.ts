@@ -20,8 +20,8 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
-  // NVIDIA → GPU on green background
-  { test: /\bnvidia\b|\bNVDA\b/i, imageUrl: "https://images.unsplash.com/photo-1727176763561-7eeb4bb193ab?w=1200&q=80" },
+  // NVIDIA → official NVIDIA logo (green eye + wordmark)
+  { test: /\bnvidia\b|\bNVDA\b/i, imageUrl: "/images/nvidia-logo.png" },
   // Bentley → luxury car (Continental GT logo)
   { test: /\bbentley\b/i, imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80", relatedTickers: { TSLA: "VWAGY" } },
   // Humana / managed care → healthcare
@@ -34,8 +34,10 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets" },
   // OpenAI / AI acquisition → AI visualization
   { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets" },
-  // Iran strike / LNG / crude → oil tanks with storm clouds
-  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80" },
+  // Iran + LNG / Qatar / crude strike → oil tanks with storm clouds
+  { test: /\biran\b.*\b(?:lng|qatar|crude|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80" },
+  // Iran (general / Fed / inflation) → oil refinery at night
+  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80" },
   // Lululemon / athletic retail → yoga fitness class
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80" },
   // Stagflation / GDP collapse → stock market crash / red tape
