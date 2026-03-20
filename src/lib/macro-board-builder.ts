@@ -61,7 +61,8 @@ async function fetchFmpTreasuryRates(): Promise<FmpTreasuryRow[]> {
     );
 
     if (!res.ok) {
-      console.warn(`[macro-board] FMP treasury: HTTP ${res.status}`);
+      const body = await res.text().catch(() => "");
+      console.warn(`[macro-board] FMP treasury: HTTP ${res.status} — ${body.slice(0, 200)}`);
       return [];
     }
 

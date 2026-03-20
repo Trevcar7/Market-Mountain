@@ -94,7 +94,10 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
   // ^GSPC = S&P 500, ^VIX = CBOE VIX, ^DXY = ICE Dollar Index, CLUSD = WTI Crude
   if (fmpKey) {
     try {
-      const symbols = encodeURIComponent("^GSPC,^VIX,^DXY,CLUSD");
+      // Encode each symbol individually — commas must stay literal as FMP separators
+      const symbols = ["^GSPC", "^VIX", "^DXY", "CLUSD"]
+        .map(s => encodeURIComponent(s))
+        .join(",");
       const fmpRes = await fetch(
         `https://financialmodelingprep.com/api/v3/quote/${symbols}?apikey=${fmpKey}`,
         { signal: AbortSignal.timeout(10000), cache: "no-store" }
@@ -102,6 +105,7 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
 
       if (fmpRes.ok) {
         const quotes = (await fmpRes.json()) as FmpQuote[];
+        console.log(`[market-snapshot] FMP returned ${quotes.length} quotes: ${quotes.map(q => q.symbol).join(", ")}`);
 
         for (const q of quotes) {
           if (!q.price || q.price <= 0) continue;
@@ -150,7 +154,8 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
           }
         }
       } else {
-        console.warn(`[market-snapshot] FMP batch quote: HTTP ${fmpRes.status}`);
+        const errBody = await fmpRes.text().catch(() => "");
+        console.warn(`[market-snapshot] FMP batch quote: HTTP ${fmpRes.status} — ${errBody.slice(0, 300)}`);
       }
     } catch (err) {
       console.warn(`[market-snapshot] FMP batch quote failed: ${String(err)}`);
@@ -163,7 +168,6 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     vix:    !itemMap.has("VIX"),
     tenY:   true,  // Always fetch 10Y for the strip (FMP batch doesn't include it)
     wti:    !itemMap.has("WTI Oil"),
-    dxy:    !itemMap.has("DXY"),
   };
 
   const fredPromises = await Promise.allSettled([
@@ -172,7 +176,6 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     fredNeeded.tenY  ? fetchFredSeries("DGS10",      3) : Promise.resolve([]),
     fredNeeded.wti   ? fetchWtiCrudePrice()              : Promise.resolve(null),
     fredNeeded.wti   ? fetchFredSeries("DCOILWTICO", 3) : Promise.resolve([]),
-    fredNeeded.dxy   ? fetchFredSeries("DTWEXBGS",   2) : Promise.resolve([]),
   ]);
 
   const sp500Obs    = fredPromises[0].status === "fulfilled" ? fredPromises[0].value as { date: string; value: string }[] : [];
@@ -256,24 +259,9 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
     }
   }
 
-  // DXY fallback — FRED DTWEXBGS (note: this is NOT the same as ICE DXY)
-  if (!itemMap.has("DXY")) {
-    const dxObs = fredPromises[5].status === "fulfilled" ? fredPromises[5].value as { date: string; value: string }[] : [];
-    if (dxObs.length >= 1) {
-      const latest = parseFloat(dxObs[0].value);
-      const prev   = dxObs.length >= 2 ? parseFloat(dxObs[1].value) : NaN;
-      if (!isNaN(latest)) {
-        const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
-        itemMap.set("DXY", {
-          label:     "DXY",
-          value:     latest.toFixed(2),
-          change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-          source:    "FRED",
-        });
-      }
-    }
-  }
+  // DXY: NO FRED fallback — FRED DTWEXBGS is the Trade-Weighted Broad Dollar
+  // Index (~120), NOT the ICE DXY (~99). Showing 120 is worse than omitting.
+  // DXY only appears if FMP provides it.
 
   // ── Phase 3: TwelveData — BTC/USD direct + USO overlay for WTI ────────
   if (twKey) {
