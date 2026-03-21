@@ -403,6 +403,7 @@ interface YahooV8Response {
         chartPreviousClose?: number;
         previousClose?: number;
       };
+      timestamp?: number[];
       indicators?: {
         quote?: Array<{
           close?: (number | null)[];
@@ -451,9 +452,25 @@ async function fetchYahooQuote(symbol: string): Promise<YahooQuoteResult | null>
     const price = result.meta?.regularMarketPrice;
     if (!price || price <= 0) return null;
 
-    // Prefer previousClose (prior trading day) over chartPreviousClose
-    // (which is the close before the entire chart range starts — can be days ago)
-    const prevClose = result.meta?.previousClose ?? result.meta?.chartPreviousClose;
+    // Compute previous close from chart data (most reliable method):
+    // The chart returns daily closes for range=5d. The second-to-last
+    // non-null close is yesterday's close, giving us the true daily change.
+    let prevClose: number | null = null;
+
+    const closes = result.indicators?.quote?.[0]?.close;
+    if (closes && closes.length >= 2) {
+      // Walk backwards to find the second-to-last non-null close
+      // (last close is today's, we want the one before it)
+      const validCloses = closes.filter((c): c is number => c != null && c > 0);
+      if (validCloses.length >= 2) {
+        prevClose = validCloses[validCloses.length - 2];
+      }
+    }
+
+    // Fallback to meta fields if chart data insufficient
+    if (!prevClose) {
+      prevClose = result.meta?.previousClose ?? result.meta?.chartPreviousClose ?? null;
+    }
 
     let pctChange = 0;
     let absChange = 0;
