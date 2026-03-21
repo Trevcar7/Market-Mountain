@@ -5,7 +5,7 @@
  * MacroBoard.
  *
  * Data source priority:
- *   Treasury yields → FMP /api/v4/treasury (real-time) → FRED DGS10/DGS2 (daily close, 1-day lag)
+ *   Treasury yields → FMP /api/v4/treasury → Yahoo Finance ^TNX/^FVX → FRED DGS10/DGS2
  *   Fed Funds Rate  → FRED DFEDTARU (changes rarely, daily is fine)
  *   CPI / Core CPI  → FRED CPIAUCSL / CPILFESL (monthly, no real-time alternative)
  *   WTI Crude       → EIA primary → FRED fallback
@@ -78,6 +78,63 @@ async function fetchFmpTreasuryRates(): Promise<FmpTreasuryRow[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Yahoo Finance Treasury Yields (same-day, no key required)
+// ---------------------------------------------------------------------------
+
+interface YahooYieldResult {
+  current: number;
+  previous: number;
+}
+
+/**
+ * Fetch a yield from Yahoo Finance's v8 chart endpoint.
+ * ^TNX = 10Y Treasury × 10, so regularMarketPrice is the actual yield %.
+ * Returns current + previous day's close for change calculation.
+ */
+async function fetchYahooYield(symbol: string): Promise<YahooYieldResult | null> {
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
+      {
+        signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; MarketMountain/1.0)",
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) {
+      console.warn(`[macro-board/Yahoo] ${symbol}: HTTP ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+
+    const current = result.meta?.regularMarketPrice;
+    if (!current || current <= 0) return null;
+
+    // Get previous close from chart data (second-to-last non-null close)
+    let previous = current;
+    const closes = result.indicators?.quote?.[0]?.close as (number | null)[] | undefined;
+    if (closes && closes.length >= 2) {
+      const validCloses = closes.filter((c: number | null): c is number => c != null && c > 0);
+      if (validCloses.length >= 2) {
+        previous = validCloses[validCloses.length - 2];
+      }
+    }
+
+    return { current, previous };
+  } catch (err) {
+    console.warn(`[macro-board/Yahoo] ${symbol} error: ${String(err)}`);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main builder
 // ---------------------------------------------------------------------------
 
@@ -86,30 +143,33 @@ async function fetchFmpTreasuryRates(): Promise<FmpTreasuryRow[]> {
  * Each source gracefully degrades to an empty result on failure.
  */
 export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
-  // Fetch all data sources in parallel
-  const [fedObs, tenYearObs, twoYearObs, cpiObs, coreCpiObs, wtiObs, blsObs, fmpTreasury] =
-    await Promise.allSettled([
-      fetchFredSeries("DFEDTARU", 3),
-      fetchFredSeries("DGS10", 3),
-      fetchFredSeries("DGS2", 3),
-      fetchFredSeries("CPIAUCSL", 18),
-      fetchFredSeries("CPILFESL", 18),
-      fetchWtiCrudePrice(),
-      fetchBlsMultipleSeries(
-        [BLS_SERIES.NONFARM_PAYROLLS, BLS_SERIES.UNEMPLOYMENT],
-        1
-      ),
-      fetchFmpTreasuryRates(),
-    ]);
+  // Fetch all data sources in parallel (fan-out)
+  const allResults = await Promise.allSettled([
+    fetchFredSeries("DFEDTARU", 3),              // [0] Fed Funds
+    fetchFredSeries("DGS10", 3),                  // [1] 10Y FRED fallback
+    fetchFredSeries("DGS2", 3),                   // [2] 2Y FRED fallback
+    fetchFredSeries("CPIAUCSL", 18),              // [3] CPI
+    fetchFredSeries("CPILFESL", 18),              // [4] Core CPI
+    fetchWtiCrudePrice(),                          // [5] WTI
+    fetchBlsMultipleSeries(                        // [6] BLS
+      [BLS_SERIES.NONFARM_PAYROLLS, BLS_SERIES.UNEMPLOYMENT],
+      1
+    ),
+    fetchFmpTreasuryRates(),                       // [7] FMP treasury
+    fetchYahooYield("^TNX"),                       // [8] Yahoo 10Y
+    fetchYahooYield("^FVX"),                       // [9] Yahoo 5Y (proxy for curve)
+  ]);
 
-  const fedData     = fedObs.status     === "fulfilled" ? fedObs.value     : [];
-  const tenYearData = tenYearObs.status === "fulfilled" ? tenYearObs.value : [];
-  const twoYearData = twoYearObs.status === "fulfilled" ? twoYearObs.value : [];
-  const cpiData     = cpiObs.status     === "fulfilled" ? cpiObs.value     : [];
-  const coreCpiData = coreCpiObs.status === "fulfilled" ? coreCpiObs.value : [];
-  const wtiData     = wtiObs.status     === "fulfilled" ? wtiObs.value     : null;
-  const blsRaw      = blsObs.status     === "fulfilled" ? blsObs.value     : {};
-  const treasuryRows = fmpTreasury.status === "fulfilled" ? fmpTreasury.value : [];
+  const fedData      = allResults[0].status === "fulfilled" ? allResults[0].value : [];
+  const tenYearData  = allResults[1].status === "fulfilled" ? allResults[1].value : [];
+  const twoYearData  = allResults[2].status === "fulfilled" ? allResults[2].value : [];
+  const cpiData      = allResults[3].status === "fulfilled" ? allResults[3].value : [];
+  const coreCpiData  = allResults[4].status === "fulfilled" ? allResults[4].value : [];
+  const wtiData      = allResults[5].status === "fulfilled" ? allResults[5].value : null;
+  const blsRaw       = allResults[6].status === "fulfilled" ? allResults[6].value : {};
+  const treasuryRows = allResults[7].status === "fulfilled" ? allResults[7].value : [];
+  const yahoo10Y     = allResults[8].status === "fulfilled" ? allResults[8].value : null;
+  const yahoo5Y      = allResults[9].status === "fulfilled" ? allResults[9].value : null;
 
   const payrollsArr = blsRaw[BLS_SERIES.NONFARM_PAYROLLS] ?? [];
   const unemployArr = blsRaw[BLS_SERIES.UNEMPLOYMENT]     ?? [];
@@ -117,29 +177,40 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
   const indicators: MacroIndicator[] = [];
 
   // ---------------------------------------------------------------------------
-  // Resolve 10Y and 2Y yields — FMP primary, FRED fallback
+  // Resolve 10Y and 2Y yields — FMP → Yahoo → FRED (cascading priority)
   // ---------------------------------------------------------------------------
   let tenYearCurrent:  number | null = null;
   let tenYearPrevious: number | null = null;
   let twoYearCurrent:  number | null = null;
   let twoYearPrevious: number | null = null;
-  let yieldSource  = "FRED";
+  let tenYieldSource  = "FRED";
+  let twoYieldSource  = "FRED";
   let yieldDateStr = "";
 
-  // Try FMP treasury rates first (real-time, intraday)
+  // Tier 1: FMP treasury rates (real-time, both maturities in one call)
   if (treasuryRows.length >= 1 && treasuryRows[0].year10 != null && treasuryRows[0].year2 != null) {
     tenYearCurrent  = treasuryRows[0].year10;
     twoYearCurrent  = treasuryRows[0].year2;
-    yieldSource     = "FMP";
+    tenYieldSource  = "FMP";
+    twoYieldSource  = "FMP";
     yieldDateStr    = treasuryRows[0].date;
 
     if (treasuryRows.length >= 2 && treasuryRows[1].year10 != null && treasuryRows[1].year2 != null) {
       tenYearPrevious = treasuryRows[1].year10;
       twoYearPrevious = treasuryRows[1].year2;
     }
+    console.log(`[macro-board] FMP treasury: 10Y=${tenYearCurrent}, 2Y=${twoYearCurrent}`);
   }
 
-  // Fallback to FRED DGS10 / DGS2
+  // Tier 2: Yahoo Finance ^TNX for 10Y (same-day, no key needed)
+  if (tenYearCurrent === null && yahoo10Y) {
+    tenYearCurrent  = yahoo10Y.current;
+    tenYearPrevious = yahoo10Y.previous;
+    tenYieldSource  = "Yahoo";
+    console.log(`[macro-board] Yahoo 10Y: ${tenYearCurrent}`);
+  }
+
+  // Tier 3: FRED DGS10 / DGS2 fallback (1-day lag)
   if (tenYearCurrent === null && tenYearData.length > 0) {
     tenYearCurrent  = parseFloat(tenYearData[0].value);
     tenYearPrevious = tenYearData.length > 1 ? parseFloat(tenYearData[1].value) : null;
@@ -179,7 +250,7 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
         ? `${changeBps > 0 ? "+" : ""}${changeBps}bps`
         : undefined,
       direction: tenYearCurrent > prev ? "up" : tenYearCurrent < prev ? "down" : "flat",
-      source: yieldSource,
+      source: tenYieldSource,
       updatedAt: yieldDateStr,
     });
   }
@@ -195,7 +266,7 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
         ? `${changeBps > 0 ? "+" : ""}${changeBps}bps`
         : undefined,
       direction: twoYearCurrent > prev ? "up" : twoYearCurrent < prev ? "down" : "flat",
-      source: yieldSource,
+      source: twoYieldSource,
       updatedAt: yieldDateStr,
     });
   }
@@ -217,7 +288,7 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
       direction:
         spread > prevSpread + 0.01 ? "up" :
         spread < prevSpread - 0.01 ? "down" : "flat",
-      source: yieldSource,
+      source: tenYieldSource,
       updatedAt: yieldDateStr,
     });
   }

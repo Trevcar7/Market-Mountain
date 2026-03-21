@@ -49,7 +49,11 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true },
   // Iran + LNG / Qatar / crude strike → oil tanks with storm clouds
   { test: /\biran\b.*\b(?:lng|qatar|crude|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80" },
-  // Iran (general / Fed / inflation) → oil refinery at night; strip money inline image
+  // Iran + Fed / central bank / rate → Federal Reserve building
+  { test: /\biran\b.*\b(?:fed|central bank|rate cut|inflation shock)\b|\b(?:fed|central bank)\b.*\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=80", clearInlineImage: true },
+  // Iran + fiscal / gilt / UK / bond → government bond trading floor
+  { test: /\biran\b.*\b(?:gilt|fiscal|bond|uk|treasury)\b|\b(?:gilt|fiscal)\b.*\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80", clearInlineImage: true },
+  // Iran (general fallback) → oil refinery at night; strip money inline image
   { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80", clearInlineImage: true },
   // Lululemon / athletic retail → yoga fitness class; strip inline image
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80", clearInlineImage: true },
