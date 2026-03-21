@@ -391,7 +391,7 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
   "whatToWatch": [
     {"event": "[MUST be from UPCOMING MACRO CALENDAR if available — specific scheduled release name and date]", "timing": "[monitoring label from the list above]", "significance": "[1-2 sentences: the economic mechanism and what outcome would move markets]", "watchMetric": "[specific level or threshold to monitor, e.g. '10-Year Treasury above 4.30%']"},
     {"event": "[second calendar event or high-impact geopolitical/policy event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]", "watchMetric": "[level or null if none applies]"},
-    {"event": "[third item — story-derived forward-looking signal or remaining calendar event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]"}
+    {"event": "[third item — a forward-looking signal or remaining calendar event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]"}
   ]
 }`;
 
@@ -426,6 +426,13 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
 
   // Build "What to Watch" — ensure real macro calendar events take priority
   let whatToWatch = generated?.whatToWatch ?? [];
+
+  // Strip prompt-leak text from Claude's output (e.g., "(Story-derived ...)")
+  const PROMPT_LEAK_RE = /\s*\((?:story[- ]derived|calendar[- ]event|from calendar|prompt hint)[^)]*\)/gi;
+  for (const item of whatToWatch) {
+    item.event = item.event.replace(PROMPT_LEAK_RE, "").trim();
+    if (item.significance) item.significance = item.significance.replace(PROMPT_LEAK_RE, "").trim();
+  }
 
   // Post-processing: verify Claude actually used the macro calendar events.
   // If Claude generated vague themes instead of real calendar events,
