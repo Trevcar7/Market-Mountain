@@ -8,6 +8,7 @@ import { NewsCollection, NewsItem, MarketImpactItem, ChartDataset } from "@/lib/
 import { applyArticlePatches } from "@/lib/news-patches";
 import { categoryLabels, categoryGradients, categoryAccentBorder, categoryAccentText } from "@/lib/category-config";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
+import { formatDate } from "@/lib/article-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { BLOCKED_SOURCES } from "@/lib/news";
 import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
@@ -51,14 +52,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ...(item.imageUrl ? { images: [{ url: item.imageUrl, width: 1200, height: 630 }] } : {}),
     },
   };
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 // ---------------------------------------------------------------------------

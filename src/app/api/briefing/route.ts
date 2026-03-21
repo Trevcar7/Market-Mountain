@@ -197,6 +197,9 @@ const CATEGORY_LEAD_WEIGHT: Record<string, number> = {
 /**
  * Topic keys that indicate broad macro impact — boosted for lead selection.
  */
+/** Strips parenthetical prompt-leak text Claude echoes from template hints. */
+const PROMPT_LEAK_RE = /\s*\((?:story[- ]derived|calendar[- ]event|from calendar|prompt hint|forward[- ]looking signal|remaining calendar|monitoring label)[^)]*\)/gi;
+
 const HIGH_IMPACT_TOPICS = new Set([
   "federal_reserve", "fed_macro", "inflation", "gdp", "employment",
   "bond_market", "broad_market", "markets", "trade_policy",
@@ -428,7 +431,6 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
   let whatToWatch = generated?.whatToWatch ?? [];
 
   // Strip prompt-leak text from Claude's output (e.g., "(Story-derived ...)")
-  const PROMPT_LEAK_RE = /\s*\((?:story[- ]derived|calendar[- ]event|from calendar|prompt hint)[^)]*\)/gi;
   for (const item of whatToWatch) {
     item.event = item.event.replace(PROMPT_LEAK_RE, "").trim();
     if (item.significance) item.significance = item.significance.replace(PROMPT_LEAK_RE, "").trim();

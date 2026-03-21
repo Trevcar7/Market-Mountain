@@ -59,16 +59,13 @@ export default function TableOfContents({ headings, readTime }: TableOfContentsP
           </li>
         ))}
       </ul>
-      <a
-        href="#"
-        className="block text-[10px] text-text-light hover:text-navy-700 mt-4 pl-3 transition-colors"
-        onClick={(e) => {
-          e.preventDefault();
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
+      <button
+        type="button"
+        className="block text-[10px] text-text-light hover:text-navy-700 mt-4 pl-3 transition-colors text-left"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       >
         Back to top
-      </a>
+      </button>
     </nav>
   );
 }

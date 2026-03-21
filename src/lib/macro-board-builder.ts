@@ -157,7 +157,6 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
     ),
     fetchFmpTreasuryRates(),                       // [7] FMP treasury
     fetchYahooYield("^TNX"),                       // [8] Yahoo 10Y
-    fetchYahooYield("^FVX"),                       // [9] Yahoo 5Y (proxy for curve)
   ]);
 
   const fedData      = allResults[0].status === "fulfilled" ? allResults[0].value : [];
@@ -169,7 +168,6 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
   const blsRaw       = allResults[6].status === "fulfilled" ? allResults[6].value : {};
   const treasuryRows = allResults[7].status === "fulfilled" ? allResults[7].value : [];
   const yahoo10Y     = allResults[8].status === "fulfilled" ? allResults[8].value : null;
-  const yahoo5Y      = allResults[9].status === "fulfilled" ? allResults[9].value : null;
 
   const payrollsArr = blsRaw[BLS_SERIES.NONFARM_PAYROLLS] ?? [];
   const unemployArr = blsRaw[BLS_SERIES.UNEMPLOYMENT]     ?? [];
