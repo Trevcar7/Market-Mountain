@@ -191,6 +191,7 @@ async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
     if (!itemMap.has("S&P 500")) yahooNeeded.push({ symbol: "^GSPC", key: "S&P 500" });
     if (!itemMap.has("VIX"))     yahooNeeded.push({ symbol: "^VIX",  key: "VIX" });
     if (!itemMap.has("DXY"))     yahooNeeded.push({ symbol: "DX-Y.NYB", key: "DXY" });
+    if (!itemMap.has("WTI Oil")) yahooNeeded.push({ symbol: "CL=F",  key: "WTI Oil" });
 
     if (yahooNeeded.length > 0) {
       if (debug) debugLog.push(`Yahoo Finance: fetching ${yahooNeeded.map(y => y.symbol).join(", ")}`);
@@ -228,6 +229,14 @@ async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
           itemMap.set("DXY", {
             label:     "DXY",
             value:     yq.price.toFixed(2),
+            change:    Math.abs(yq.pctChange) < 0.005 ? "—" : `${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%`,
+            direction: yq.pctChange > 0.005 ? "up" : yq.pctChange < -0.005 ? "down" : "flat",
+            source:    "Yahoo",
+          });
+        } else if (key === "WTI Oil") {
+          itemMap.set("WTI Oil", {
+            label:     "WTI Oil",
+            value:     `$${yq.price.toFixed(2)}`,
             change:    Math.abs(yq.pctChange) < 0.005 ? "—" : `${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%`,
             direction: yq.pctChange > 0.005 ? "up" : yq.pctChange < -0.005 ? "down" : "flat",
             source:    "Yahoo",
@@ -338,8 +347,7 @@ async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
   }
 
   // DXY: NO FRED fallback — FRED DTWEXBGS is the Trade-Weighted Broad Dollar
-  // Index (~120), NOT the ICE DXY (~99). Showing 120 is worse than omitting.
-  // DXY only appears if FMP provides it.
+  // Index (~120), NOT the ICE DXY (~99). DXY only appears via FMP or Yahoo.
 
   // ── Phase 3: TwelveData — BTC/USD direct + USO overlay for WTI ────────
   if (twKey) {
@@ -413,8 +421,10 @@ interface YahooV8Response {
 async function fetchYahooQuote(symbol: string): Promise<YahooQuoteResult | null> {
   try {
     const encoded = encodeURIComponent(symbol);
+    // range=5d ensures we always have at least one previous trading day
+    // (handles weekends/holidays)
     const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=2d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`,
       {
         signal: AbortSignal.timeout(6000),
         cache: "no-store",
@@ -441,8 +451,9 @@ async function fetchYahooQuote(symbol: string): Promise<YahooQuoteResult | null>
     const price = result.meta?.regularMarketPrice;
     if (!price || price <= 0) return null;
 
-    // Get previous close for change calculation
-    const prevClose = result.meta?.chartPreviousClose ?? result.meta?.previousClose;
+    // Prefer previousClose (prior trading day) over chartPreviousClose
+    // (which is the close before the entire chart range starts — can be days ago)
+    const prevClose = result.meta?.previousClose ?? result.meta?.chartPreviousClose;
 
     let pctChange = 0;
     let absChange = 0;
