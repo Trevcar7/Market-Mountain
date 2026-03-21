@@ -90,75 +90,72 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
   const itemMap = new Map<string, MarketSnapshotItem>();
 
   // ── Phase 1: FMP direct quotes (real-time, most accurate) ──────────────
-  // Single batch API call — 1 credit for all symbols.
-  // ^GSPC = S&P 500, ^VIX = CBOE VIX, ^DXY = ICE Dollar Index, CLUSD = WTI Crude
+  // Individual API calls per symbol — more resilient than batch (one bad symbol
+  // won't break the others). Uses ~3 credits total.
   if (fmpKey) {
-    try {
-      // Encode each symbol individually — commas must stay literal as FMP separators
-      const symbols = ["^GSPC", "^VIX", "^DXY", "CLUSD"]
-        .map(s => encodeURIComponent(s))
-        .join(",");
-      const fmpRes = await fetch(
-        `https://financialmodelingprep.com/api/v3/quote/${symbols}?apikey=${fmpKey}`,
-        { signal: AbortSignal.timeout(10000), cache: "no-store" }
-      );
+    const fmpSymbols = [
+      { fmp: "%5EGSPC", key: "S&P 500" },
+      { fmp: "%5EVIX",  key: "VIX" },
+      { fmp: "%5EDXY",  key: "DXY" },
+    ] as const;
 
-      if (fmpRes.ok) {
-        const quotes = (await fmpRes.json()) as FmpQuote[];
-        console.log(`[market-snapshot] FMP returned ${quotes.length} quotes: ${quotes.map(q => q.symbol).join(", ")}`);
-
-        for (const q of quotes) {
-          if (!q.price || q.price <= 0) continue;
-          const pct = q.changesPercentage ?? 0;
-          const abs = q.change ?? 0;
-
-          if (q.symbol === "^GSPC") {
-            itemMap.set("S&P 500", {
-              label:     "S&P 500",
-              value:     Math.round(q.price).toLocaleString(),
-              change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-              direction: pct > 0.01 ? "up" : pct < -0.01 ? "down" : "flat",
-              source:    "FMP",
-            });
+    const fmpResults = await Promise.allSettled(
+      fmpSymbols.map(({ fmp }) =>
+        fetch(
+          `https://financialmodelingprep.com/api/v3/quote/${fmp}?apikey=${fmpKey}`,
+          { signal: AbortSignal.timeout(8000), cache: "no-store" }
+        ).then(async (res) => {
+          if (!res.ok) {
+            const body = await res.text().catch(() => "");
+            console.warn(`[market-snapshot] FMP ${fmp}: HTTP ${res.status} — ${body.slice(0, 200)}`);
+            return null;
           }
+          const data = await res.json();
+          // FMP returns array for /quote, or error object
+          const arr = Array.isArray(data) ? data : [];
+          return arr[0] as FmpQuote | undefined;
+        })
+      )
+    );
 
-          if (q.symbol === "^VIX") {
-            // VIX change is in points, not percent (industry standard)
-            itemMap.set("VIX", {
-              label:     "VIX",
-              value:     q.price.toFixed(2),
-              change:    Math.abs(abs) < 0.005 ? "—" : `${abs >= 0 ? "+" : ""}${abs.toFixed(2)}`,
-              direction: abs > 0.005 ? "up" : abs < -0.005 ? "down" : "flat",
-              source:    "FMP",
-            });
-          }
+    for (let i = 0; i < fmpSymbols.length; i++) {
+      const result = fmpResults[i];
+      if (result.status !== "fulfilled" || !result.value) continue;
+      const q = result.value;
+      if (!q.price || q.price <= 0) continue;
 
-          if (q.symbol === "^DXY") {
-            itemMap.set("DXY", {
-              label:     "DXY",
-              value:     q.price.toFixed(2),
-              change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-              direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-              source:    "FMP",
-            });
-          }
+      const pct = q.changesPercentage ?? 0;
+      const abs = q.change ?? 0;
+      const { key } = fmpSymbols[i];
 
-          if (q.symbol === "CLUSD") {
-            itemMap.set("WTI Oil", {
-              label:     "WTI Oil",
-              value:     `$${q.price.toFixed(2)}`,
-              change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-              direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-              source:    "FMP",
-            });
-          }
-        }
-      } else {
-        const errBody = await fmpRes.text().catch(() => "");
-        console.warn(`[market-snapshot] FMP batch quote: HTTP ${fmpRes.status} — ${errBody.slice(0, 300)}`);
+      if (key === "S&P 500") {
+        itemMap.set("S&P 500", {
+          label:     "S&P 500",
+          value:     Math.round(q.price).toLocaleString(),
+          change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+          direction: pct > 0.01 ? "up" : pct < -0.01 ? "down" : "flat",
+          source:    "FMP",
+        });
+      } else if (key === "VIX") {
+        // VIX change is in points, not percent (industry standard)
+        itemMap.set("VIX", {
+          label:     "VIX",
+          value:     q.price.toFixed(2),
+          change:    Math.abs(abs) < 0.005 ? "—" : `${abs >= 0 ? "+" : ""}${abs.toFixed(2)}`,
+          direction: abs > 0.005 ? "up" : abs < -0.005 ? "down" : "flat",
+          source:    "FMP",
+        });
+      } else if (key === "DXY") {
+        itemMap.set("DXY", {
+          label:     "DXY",
+          value:     q.price.toFixed(2),
+          change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+          direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
+          source:    "FMP",
+        });
       }
-    } catch (err) {
-      console.warn(`[market-snapshot] FMP batch quote failed: ${String(err)}`);
+
+      console.log(`[market-snapshot] FMP ${key}: ${q.price} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`);
     }
   }
 
