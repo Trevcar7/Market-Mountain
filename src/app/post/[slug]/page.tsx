@@ -12,6 +12,7 @@ import ReadingProgress from "@/components/ReadingProgress";
 import ArticleCard from "@/components/ArticleCard";
 import TableOfContents from "@/components/TableOfContents";
 import { parseHeadings } from "@/lib/parse-headings";
+import ShareBar from "@/components/ShareBar";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -157,21 +158,37 @@ export default async function ArticlePage({ params }: Props) {
             {article.title}
           </h1>
 
-          {/* Meta */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-white/40 text-[11px] tracking-widest uppercase">
-            <Link href="/about" className="text-white/55 hover:text-white/80 transition-colors font-medium normal-case tracking-normal text-xs">
-              By Trevor Carnovsky
-            </Link>
-            <span className="text-white/30" aria-hidden="true">·</span>
-            <time dateTime={article.date}>{formatDate(article.date)}</time>
-            <span className="text-white/30" aria-hidden="true">·</span>
-            <span>{article.readTime}</span>
-            {article.updated && article.updated !== article.date && (
-              <>
-                <span className="text-white/30" aria-hidden="true">·</span>
-                <span>Updated {formatDate(article.updated)}</span>
-              </>
-            )}
+          {/* Author byline */}
+          <div className="flex items-center gap-3 mt-2">
+            <Image
+              src="/images/trevor.jpg"
+              alt="Trevor Carnovsky"
+              width={40}
+              height={40}
+              className="rounded-full ring-2 ring-white/20"
+            />
+            <div>
+              <Link href="/about" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
+                Trevor Carnovsky
+              </Link>
+              <p className="text-white/35 text-[11px]">Equity Researcher · CFA Research Challenge Champion</p>
+            </div>
+          </div>
+
+          {/* Meta + Share */}
+          <div className="flex flex-wrap items-center justify-between gap-y-3 mt-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-white/40 text-[11px] tracking-widest uppercase">
+              <time dateTime={article.date}>{formatDate(article.date)}</time>
+              <span className="text-white/30" aria-hidden="true">·</span>
+              <span>{article.readTime}</span>
+              {article.updated && article.updated !== article.date && (
+                <>
+                  <span className="text-white/30" aria-hidden="true">·</span>
+                  <span>Updated {formatDate(article.updated)}</span>
+                </>
+              )}
+            </div>
+            <ShareBar url={articleUrl} title={article.title} />
           </div>
         </div>
       </div>
@@ -180,10 +197,11 @@ export default async function ArticlePage({ params }: Props) {
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       {/* Article body — with optional ToC sidebar on xl+ screens */}
+      <div className="bg-white">
       <div className="mx-auto max-w-[900px] px-4 sm:px-6 py-10 sm:py-14 xl:flex xl:gap-14">
         {tocHeadings.length >= 3 && (
           <aside className="hidden xl:block w-44 shrink-0">
-            <TableOfContents headings={tocHeadings} />
+            <TableOfContents headings={tocHeadings} readTime={article.readTime} />
           </aside>
         )}
       <article className="min-w-0 flex-1 max-w-[680px]">
@@ -197,7 +215,11 @@ export default async function ArticlePage({ params }: Props) {
 
         {/* Disclaimer */}
         {article.disclaimer !== false && (
-          <div className="mt-10 p-4 sm:p-5 rounded-xl border border-border bg-surface-2 text-text-muted text-sm leading-relaxed">
+          <div className={`mt-10 p-4 sm:p-5 rounded-xl text-text-muted text-sm leading-relaxed ${
+            article.tags?.some(t => /equity research|price target/i.test(t))
+              ? "border-l-4 border-l-amber-400 border border-amber-200/50 bg-amber-50/50"
+              : "border border-border bg-surface-2"
+          }`}>
             <strong className="text-navy-800 font-semibold">Disclaimer: </strong>
             This article is for informational purposes only and does not
             constitute financial advice. Please perform your own research and
@@ -205,38 +227,58 @@ export default async function ArticlePage({ params }: Props) {
           </div>
         )}
 
-        {/* Author / LinkedIn */}
-        <div className="mt-8 pt-6 border-t border-border flex items-center justify-between flex-wrap gap-4">
-          <a
-            href="https://www.linkedin.com/in/trevor-carnovsky/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 group"
-            aria-label="Connect with Trevor Carnovsky on LinkedIn"
-          >
-            <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[#0077B5] text-white shadow-sm group-hover:bg-[#005f93] transition-colors">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-              </svg>
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-navy-900 group-hover:text-[#0077B5] transition-colors">Trevor Carnovsky</p>
-              <p className="text-xs text-slate-400">Connect on LinkedIn</p>
+        {/* Author card */}
+        <div className="mt-8 pt-6 border-t border-border">
+          <div className="flex items-start gap-4 mb-4">
+            <Image
+              src="/images/trevor.jpg"
+              alt="Trevor Carnovsky"
+              width={56}
+              height={56}
+              className="rounded-full ring-2 ring-border flex-shrink-0"
+            />
+            <div className="flex-1">
+              <Link href="/about" className="text-base font-semibold text-navy-900 hover:text-accent-600 transition-colors">
+                Trevor Carnovsky
+              </Link>
+              <p className="text-xs text-text-light mt-0.5">Equity Researcher · CFA Research Challenge Champion</p>
+              <p className="text-sm text-text-muted mt-2 leading-relaxed">
+                Independent equity researcher focused on fundamental analysis and long-term value creation.
+                Data-driven, fundamental-first.
+              </p>
             </div>
-          </a>
-
-          {/* Back link */}
-          <Link
-            href="/articles"
-            className="inline-flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M12 7H2M6 3L2 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Back to all articles
-          </Link>
+          </div>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <a
+                href="https://www.linkedin.com/in/trevor-carnovsky/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-[#0077B5] hover:text-[#005f93] font-medium transition-colors"
+                aria-label="Connect with Trevor Carnovsky on LinkedIn"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
+                LinkedIn
+              </a>
+              <Link href="/articles" className="text-sm text-text-muted hover:text-navy-900 transition-colors">
+                All articles
+              </Link>
+            </div>
+            <Link
+              href="/articles"
+              className="inline-flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M12 7H2M6 3L2 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Back to all articles
+            </Link>
+          </div>
         </div>
       </article>
+      </div>
       </div>
 
       {/* Related Articles */}

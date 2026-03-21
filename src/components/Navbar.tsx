@@ -74,8 +74,8 @@ export default function Navbar() {
                   {link.label}
                   {active && (
                     <span
-                      className={`absolute bottom-0 left-4 right-4 h-[3px] rounded-full ${
-                        isHeroPage && !scrolled ? "bg-accent-400" : "bg-accent-500"
+                      className={`absolute bottom-0 left-4 right-4 h-[2px] rounded-full ${
+                        isHeroPage && !scrolled ? "bg-accent-400" : "bg-navy-600"
                       }`}
                       aria-hidden="true"
                     />

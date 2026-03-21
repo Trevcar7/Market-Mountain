@@ -1,5 +1,5 @@
 import { getAllArticles } from "@/lib/articles";
-import ArticleCard from "@/components/ArticleCard";
+import ArticleFilter from "@/components/ArticleFilter";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -10,8 +10,6 @@ export const metadata: Metadata = {
 
 export default function ArticlesPage() {
   const articles = getAllArticles();
-  const featured = articles[0];
-  const rest = articles.slice(1);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
@@ -30,29 +28,7 @@ export default function ArticlesPage() {
         </p>
       </div>
 
-      {articles.length === 0 ? (
-        <p className="text-text-muted text-center py-20">
-          No articles published yet — check back soon.
-        </p>
-      ) : (
-        <>
-          {/* Featured card */}
-          {featured && (
-            <div className="mb-6 sm:mb-8">
-              <ArticleCard article={featured} featured />
-            </div>
-          )}
-
-          {/* Article grid */}
-          {rest.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-              {rest.map((article) => (
-                <ArticleCard key={article.slug} article={article} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      <ArticleFilter articles={articles} />
     </div>
   );
 }

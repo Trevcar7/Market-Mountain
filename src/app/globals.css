@@ -89,12 +89,17 @@ body {
 }
 
 .prose h1,
-.prose h2,
+.prose h2 {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
 .prose h3,
 .prose h4 {
   font-family: var(--font-serif);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
 .prose blockquote {
@@ -105,7 +110,15 @@ body {
 
 .prose p,
 .prose li {
-  line-height: 1.85;
+  line-height: 1.75;
+  font-size: 1.125rem;
+}
+
+@media (min-width: 640px) {
+  .prose p,
+  .prose li {
+    line-height: 1.8;
+  }
 }
 
 

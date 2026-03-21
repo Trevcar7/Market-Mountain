@@ -3,24 +3,12 @@ import path from "path";
 import matter from "gray-matter";
 import readingTime from "reading-time";
 
+// Re-export types and formatDate from the client-safe module
+export type { ArticleMeta, Article } from "./article-types";
+export { formatDate } from "./article-types";
+import type { ArticleMeta, Article } from "./article-types";
+
 const postsDirectory = path.join(process.cwd(), "src/content/posts");
-
-export interface ArticleMeta {
-  slug: string;
-  title: string;
-  date: string;
-  readTime: string;
-  excerpt: string;
-  coverImage?: string;
-  coverImagePosition?: string; // e.g. "top", "center", "bottom", "50% 20%"
-  tags?: string[];
-  updated?: string;
-  disclaimer?: boolean;
-}
-
-export interface Article extends ArticleMeta {
-  content: string;
-}
 
 export function getAllArticleSlugs(): string[] {
   if (!fs.existsSync(postsDirectory)) return [];
@@ -82,12 +70,3 @@ export function getArticle(slug: string): Article | null {
   };
 }
 
-export function formatDate(dateStr: string): string {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}

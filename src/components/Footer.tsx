@@ -80,7 +80,7 @@ export default function Footer() {
           <p className="text-xs text-white/40">
             © {year} Market Mountain. All rights reserved.
           </p>
-          <p className="text-xs text-white/50 text-center sm:text-right max-w-md">
+          <p className="text-xs text-white/65 text-center sm:text-right max-w-md">
             Content is for informational purposes only and does not constitute
             financial advice. Always perform your own due diligence.
           </p>
