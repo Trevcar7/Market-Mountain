@@ -153,10 +153,17 @@ export default async function ArticlePage({ params }: Props) {
 
           {/* Title */}
           <h1
-            className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-[1.15] tracking-tight mb-6 font-playfair"
+            className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-[1.15] tracking-tight mb-4 font-playfair"
           >
             {article.title}
           </h1>
+
+          {/* Dek / standfirst */}
+          {article.excerpt && (
+            <p className="text-white/60 text-lg sm:text-xl leading-relaxed font-normal max-w-[600px] mb-6">
+              {article.excerpt}
+            </p>
+          )}
 
           {/* Author byline */}
           <div className="flex items-center gap-3 mt-2">
@@ -205,7 +212,7 @@ export default async function ArticlePage({ params }: Props) {
           </aside>
         )}
       <article className="min-w-0 flex-1 max-w-[680px]">
-        <div className="prose prose-lg prose-slate max-w-none">
+        <div className="prose prose-lg prose-slate max-w-none prose-drop-cap">
           <MDXRemote
             source={article.content}
             components={{ DCFHeatmap, BarChart, DataTable }}

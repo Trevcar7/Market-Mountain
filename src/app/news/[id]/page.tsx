@@ -12,6 +12,10 @@ import { formatDate } from "@/lib/article-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { BLOCKED_SOURCES } from "@/lib/news";
 import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
+import ReadingProgress from "@/components/ReadingProgress";
+import ShareBar from "@/components/ShareBar";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://marketmountainfinance.com";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -185,8 +189,11 @@ export default async function NewsStoryPage({ params }: Props) {
     }
   });
 
+  const storyUrl = `${SITE_URL}/news/${item.id}`;
+
   return (
     <>
+      <ReadingProgress />
       {/* Hero */}
       <div className="bg-navy-900 text-white">
         {/* Cover: photo or gradient */}
@@ -259,21 +266,24 @@ export default async function NewsStoryPage({ params }: Props) {
             </div>
           )}
 
-          {/* Meta */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-white/40 text-[11px] tracking-widest uppercase">
-            <span className="text-white/55 normal-case tracking-normal text-xs font-medium">
-              Market Mountain
-            </span>
-            <span className="w-3 h-px bg-white/20" aria-hidden="true" />
-            <time dateTime={item.publishedAt}>{formatDate(item.publishedAt)}</time>
-            {item.relatedTickers && item.relatedTickers.length > 0 && (
-              <>
-                <span className="w-3 h-px bg-white/20" aria-hidden="true" />
-                <span className="normal-case tracking-normal">
-                  {item.relatedTickers.slice(0, 3).join(" · ")}
-                </span>
-              </>
-            )}
+          {/* Meta + Share */}
+          <div className="flex flex-wrap items-center justify-between gap-y-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-white/40 text-[11px] tracking-widest uppercase">
+              <span className="text-white/55 normal-case tracking-normal text-xs font-medium">
+                Market Mountain
+              </span>
+              <span className="w-3 h-px bg-white/20" aria-hidden="true" />
+              <time dateTime={item.publishedAt}>{formatDate(item.publishedAt)}</time>
+              {item.relatedTickers && item.relatedTickers.length > 0 && (
+                <>
+                  <span className="w-3 h-px bg-white/20" aria-hidden="true" />
+                  <span className="normal-case tracking-normal">
+                    {item.relatedTickers.slice(0, 3).join(" · ")}
+                  </span>
+                </>
+              )}
+            </div>
+            <ShareBar url={storyUrl} title={item.title} />
           </div>
         </div>
       </div>
@@ -282,6 +292,7 @@ export default async function NewsStoryPage({ params }: Props) {
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       {/* Story body */}
+      <div className="bg-white">
       <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
         <article>
           <div className="prose prose-slate max-w-none">
@@ -454,6 +465,7 @@ export default async function NewsStoryPage({ params }: Props) {
             </Link>
           </div>
         </article>
+      </div>
       </div>
     </>
   );

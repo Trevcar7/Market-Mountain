@@ -122,6 +122,37 @@ body {
 }
 
 
+/* Paragraph spacing — generous for financial analysis readability */
+.prose p + p {
+  margin-top: 1.5em;
+}
+
+.prose h2 {
+  margin-top: 2.5em;
+}
+
+/* Section dividers — editorial centered fade */
+.prose hr {
+  border: none;
+  text-align: center;
+  margin: 2.5em auto;
+  max-width: 80px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--color-border-2), transparent);
+}
+
+/* Drop cap — WSJ/NYT-style editorial opener */
+.prose-drop-cap > p:first-of-type::first-letter {
+  float: left;
+  font-family: var(--font-serif);
+  font-size: 3.5em;
+  line-height: 0.8;
+  padding-right: 0.08em;
+  padding-top: 0.05em;
+  color: var(--color-navy-900);
+  font-weight: 700;
+}
+
 .prose {
   font-variant-numeric: lining-nums;
 }
