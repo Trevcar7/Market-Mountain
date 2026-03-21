@@ -105,6 +105,85 @@ export async function fetchFredWithChange(
   return { value: obs[0].value, change: changeStr ?? "" };
 }
 
+// ---------------------------------------------------------------------------
+// Yahoo Finance Treasury Yield (same-day, no key required)
+// ---------------------------------------------------------------------------
+
+/** Yahoo Finance symbol map for treasury yields */
+const YIELD_YAHOO_SYMBOLS: Record<string, string> = {
+  DGS10: "^TNX",
+  DGS30: "^TYX",
+};
+
+/**
+ * Fetch a treasury yield from Yahoo Finance's v8 chart endpoint.
+ * Returns value + change in the same format as fetchFredWithChange.
+ * Falls back gracefully — returns null if Yahoo is unavailable.
+ */
+export async function fetchYahooYield(
+  symbol: string
+): Promise<{ value: string; change: string } | null> {
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
+      {
+        signal: withTimeout(6000),
+        cache: "no-store",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; MarketMountain/1.0)",
+          "Accept": "application/json",
+        },
+      }
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+
+    const current = result.meta?.regularMarketPrice;
+    if (!current || current <= 0) return null;
+
+    // Compute previous close from chart close array
+    let previous = current;
+    const closes = result.indicators?.quote?.[0]?.close;
+    if (Array.isArray(closes) && closes.length >= 2) {
+      const valid = closes.filter((c: unknown): c is number => typeof c === "number" && c > 0);
+      if (valid.length >= 2) previous = valid[valid.length - 2];
+    }
+
+    const change = current - previous;
+    const changeStr = Math.abs(change) > 0.001
+      ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}`
+      : "";
+
+    return { value: current.toFixed(2), change: changeStr };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch a treasury yield with Yahoo Finance → FRED fallback.
+ * Provides same-day accuracy when Yahoo is available, with FRED as backup.
+ * Only works for FRED series that have a Yahoo equivalent (DGS10, DGS30).
+ */
+export async function fetchTreasuryYieldWithChange(
+  fredSeriesId: string
+): Promise<{ value: string; change: string; source: string } | null> {
+  const yahooSymbol = YIELD_YAHOO_SYMBOLS[fredSeriesId];
+
+  if (yahooSymbol) {
+    const yahoo = await fetchYahooYield(yahooSymbol);
+    if (yahoo) return { ...yahoo, source: "Yahoo" };
+  }
+
+  const fred = await fetchFredWithChange(fredSeriesId);
+  if (fred) return { ...fred, source: "FRED" };
+
+  return null;
+}
+
 /**
  * Build a chart-ready dataset from a FRED series.
  * Returns chronologically ordered { labels, values } or null.
@@ -1093,7 +1172,7 @@ export async function fetchContextualData(
       case "fed_macro": {
         const [fedfunds, treasury10y, treasury2y, cpiYoyBls, cpiYoyFred] = await Promise.allSettled([
           fetchFredWithChange("FEDFUNDS"),
-          fetchFredWithChange("DGS10"),
+          fetchTreasuryYieldWithChange("DGS10"),
           fetchFredWithChange("DGS2"),
           fetchBlsMultipleSeries([BLS_SERIES.CPI_ALL], 2),
           fetchFredSeries("CPIAUCSL", 18),
@@ -1229,18 +1308,18 @@ export async function fetchContextualData(
       // ── Bond market / yield curve ───────────────────────────────────────
       case "bond_market": {
         const [t10y, t2y, t30y, fedfunds] = await Promise.allSettled([
-          fetchFredWithChange("DGS10"),
+          fetchTreasuryYieldWithChange("DGS10"),
           fetchFredWithChange("DGS2"),
-          fetchFredWithChange("DGS30"),
+          fetchTreasuryYieldWithChange("DGS30"),
           fetchFredWithChange("FEDFUNDS"),
         ]);
 
         if (t10y.status === "fulfilled" && t10y.value)
-          points.push({ label: "10-Year Yield", value: `${t10y.value.value}%`, change: t10y.value.change || undefined, source: "FRED" });
+          points.push({ label: "10-Year Yield", value: `${t10y.value.value}%`, change: t10y.value.change || undefined, source: t10y.value.source });
         if (t2y.status === "fulfilled" && t2y.value)
           points.push({ label: "2-Year Yield", value: `${t2y.value.value}%`, change: t2y.value.change || undefined, source: "FRED" });
         if (t30y.status === "fulfilled" && t30y.value)
-          points.push({ label: "30-Year Yield", value: `${t30y.value.value}%`, change: t30y.value.change || undefined, source: "FRED" });
+          points.push({ label: "30-Year Yield", value: `${t30y.value.value}%`, change: t30y.value.change || undefined, source: t30y.value.source });
         if (fedfunds.status === "fulfilled" && fedfunds.value)
           points.push({ label: "Fed Funds Rate", value: `${fedfunds.value.value}%`, change: fedfunds.value.change || undefined, source: "FRED" });
         break;
@@ -1264,7 +1343,7 @@ export async function fetchContextualData(
       case "trade_policy": {
         const [energy, treasury10y] = await Promise.allSettled([
           fetchEnergySummary(),
-          fetchFredLatest("DGS10"),
+          fetchTreasuryYieldWithChange("DGS10"),
         ]);
         if (energy.status === "fulfilled") {
           if (energy.value.wti)
@@ -1273,7 +1352,7 @@ export async function fetchContextualData(
             points.push({ label: "Brent Crude", value: `$${energy.value.brent.value.toFixed(2)}/bbl`, source: "EIA" });
         }
         if (treasury10y.status === "fulfilled" && treasury10y.value)
-          points.push({ label: "10-Year Treasury", value: `${treasury10y.value.value}%`, source: "FRED" });
+          points.push({ label: "10-Year Treasury", value: `${treasury10y.value.value}%`, source: treasury10y.value.source });
         break;
       }
 
@@ -1319,9 +1398,9 @@ export async function fetchContextualData(
           points.push({ label: "VIX", value: vix.value.price, source: "Alpha Vantage" });
 
         // Add treasury yield context
-        const t10y = await fetchFredLatest("DGS10");
+        const t10y = await fetchTreasuryYieldWithChange("DGS10");
         if (t10y)
-          points.push({ label: "10-Year Treasury", value: `${t10y.value}%`, source: "FRED" });
+          points.push({ label: "10-Year Treasury", value: `${t10y.value}%`, source: t10y.source });
         break;
       }
 
@@ -1342,11 +1421,11 @@ export async function fetchContextualData(
       case "merger_acquisition":
       case "bankruptcy": {
         const [t10y, spy] = await Promise.allSettled([
-          fetchFredLatest("DGS10"),
+          fetchTreasuryYieldWithChange("DGS10"),
           fetchStockQuote("SPY"),
         ]);
         if (t10y.status === "fulfilled" && t10y.value)
-          points.push({ label: "10-Year Yield", value: `${t10y.value.value}%`, source: "FRED" });
+          points.push({ label: "10-Year Yield", value: `${t10y.value.value}%`, source: t10y.value.source });
         if (spy.status === "fulfilled" && spy.value)
           points.push({ label: "S&P 500 ETF (SPY)", value: spy.value.price, change: spy.value.changePercent, source: "Alpha Vantage" });
         break;
@@ -1356,12 +1435,12 @@ export async function fetchContextualData(
       default: {
         const [fedfunds, t10y] = await Promise.allSettled([
           fetchFredLatest("FEDFUNDS"),
-          fetchFredLatest("DGS10"),
+          fetchTreasuryYieldWithChange("DGS10"),
         ]);
         if (fedfunds.status === "fulfilled" && fedfunds.value)
           points.push({ label: "Fed Funds Rate", value: `${fedfunds.value.value}%`, source: "FRED" });
         if (t10y.status === "fulfilled" && t10y.value)
-          points.push({ label: "10-Year Treasury", value: `${t10y.value.value}%`, source: "FRED" });
+          points.push({ label: "10-Year Treasury", value: `${t10y.value.value}%`, source: t10y.value.source });
         break;
       }
     }
