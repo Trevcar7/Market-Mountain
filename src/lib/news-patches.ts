@@ -31,8 +31,10 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
-  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%
-  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", clearChart: true, clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
+  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%; category → markets
+  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
+  // Nexstar / Tegna acquisition → markets category
+  { test: /\bnexstar\b|\btegna\b/i, imageUrl: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80", category: "markets" },
   // NVIDIA → official NVIDIA logo (green eye + wordmark); fix category to markets; strip bad AMD inline image
   { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", category: "markets", clearInlineImage: true },
   // Bentley → luxury car (Continental GT logo)

@@ -229,9 +229,6 @@ export default function MacroSnapshotWidget({ initialData }: Props) {
                       </span>
                     )}
                   </div>
-                  {dp.source && (
-                    <p className="text-white/25 text-[8px] mt-0.5 tracking-wide">Source: {dp.source}</p>
-                  )}
                 </div>
               ))}
             </div>
