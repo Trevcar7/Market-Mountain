@@ -14,23 +14,23 @@ const CACHE_SECONDS = 5 * 60; // 5 minutes
  *   S&P 500, VIX, 10Y Yield, WTI Oil, DXY, BTC
  *
  * Data source strategy (priority order):
- *   1. FMP (Financial Modeling Prep) — real-time direct quotes for indices.
- *      Individual API calls for ^GSPC, ^VIX, ^DXY (~3 credits).
- *   2. Yahoo Finance — unofficial but reliable same-day quote data.
- *   3. FRED — daily-close fallback (can lag 1 day on business days).
- *   4. TwelveData — BTC/USD (crypto, real-time on free tier).
+ *   1. Yahoo Finance — same-day quote data (no key required).
+ *   2. FRED — daily-close fallback (can lag 1 day on business days).
+ *   3. TwelveData — BTC/USD (crypto, real-time on free tier).
  *
- * Why not "FRED baseline + ETF proxy %"?
- *   FRED SP500/VIXCLS/DCOILWTICO can lag 1-3 days. Applying today's ETF %
- *   change to a multi-day-old baseline produces wrong absolute values.
- *   FMP/Yahoo direct quotes give the actual current price — no proxy math needed.
+ * All independent sources are fetched in parallel (fan-out / fan-in).
+ * Items are filled in priority order: Yahoo > FRED, with 10Y always from FRED.
  *
  * TTL: 5-min server-side Redis cache.
- * Pass ?_debug=1 for diagnostic info (FMP key status, source logs).
+ * Pass ?_debug=<SNAPSHOT_DEBUG_KEY> for diagnostic info.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const debug = url.searchParams.get("_debug") === "1";
+  const debugParam = url.searchParams.get("_debug");
+  const debugSecret = process.env.SNAPSHOT_DEBUG_KEY;
+  // Debug requires a secret to prevent cache bypass abuse and info leakage
+  const debug = !!(debugParam && debugSecret && debugParam === debugSecret);
+
   const kv = getRedisClient();
 
   if (!kv) {
@@ -53,10 +53,10 @@ export async function GET(request: Request) {
 
     const data = await buildSnapshot(debug);
 
-    // Only cache if we got meaningful data (>=3 items).
-    if (data.items.length >= 3) {
+    // Only cache non-debug requests with meaningful data (>=3 items).
+    if (data.items.length >= 3 && !debug) {
       await kv.set(KV_KEY, data, { ex: CACHE_SECONDS });
-    } else {
+    } else if (data.items.length < 3) {
       console.warn(`[/api/market-snapshot] Only ${data.items.length} items resolved — skipping cache`);
     }
 
@@ -71,16 +71,47 @@ export async function GET(request: Request) {
 }
 
 // ---------------------------------------------------------------------------
-// FMP types
+// Indicator config — single source of truth for formatting & thresholds
 // ---------------------------------------------------------------------------
 
-interface FmpQuote {
-  symbol:             string;
-  price:              number;
-  change:             number;
-  changesPercentage:  number;
-  previousClose?:     number;
-  name?:              string;
+interface IndicatorConfig {
+  formatValue: (price: number) => string;
+  /** "pct" = percentage change, "abs" = absolute points (VIX), "bps" = basis points (yields) */
+  changeType: "pct" | "abs";
+  threshold: number;
+}
+
+const INDICATOR_CONFIGS: Record<string, IndicatorConfig> = {
+  "S&P 500": { formatValue: (p) => Math.round(p).toLocaleString(),  changeType: "pct", threshold: 0.01 },
+  "VIX":     { formatValue: (p) => p.toFixed(2),                    changeType: "abs", threshold: 0.005 },
+  "DXY":     { formatValue: (p) => p.toFixed(2),                    changeType: "pct", threshold: 0.005 },
+  "WTI Oil": { formatValue: (p) => `$${p.toFixed(2)}`,              changeType: "pct", threshold: 0.005 },
+  "BTC":     { formatValue: (p) => `$${Math.round(p).toLocaleString()}`, changeType: "pct", threshold: 0.005 },
+};
+
+/** Build a MarketSnapshotItem using the config for the given key. */
+function buildItem(
+  key: string,
+  price: number,
+  pctChange: number,
+  absChange: number,
+  source: string,
+): MarketSnapshotItem {
+  const cfg = INDICATOR_CONFIGS[key];
+  if (!cfg) {
+    // Fallback for unconfigured keys (e.g., 10Y Yield handled separately)
+    return { label: key, value: String(price), change: "—", direction: "flat", source };
+  }
+  const changeVal = cfg.changeType === "abs" ? absChange : pctChange;
+  const suffix = cfg.changeType === "pct" ? "%" : "";
+
+  return {
+    label:     key,
+    value:     cfg.formatValue(price),
+    change:    Math.abs(changeVal) < cfg.threshold ? "—" : `${changeVal >= 0 ? "+" : ""}${changeVal.toFixed(2)}${suffix}`,
+    direction: changeVal > cfg.threshold ? "up" : changeVal < -cfg.threshold ? "down" : "flat",
+    source,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -90,187 +121,66 @@ interface FmpQuote {
 async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
   const now        = new Date();
   const validUntil = new Date(now.getTime() + CACHE_SECONDS * 1000);
-  const fmpKey     = process.env.FMP_API_KEY;
   const twKey      = process.env.TWELVEDATA_API_KEY;
-  const debugLog: string[] = [];
+  const debugLog: string[] | null = debug ? [] : null;
 
   const itemMap = new Map<string, MarketSnapshotItem>();
 
-  if (debug) {
-    debugLog.push(`FMP_API_KEY: ${fmpKey ? `set (${fmpKey.length} chars)` : "NOT SET"}`);
+  if (debugLog) {
     debugLog.push(`TWELVEDATA_API_KEY: ${twKey ? `set (${twKey.length} chars)` : "NOT SET"}`);
     debugLog.push(`FRED_API_KEY: ${process.env.FRED_API_KEY ? "set" : "NOT SET"}`);
   }
 
-  // ── Phase 1: FMP direct quotes (real-time, most accurate) ──────────────
-  // Individual API calls per symbol — more resilient than batch (one bad symbol
-  // won't break the others). Uses ~3 credits total.
-  if (fmpKey) {
-    const fmpSymbols = [
-      { fmp: "%5EGSPC", key: "S&P 500" },
-      { fmp: "%5EVIX",  key: "VIX" },
-      { fmp: "%5EDXY",  key: "DXY" },
-    ] as const;
+  // ── Fan-out: launch ALL independent fetches in parallel ─────────────────
+  // Yahoo: S&P 500, VIX, DXY, WTI Oil (same-day quotes)
+  // FRED:  10Y Yield (always), S&P/VIX/WTI (fallback if Yahoo fails)
+  // TwelveData: BTC/USD
+  const yahooSymbols = [
+    { symbol: "^GSPC",    key: "S&P 500" },
+    { symbol: "^VIX",     key: "VIX" },
+    { symbol: "DX-Y.NYB", key: "DXY" },
+    { symbol: "CL=F",     key: "WTI Oil" },
+  ] as const;
 
-    const fmpResults = await Promise.allSettled(
-      fmpSymbols.map(({ fmp }) =>
-        fetch(
-          `https://financialmodelingprep.com/api/v3/quote/${fmp}?apikey=${fmpKey}`,
-          { signal: AbortSignal.timeout(8000), cache: "no-store" }
-        ).then(async (res) => {
-          if (!res.ok) {
-            const body = await res.text().catch(() => "");
-            const msg = `FMP ${fmp}: HTTP ${res.status} — ${body.slice(0, 200)}`;
-            console.warn(`[market-snapshot] ${msg}`);
-            if (debug) debugLog.push(msg);
-            return null;
-          }
-          const data = await res.json();
-          // FMP returns array for /quote, or error object
-          if (debug) debugLog.push(`FMP ${fmp} raw: ${JSON.stringify(data).slice(0, 300)}`);
-          const arr = Array.isArray(data) ? data : [];
-          return arr[0] as FmpQuote | undefined;
-        })
-      )
-    );
-
-    for (let i = 0; i < fmpSymbols.length; i++) {
-      const result = fmpResults[i];
-      if (result.status === "rejected") {
-        const msg = `FMP ${fmpSymbols[i].fmp}: rejected — ${String(result.reason)}`;
-        console.warn(`[market-snapshot] ${msg}`);
-        if (debug) debugLog.push(msg);
-        continue;
-      }
-      if (!result.value) continue;
-      const q = result.value;
-      if (!q.price || q.price <= 0) continue;
-
-      const pct = q.changesPercentage ?? 0;
-      const abs = q.change ?? 0;
-      const { key } = fmpSymbols[i];
-
-      if (key === "S&P 500") {
-        itemMap.set("S&P 500", {
-          label:     "S&P 500",
-          value:     Math.round(q.price).toLocaleString(),
-          change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: pct > 0.01 ? "up" : pct < -0.01 ? "down" : "flat",
-          source:    "FMP",
-        });
-      } else if (key === "VIX") {
-        // VIX change is in points, not percent (industry standard)
-        itemMap.set("VIX", {
-          label:     "VIX",
-          value:     q.price.toFixed(2),
-          change:    Math.abs(abs) < 0.005 ? "—" : `${abs >= 0 ? "+" : ""}${abs.toFixed(2)}`,
-          direction: abs > 0.005 ? "up" : abs < -0.005 ? "down" : "flat",
-          source:    "FMP",
-        });
-      } else if (key === "DXY") {
-        itemMap.set("DXY", {
-          label:     "DXY",
-          value:     q.price.toFixed(2),
-          change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-          source:    "FMP",
-        });
-      }
-
-      console.log(`[market-snapshot] FMP ${key}: ${q.price} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`);
-      if (debug) debugLog.push(`FMP ${key}: ${q.price} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`);
-    }
-  } else if (debug) {
-    debugLog.push("FMP SKIPPED — no API key");
-  }
-
-  // ── Phase 1.5: Yahoo Finance fallback (same-day quotes, no key needed) ──
-  // Fills S&P 500, VIX, DXY if FMP didn't provide them.
-  {
-    const yahooNeeded: { symbol: string; key: string }[] = [];
-    if (!itemMap.has("S&P 500")) yahooNeeded.push({ symbol: "^GSPC", key: "S&P 500" });
-    if (!itemMap.has("VIX"))     yahooNeeded.push({ symbol: "^VIX",  key: "VIX" });
-    if (!itemMap.has("DXY"))     yahooNeeded.push({ symbol: "DX-Y.NYB", key: "DXY" });
-    if (!itemMap.has("WTI Oil")) yahooNeeded.push({ symbol: "CL=F",  key: "WTI Oil" });
-
-    if (yahooNeeded.length > 0) {
-      if (debug) debugLog.push(`Yahoo Finance: fetching ${yahooNeeded.map(y => y.symbol).join(", ")}`);
-      const yahooResults = await Promise.allSettled(
-        yahooNeeded.map(({ symbol }) => fetchYahooQuote(symbol))
-      );
-
-      for (let i = 0; i < yahooNeeded.length; i++) {
-        const result = yahooResults[i];
-        if (result.status !== "fulfilled" || !result.value) {
-          if (debug) debugLog.push(`Yahoo ${yahooNeeded[i].symbol}: ${result.status === "rejected" ? String(result.reason) : "null"}`);
-          continue;
-        }
-        const yq = result.value;
-        const { key } = yahooNeeded[i];
-
-        if (key === "S&P 500") {
-          itemMap.set("S&P 500", {
-            label:     "S&P 500",
-            value:     Math.round(yq.price).toLocaleString(),
-            change:    `${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%`,
-            direction: yq.pctChange > 0.01 ? "up" : yq.pctChange < -0.01 ? "down" : "flat",
-            source:    "Yahoo",
-          });
-        } else if (key === "VIX") {
-          const abs = yq.absChange;
-          itemMap.set("VIX", {
-            label:     "VIX",
-            value:     yq.price.toFixed(2),
-            change:    Math.abs(abs) < 0.005 ? "—" : `${abs >= 0 ? "+" : ""}${abs.toFixed(2)}`,
-            direction: abs > 0.005 ? "up" : abs < -0.005 ? "down" : "flat",
-            source:    "Yahoo",
-          });
-        } else if (key === "DXY") {
-          itemMap.set("DXY", {
-            label:     "DXY",
-            value:     yq.price.toFixed(2),
-            change:    Math.abs(yq.pctChange) < 0.005 ? "—" : `${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%`,
-            direction: yq.pctChange > 0.005 ? "up" : yq.pctChange < -0.005 ? "down" : "flat",
-            source:    "Yahoo",
-          });
-        } else if (key === "WTI Oil") {
-          itemMap.set("WTI Oil", {
-            label:     "WTI Oil",
-            value:     `$${yq.price.toFixed(2)}`,
-            change:    Math.abs(yq.pctChange) < 0.005 ? "—" : `${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%`,
-            direction: yq.pctChange > 0.005 ? "up" : yq.pctChange < -0.005 ? "down" : "flat",
-            source:    "Yahoo",
-          });
-        }
-
-        console.log(`[market-snapshot] Yahoo ${key}: ${yq.price}`);
-        if (debug) debugLog.push(`Yahoo ${key}: ${yq.price} (${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%)`);
-      }
-    }
-  }
-
-  // ── Phase 2: FRED fallback (daily close) — fills gaps FMP didn't cover ─
-  const fredNeeded = {
-    sp500:  !itemMap.has("S&P 500"),
-    vix:    !itemMap.has("VIX"),
-    tenY:   true,  // Always fetch 10Y for the strip (FMP batch doesn't include it)
-    wti:    !itemMap.has("WTI Oil"),
-  };
-
-  const fredPromises = await Promise.allSettled([
-    fredNeeded.sp500 ? fetchFredSeries("SP500",      3) : Promise.resolve([]),
-    fredNeeded.vix   ? fetchFredSeries("VIXCLS",     3) : Promise.resolve([]),
-    fredNeeded.tenY  ? fetchFredSeries("DGS10",      3) : Promise.resolve([]),
-    fredNeeded.wti   ? fetchWtiCrudePrice()              : Promise.resolve(null),
-    fredNeeded.wti   ? fetchFredSeries("DCOILWTICO", 3) : Promise.resolve([]),
+  const [
+    // Yahoo results (indices 0-3)
+    ...allResults
+  ] = await Promise.allSettled([
+    ...yahooSymbols.map(({ symbol }) => fetchYahooQuote(symbol)),
+    // FRED results (indices 4-8)
+    fetchFredSeries("SP500",      3),          // [4] S&P fallback
+    fetchFredSeries("VIXCLS",     3),          // [5] VIX fallback
+    fetchFredSeries("DGS10",      3),          // [6] 10Y (always)
+    fetchWtiCrudePrice(),                      // [7] WTI EIA
+    fetchFredSeries("DCOILWTICO", 3),          // [8] WTI FRED fallback
+    // TwelveData (index 9)
+    twKey ? fetchTwelveDataQuote(twKey, "BTC/USD") : Promise.resolve(null), // [9]
   ]);
 
-  const sp500Obs    = fredPromises[0].status === "fulfilled" ? fredPromises[0].value as { date: string; value: string }[] : [];
-  const vixObs      = fredPromises[1].status === "fulfilled" ? fredPromises[1].value as { date: string; value: string }[] : [];
-  const tenYearObs  = fredPromises[2].status === "fulfilled" ? fredPromises[2].value as { date: string; value: string }[] : [];
-  const wtiEiaVal   = fredPromises[3].status === "fulfilled" ? fredPromises[3].value as { value: number; period: string } | null : null;
-  const wtiCoObs    = fredPromises[4].status === "fulfilled" ? fredPromises[4].value as { date: string; value: string }[] : [];
-  // dxFredObs unused now since we always prefer FMP for DXY
+  // ── Process Yahoo results (primary source) ──────────────────────────────
+  for (let i = 0; i < yahooSymbols.length; i++) {
+    const result = allResults[i];
+    if (result.status !== "fulfilled" || !result.value) {
+      if (debugLog) debugLog.push(`Yahoo ${yahooSymbols[i].symbol}: ${result.status === "rejected" ? String((result as PromiseRejectedResult).reason) : "null"}`);
+      continue;
+    }
+    const yq = result.value as YahooQuoteResult;
+    const { key } = yahooSymbols[i];
+
+    itemMap.set(key, buildItem(key, yq.price, yq.pctChange, yq.absChange, "Yahoo"));
+
+    console.log(`[market-snapshot] Yahoo ${key}: ${yq.price}`);
+    debugLog?.push(`Yahoo ${key}: ${yq.price} (${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%)`);
+  }
+
+  // ── Process FRED fallbacks (fills gaps Yahoo didn't cover) ──────────────
+  type FredObs = { date: string; value: string }[];
+
+  const sp500Obs   = allResults[4].status === "fulfilled" ? allResults[4].value as FredObs : [];
+  const vixObs     = allResults[5].status === "fulfilled" ? allResults[5].value as FredObs : [];
+  const tenYearObs = allResults[6].status === "fulfilled" ? allResults[6].value as FredObs : [];
+  const wtiEiaVal  = allResults[7].status === "fulfilled" ? allResults[7].value as { value: number; period: string } | null : null;
+  const wtiCoObs   = allResults[8].status === "fulfilled" ? allResults[8].value as FredObs : [];
 
   // S&P 500 fallback
   if (!itemMap.has("S&P 500") && sp500Obs.length >= 1) {
@@ -278,13 +188,7 @@ async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
     const prev   = sp500Obs.length >= 2 ? parseFloat(sp500Obs[1].value) : NaN;
     if (!isNaN(latest)) {
       const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
-      itemMap.set("S&P 500", {
-        label:     "S&P 500",
-        value:     Math.round(latest).toLocaleString(),
-        change:    `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-        direction: pct > 0.01 ? "up" : pct < -0.01 ? "down" : "flat",
-        source:    "FRED",
-      });
+      itemMap.set("S&P 500", buildItem("S&P 500", latest, pct, latest - (prev || latest), "FRED"));
     }
   }
 
@@ -294,17 +198,12 @@ async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
     const prev   = vixObs.length >= 2 ? parseFloat(vixObs[1].value) : NaN;
     if (!isNaN(latest)) {
       const pts = !isNaN(prev) ? latest - prev : 0;
-      itemMap.set("VIX", {
-        label:     "VIX",
-        value:     latest.toFixed(2),
-        change:    Math.abs(pts) < 0.005 ? "—" : `${pts >= 0 ? "+" : ""}${pts.toFixed(2)}`,
-        direction: pts > 0.005 ? "up" : pts < -0.005 ? "down" : "flat",
-        source:    "FRED",
-      });
+      const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
+      itemMap.set("VIX", buildItem("VIX", latest, pct, pts, "FRED"));
     }
   }
 
-  // 10Y Treasury Yield — change in basis points
+  // 10Y Treasury Yield — always from FRED, change in basis points
   if (tenYearObs.length >= 1) {
     const latest = parseFloat(tenYearObs[0].value);
     const prev   = tenYearObs.length >= 2 ? parseFloat(tenYearObs[1].value) : NaN;
@@ -324,48 +223,27 @@ async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
   if (!itemMap.has("WTI Oil")) {
     if (wtiEiaVal?.value != null) {
       itemMap.set("WTI Oil", {
-        label:     "WTI Oil",
-        value:     `$${wtiEiaVal.value.toFixed(2)}`,
-        change:    "—",
-        direction: "flat",
-        source:    "EIA",
+        label: "WTI Oil", value: `$${wtiEiaVal.value.toFixed(2)}`,
+        change: "—", direction: "flat", source: "EIA",
       });
     } else if (wtiCoObs.length >= 1) {
       const latest = parseFloat(wtiCoObs[0].value);
       const prev   = wtiCoObs.length >= 2 ? parseFloat(wtiCoObs[1].value) : NaN;
       if (!isNaN(latest)) {
         const pct = !isNaN(prev) && prev > 0 ? ((latest / prev - 1) * 100) : 0;
-        itemMap.set("WTI Oil", {
-          label:     "WTI Oil",
-          value:     `$${latest.toFixed(2)}`,
-          change:    Math.abs(pct) < 0.005 ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
-          direction: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
-          source:    "FRED",
-        });
+        itemMap.set("WTI Oil", buildItem("WTI Oil", latest, pct, latest - (prev || latest), "FRED"));
       }
     }
   }
 
   // DXY: NO FRED fallback — FRED DTWEXBGS is the Trade-Weighted Broad Dollar
-  // Index (~120), NOT the ICE DXY (~99). DXY only appears via FMP or Yahoo.
+  // Index (~120), NOT the ICE DXY (~99). DXY only appears via Yahoo.
 
-  // ── Phase 3: TwelveData — BTC/USD direct + USO overlay for WTI ────────
-  if (twKey) {
-    // BTC/USD is real-time on TwelveData free tier (crypto pairs)
-    const [btcRes] = await Promise.allSettled([
-      fetchTwelveDataQuote(twKey, "BTC/USD"),
-    ]);
-
-    if (btcRes.status === "fulfilled" && btcRes.value) {
-      const btc = btcRes.value;
-      itemMap.set("BTC", {
-        label:     "BTC",
-        value:     `$${Math.round(btc.price).toLocaleString()}`,
-        change:    `${btc.pctChange >= 0 ? "+" : ""}${btc.pctChange.toFixed(2)}%`,
-        direction: btc.pctChange > 0.005 ? "up" : btc.pctChange < -0.005 ? "down" : "flat",
-        source:    "TwelveData",
-      });
-    }
+  // ── Process TwelveData BTC ──────────────────────────────────────────────
+  const btcResult = allResults[9];
+  if (btcResult.status === "fulfilled" && btcResult.value) {
+    const btc = btcResult.value as TwelveDataRaw;
+    itemMap.set("BTC", buildItem("BTC", btc.price, btc.pctChange, btc.absChange, "TwelveData"));
   }
 
   // ── Output in display order ────────────────────────────────────────────
@@ -378,7 +256,7 @@ async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
     validUntil:  validUntil.toISOString(),
   };
 
-  if (debug) {
+  if (debugLog) {
     result._debug = debugLog;
   }
 
@@ -459,8 +337,6 @@ async function fetchYahooQuote(symbol: string): Promise<YahooQuoteResult | null>
 
     const closes = result.indicators?.quote?.[0]?.close;
     if (closes && closes.length >= 2) {
-      // Walk backwards to find the second-to-last non-null close
-      // (last close is today's, we want the one before it)
       const validCloses = closes.filter((c): c is number => c != null && c > 0);
       if (validCloses.length >= 2) {
         prevClose = validCloses[validCloses.length - 2];
@@ -551,12 +427,6 @@ async function fetchTwelveDataQuote(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Parse a formatted value like "6,632" or "$94.65" back to a number */
-function parseFredValue(formatted: string | undefined): number {
-  if (!formatted) return NaN;
-  return parseFloat(formatted.replace(/[$,]/g, ""));
-}
 
 function emptySnapshot(): MarketSnapshotData {
   return {
