@@ -15,37 +15,43 @@ const CACHE_SECONDS = 5 * 60; // 5 minutes
  *
  * Data source strategy (priority order):
  *   1. FMP (Financial Modeling Prep) — real-time direct quotes for indices.
- *      Single batch API call for ^GSPC, ^VIX, ^DXY, CLUSD (1 credit).
- *   2. FRED — daily-close fallback for all instruments.
- *   3. TwelveData — BTC/USD (crypto, real-time on free tier) + ETF proxies
- *      as last-resort overlay when both FMP and FRED are stale.
+ *      Individual API calls for ^GSPC, ^VIX, ^DXY (~3 credits).
+ *   2. Yahoo Finance — unofficial but reliable same-day quote data.
+ *   3. FRED — daily-close fallback (can lag 1 day on business days).
+ *   4. TwelveData — BTC/USD (crypto, real-time on free tier).
  *
  * Why not "FRED baseline + ETF proxy %"?
  *   FRED SP500/VIXCLS/DCOILWTICO can lag 1-3 days. Applying today's ETF %
  *   change to a multi-day-old baseline produces wrong absolute values.
- *   FMP direct quotes give the actual current price — no proxy math needed.
+ *   FMP/Yahoo direct quotes give the actual current price — no proxy math needed.
  *
- * TTL: 5-min server-side Redis cache
+ * TTL: 5-min server-side Redis cache.
+ * Pass ?_debug=1 for diagnostic info (FMP key status, source logs).
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const debug = url.searchParams.get("_debug") === "1";
   const kv = getRedisClient();
 
   if (!kv) {
-    const data = await buildSnapshot();
+    const data = await buildSnapshot(debug);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60" },
     });
   }
 
   try {
-    const cached = await kv.get<MarketSnapshotData>(KV_KEY);
-    if (cached && new Date(cached.validUntil) > new Date()) {
-      return NextResponse.json(cached, {
-        headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60" },
-      });
+    // Skip cache for debug requests
+    if (!debug) {
+      const cached = await kv.get<MarketSnapshotData>(KV_KEY);
+      if (cached && new Date(cached.validUntil) > new Date()) {
+        return NextResponse.json(cached, {
+          headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60" },
+        });
+      }
     }
 
-    const data = await buildSnapshot();
+    const data = await buildSnapshot(debug);
 
     // Only cache if we got meaningful data (>=3 items).
     if (data.items.length >= 3) {
@@ -59,7 +65,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("[/api/market-snapshot] Error:", error);
-    const fallback = await buildSnapshot().catch(() => emptySnapshot());
+    const fallback = await buildSnapshot(false).catch(() => emptySnapshot());
     return NextResponse.json(fallback, { status: 200 });
   }
 }
@@ -81,13 +87,20 @@ interface FmpQuote {
 // Snapshot builder
 // ---------------------------------------------------------------------------
 
-async function buildSnapshot(): Promise<MarketSnapshotData> {
+async function buildSnapshot(debug = false): Promise<MarketSnapshotData> {
   const now        = new Date();
   const validUntil = new Date(now.getTime() + CACHE_SECONDS * 1000);
   const fmpKey     = process.env.FMP_API_KEY;
   const twKey      = process.env.TWELVEDATA_API_KEY;
+  const debugLog: string[] = [];
 
   const itemMap = new Map<string, MarketSnapshotItem>();
+
+  if (debug) {
+    debugLog.push(`FMP_API_KEY: ${fmpKey ? `set (${fmpKey.length} chars)` : "NOT SET"}`);
+    debugLog.push(`TWELVEDATA_API_KEY: ${twKey ? `set (${twKey.length} chars)` : "NOT SET"}`);
+    debugLog.push(`FRED_API_KEY: ${process.env.FRED_API_KEY ? "set" : "NOT SET"}`);
+  }
 
   // ── Phase 1: FMP direct quotes (real-time, most accurate) ──────────────
   // Individual API calls per symbol — more resilient than batch (one bad symbol
@@ -107,11 +120,14 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
         ).then(async (res) => {
           if (!res.ok) {
             const body = await res.text().catch(() => "");
-            console.warn(`[market-snapshot] FMP ${fmp}: HTTP ${res.status} — ${body.slice(0, 200)}`);
+            const msg = `FMP ${fmp}: HTTP ${res.status} — ${body.slice(0, 200)}`;
+            console.warn(`[market-snapshot] ${msg}`);
+            if (debug) debugLog.push(msg);
             return null;
           }
           const data = await res.json();
           // FMP returns array for /quote, or error object
+          if (debug) debugLog.push(`FMP ${fmp} raw: ${JSON.stringify(data).slice(0, 300)}`);
           const arr = Array.isArray(data) ? data : [];
           return arr[0] as FmpQuote | undefined;
         })
@@ -120,7 +136,13 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
 
     for (let i = 0; i < fmpSymbols.length; i++) {
       const result = fmpResults[i];
-      if (result.status !== "fulfilled" || !result.value) continue;
+      if (result.status === "rejected") {
+        const msg = `FMP ${fmpSymbols[i].fmp}: rejected — ${String(result.reason)}`;
+        console.warn(`[market-snapshot] ${msg}`);
+        if (debug) debugLog.push(msg);
+        continue;
+      }
+      if (!result.value) continue;
       const q = result.value;
       if (!q.price || q.price <= 0) continue;
 
@@ -156,6 +178,65 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
       }
 
       console.log(`[market-snapshot] FMP ${key}: ${q.price} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`);
+      if (debug) debugLog.push(`FMP ${key}: ${q.price} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`);
+    }
+  } else if (debug) {
+    debugLog.push("FMP SKIPPED — no API key");
+  }
+
+  // ── Phase 1.5: Yahoo Finance fallback (same-day quotes, no key needed) ──
+  // Fills S&P 500, VIX, DXY if FMP didn't provide them.
+  {
+    const yahooNeeded: { symbol: string; key: string }[] = [];
+    if (!itemMap.has("S&P 500")) yahooNeeded.push({ symbol: "^GSPC", key: "S&P 500" });
+    if (!itemMap.has("VIX"))     yahooNeeded.push({ symbol: "^VIX",  key: "VIX" });
+    if (!itemMap.has("DXY"))     yahooNeeded.push({ symbol: "DX-Y.NYB", key: "DXY" });
+
+    if (yahooNeeded.length > 0) {
+      if (debug) debugLog.push(`Yahoo Finance: fetching ${yahooNeeded.map(y => y.symbol).join(", ")}`);
+      const yahooResults = await Promise.allSettled(
+        yahooNeeded.map(({ symbol }) => fetchYahooQuote(symbol))
+      );
+
+      for (let i = 0; i < yahooNeeded.length; i++) {
+        const result = yahooResults[i];
+        if (result.status !== "fulfilled" || !result.value) {
+          if (debug) debugLog.push(`Yahoo ${yahooNeeded[i].symbol}: ${result.status === "rejected" ? String(result.reason) : "null"}`);
+          continue;
+        }
+        const yq = result.value;
+        const { key } = yahooNeeded[i];
+
+        if (key === "S&P 500") {
+          itemMap.set("S&P 500", {
+            label:     "S&P 500",
+            value:     Math.round(yq.price).toLocaleString(),
+            change:    `${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%`,
+            direction: yq.pctChange > 0.01 ? "up" : yq.pctChange < -0.01 ? "down" : "flat",
+            source:    "Yahoo",
+          });
+        } else if (key === "VIX") {
+          const abs = yq.absChange;
+          itemMap.set("VIX", {
+            label:     "VIX",
+            value:     yq.price.toFixed(2),
+            change:    Math.abs(abs) < 0.005 ? "—" : `${abs >= 0 ? "+" : ""}${abs.toFixed(2)}`,
+            direction: abs > 0.005 ? "up" : abs < -0.005 ? "down" : "flat",
+            source:    "Yahoo",
+          });
+        } else if (key === "DXY") {
+          itemMap.set("DXY", {
+            label:     "DXY",
+            value:     yq.price.toFixed(2),
+            change:    Math.abs(yq.pctChange) < 0.005 ? "—" : `${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%`,
+            direction: yq.pctChange > 0.005 ? "up" : yq.pctChange < -0.005 ? "down" : "flat",
+            source:    "Yahoo",
+          });
+        }
+
+        console.log(`[market-snapshot] Yahoo ${key}: ${yq.price}`);
+        if (debug) debugLog.push(`Yahoo ${key}: ${yq.price} (${yq.pctChange >= 0 ? "+" : ""}${yq.pctChange.toFixed(2)}%)`);
+      }
     }
   }
 
@@ -283,11 +364,98 @@ async function buildSnapshot(): Promise<MarketSnapshotData> {
   const STRIP_ORDER = ["S&P 500", "VIX", "10Y Yield", "WTI Oil", "DXY", "BTC"];
   const items = STRIP_ORDER.map((k) => itemMap.get(k)).filter(Boolean) as MarketSnapshotItem[];
 
-  return {
+  const result: MarketSnapshotData & { _debug?: string[] } = {
     items: items.slice(0, 7),
     generatedAt: now.toISOString(),
     validUntil:  validUntil.toISOString(),
   };
+
+  if (debug) {
+    result._debug = debugLog;
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Yahoo Finance — unofficial quote API (no key required)
+// ---------------------------------------------------------------------------
+
+interface YahooQuoteResult {
+  price:     number;
+  pctChange: number;
+  absChange: number;
+}
+
+interface YahooV8Response {
+  chart?: {
+    result?: Array<{
+      meta?: {
+        regularMarketPrice?: number;
+        chartPreviousClose?: number;
+        previousClose?: number;
+      };
+      indicators?: {
+        quote?: Array<{
+          close?: (number | null)[];
+        }>;
+      };
+    }>;
+    error?: { description?: string };
+  };
+}
+
+/**
+ * Fetch a quote from Yahoo Finance's v8 chart endpoint.
+ * No API key needed. Returns same-day market close data.
+ * Falls back gracefully if Yahoo blocks the request.
+ */
+async function fetchYahooQuote(symbol: string): Promise<YahooQuoteResult | null> {
+  try {
+    const encoded = encodeURIComponent(symbol);
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=2d`,
+      {
+        signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; MarketMountain/1.0)",
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) {
+      console.warn(`[market-snapshot/Yahoo] ${symbol}: HTTP ${res.status}`);
+      return null;
+    }
+
+    const data = (await res.json()) as YahooV8Response;
+    const result = data.chart?.result?.[0];
+    if (!result) {
+      console.warn(`[market-snapshot/Yahoo] ${symbol}: no chart result`);
+      return null;
+    }
+
+    // Get current price from meta
+    const price = result.meta?.regularMarketPrice;
+    if (!price || price <= 0) return null;
+
+    // Get previous close for change calculation
+    const prevClose = result.meta?.chartPreviousClose ?? result.meta?.previousClose;
+
+    let pctChange = 0;
+    let absChange = 0;
+    if (prevClose && prevClose > 0) {
+      absChange = price - prevClose;
+      pctChange = (absChange / prevClose) * 100;
+    }
+
+    return { price, pctChange, absChange };
+  } catch (err) {
+    console.warn(`[market-snapshot/Yahoo] ${symbol} error: ${String(err)}`);
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
