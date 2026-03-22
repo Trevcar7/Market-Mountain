@@ -60,7 +60,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
 
   const W = 600;
   const H = isMultiSeries ? 250 : 220; // Taller for legend
-  const PADDING = { top: 28, right: 20, bottom: 44, left: 52 };
+  const PADDING = { top: 28, right: isMultiSeries ? 52 : 20, bottom: 44, left: 52 };
   const plotW = W - PADDING.left - PADDING.right;
   const plotH = H - PADDING.top - PADDING.bottom - (isMultiSeries ? 20 : 0);
 
@@ -260,9 +260,16 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
                   <circle cx={lastPt.x} cy={lastPt.y} r={4} fill="white" stroke={color} strokeWidth="2" />
                   <circle cx={lastPt.x} cy={lastPt.y} r={2} fill={color} />
                   {(() => {
-                    const lx = lastPt.x - (si === 0 ? 4 : -4);
+                    // Position end labels: primary on left, secondary on right
+                    // Clamp secondary labels to stay within the SVG viewbox
+                    const rightEdge = W - 4;
+                    let lx = lastPt.x - (si === 0 ? 4 : -4);
+                    let anchor: "end" | "start" = si === 0 ? "end" : "start";
+                    if (anchor === "start" && lx + 40 > rightEdge) {
+                      lx = lastPt.x - 4;
+                      anchor = "end";
+                    }
                     const ly = lastPt.y - 14;
-                    const anchor = si === 0 ? "end" : "start";
                     return (
                       <>
                         <text x={lx} y={ly} textAnchor={anchor} fontSize="10" fontWeight="700"
