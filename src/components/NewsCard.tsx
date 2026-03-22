@@ -170,8 +170,8 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
           </div>
         )}
 
-        <p className="text-text-muted text-sm leading-relaxed line-clamp-2 flex-1 hidden sm:block">
-          {excerpt || news.whyThisMatters || ""}
+        <p className="text-text-muted text-sm leading-relaxed line-clamp-2 flex-1">
+          {news.whyThisMatters || excerpt || ""}
         </p>
 
         <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 pt-3 border-t border-border/60">
