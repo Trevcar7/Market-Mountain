@@ -40,11 +40,13 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   // Bentley → luxury car (Continental GT logo)
   { test: /\bbentley\b/i, imageUrl: "https://images.unsplash.com/photo-1661683769067-1ebc0e7aa7b6?w=1200&q=80", relatedTickers: { TSLA: "VWAGY" } },
   // Humana / managed care → healthcare
-  { test: /\bhumana\b|\bmanaged care\b/i, imageUrl: "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80" },
+  // Title fix: downgrade was about Medicare Advantage Stars ratings, not treasury yields
+  { test: /\bhumana\b|\bmanaged care\b/i, imageUrl: "https://images.unsplash.com/photo-1638202993928-7267aad84c31?w=1200&q=80", title: "Bernstein Cuts Humana Target as Medicare Advantage Stars Pressure Weighs on Managed Care" },
   // Apple + IBM M&A → tech corporate; strip inline image
   { test: /\bibm\b.*\bapple\b|\bapple\b.*\bibm\b/i, imageUrl: "https://images.unsplash.com/photo-1722537273895-b35dfbd273ee?w=1200&q=80", clearInlineImage: true },
   // MLB / baseball / sports betting → baseball stadium (strip irrelevant macro data + inline image)
-  { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", title: "Baseball Gains CFTC Approval for Polymarket Prediction Deals, Legitimizing Sports Betting", category: "markets", clearKeyData: true, clearInlineImage: true },
+  // Title fix: CFTC signed an MOU (info-sharing agreement), not a regulatory approval
+  { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", title: "MLB Partners With Polymarket Under CFTC Framework, Opening Door for Sports Prediction Markets", category: "markets", clearKeyData: true, clearInlineImage: true },
   // Meta content moderation / AI → Facebook + Messenger 3D icons (strip irrelevant macro data + wall street inline image)
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
   // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data)
