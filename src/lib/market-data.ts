@@ -1505,16 +1505,18 @@ export async function fetchBriefingMacroPanel(): Promise<KeyDataPoint[]> {
       cpiDataFred,
       energy,
       wtiFredFallback,
-      dxy,
+      yahooDxy,
+      yahooWti,
     ] = await Promise.allSettled([
       fetchFredWithChange("FEDFUNDS"),
-      fetchFredWithChange("DGS10"),
+      fetchTreasuryYieldWithChange("DGS10"),  // Yahoo → FRED cascade for same-day 10Y
       fetchFredWithChange("T10Y2Y"),          // 10Y minus 2Y spread (FRED series)
       fetchBlsMultipleSeries([BLS_SERIES.CPI_ALL], 2),  // BLS CPI for YoY calc (primary)
       fetchFredSeries("CPIAUCSL", 18),                  // FRED CPI fallback (18 months)
       fetchEnergySummary(),
       fetchFredWithChange("DCOILWTICO"),      // FRED WTI fallback when EIA key missing
-      fetchFredWithChange("DTWEXBGS"),        // Trade-weighted Dollar Index
+      fetchYahooYield("DX-Y.NYB"),            // ICE Dollar Index (~99) via Yahoo
+      fetchYahooYield("CL=F"),                // WTI crude futures via Yahoo
     ]);
 
     // 1. Fed Funds Rate — omit "+0.00" noise (rate changes are discrete events)
@@ -1539,7 +1541,7 @@ export async function fetchBriefingMacroPanel(): Promise<KeyDataPoint[]> {
         label: "10-Year Treasury",
         value: `${treasury10y.value.value}%`,
         change: bpsChange,
-        source: "FRED",
+        source: treasury10y.value.source,
       });
     }
 
@@ -1588,13 +1590,27 @@ export async function fetchBriefingMacroPanel(): Promise<KeyDataPoint[]> {
       }
     }
 
-    // 5. WTI Crude Oil — EIA primary, FRED DCOILWTICO fallback
+    // 5. WTI Crude Oil — EIA primary → Yahoo CL=F → FRED DCOILWTICO fallback
     if (energy.status === "fulfilled" && energy.value.wti) {
       points.push({
         label: "WTI Crude",
         value: `$${energy.value.wti.value.toFixed(2)}/bbl`,
         source: "EIA",
       });
+    } else if (yahooWti.status === "fulfilled" && yahooWti.value) {
+      const price = parseFloat(yahooWti.value.value);
+      if (!isNaN(price)) {
+        const rawChange = parseFloat(yahooWti.value.change || "0");
+        const pctChange = !isNaN(rawChange) && price > 0 && rawChange !== 0
+          ? `${rawChange > 0 ? "+" : ""}${((rawChange / (price - rawChange)) * 100).toFixed(1)}%`
+          : undefined;
+        points.push({
+          label: "WTI Crude",
+          value: `$${price.toFixed(2)}/bbl`,
+          change: pctChange,
+          source: "Yahoo",
+        });
+      }
     } else if (wtiFredFallback.status === "fulfilled" && wtiFredFallback.value) {
       const price = parseFloat(wtiFredFallback.value.value);
       if (!isNaN(price)) {
@@ -1611,17 +1627,17 @@ export async function fetchBriefingMacroPanel(): Promise<KeyDataPoint[]> {
       }
     }
 
-    // 6. Dollar Index (DTWEXBGS — Nominal Broad Trade-Weighted)
-    if (dxy.status === "fulfilled" && dxy.value) {
-      const rawChange = parseFloat(dxy.value.change || "0");
+    // 6. Dollar Index — Yahoo ICE DXY (~99), NOT FRED DTWEXBGS (~120)
+    if (yahooDxy.status === "fulfilled" && yahooDxy.value) {
+      const rawChange = parseFloat(yahooDxy.value.change || "0");
       const changeStr = !isNaN(rawChange) && rawChange !== 0
         ? `${rawChange > 0 ? "+" : ""}${rawChange.toFixed(2)}`
         : undefined;
       points.push({
         label: "Dollar Index",
-        value: dxy.value.value,
+        value: yahooDxy.value.value,
         change: changeStr,
-        source: "FRED",
+        source: "Yahoo",
       });
     }
   } catch (err) {
