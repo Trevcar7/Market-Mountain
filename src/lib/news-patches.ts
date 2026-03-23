@@ -33,6 +33,8 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
+  // Netflix / streaming → Netflix on TV screen
+  { test: /\bnetflix\b|\bNFLX\b/i, imageUrl: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=1200&q=80" },
   // Musk / Terafab / Tesla semiconductor → AI chip image; category → markets; strip irrelevant dollar chart
   { test: /\bterafab\b|\bmusk\b.*\b(?:chip|twitter|tesla)\b/i, imageUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1200&q=80", category: "markets", clearChartLabels: /dollar|dxy|dtwex/i },
   // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%; category → markets
