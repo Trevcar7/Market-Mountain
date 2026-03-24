@@ -81,4 +81,10 @@ export const SUPPRESSED_ARTICLE_IDS = new Set<string>([
   // Keep the newer article (news-1773983327353-2050); suppress the older.
   "news-1773954083167-2050",  // "MLB Secures CFTC Approval for Polymarket Sports Betting Partnership"
 
+  // ── March 23, 2026 — Duplicate Larry Fink / BlackRock article ──────────
+  // Same story (Fink's annual letter: AI wealth gap + Social Security reform)
+  // synthesized twice ~11h apart. Keep the newer article (news-1774329425475-1245);
+  // suppress the older.
+  "news-1774288973822-1245",  // "Fink Warns AI Wealth Gap Risks Widening as BlackRock Pushes Retail Investment Access"
+
 ]);

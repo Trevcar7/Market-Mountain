@@ -33,6 +33,10 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
+  // Warren / Pentagon / defense policy → US military image; category → policy
+  { test: /\bpentagon\b|\bwarren\b.*\b(?:defense|blacklist|anthropic)\b/i, imageUrl: "https://images.unsplash.com/photo-1569982175971-d92b01cf8694?w=1200&q=80", category: "policy" },
+  // Pfizer / pharma → markets category (not macro)
+  { test: /\bpfizer\b|\bPFE\b|\bvalneva\b/i, imageUrl: "https://images.unsplash.com/photo-1770461846516-b7e5993a8e4f?w=1200&q=80", category: "markets" },
   // Netflix / streaming → Netflix on TV screen
   { test: /\bnetflix\b|\bNFLX\b/i, imageUrl: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=1200&q=80" },
   // Musk / Terafab / Tesla semiconductor → AI chip image; category → markets; strip irrelevant dollar chart
@@ -57,12 +61,12 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
   // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data)
   { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true },
-  // Iran + LNG / Qatar / crude strike → oil tanks with storm clouds
-  { test: /\biran\b.*\b(?:lng|qatar|crude|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80" },
-  // Iran + gilt / fiscal / UK → London skyline (UK finance); must come BEFORE Fed pattern
-  { test: /\biran\b.*\b(?:gilt|fiscal|uk\b)/i, imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80", clearInlineImage: true },
-  // Iran (general / Fed / inflation fallback) → oil refinery at night; strip money inline image
-  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80", clearInlineImage: true },
+  // Iran + LNG / Qatar / crude / oil strike → oil tanks with storm clouds; category → macro
+  { test: /\biran\b.*\b(?:lng|qatar|crude|oil|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80", category: "macro" },
+  // Iran + gilt / fiscal / UK → London skyline (UK finance); must come BEFORE general fallback
+  { test: /\biran\b.*\b(?:gilt|fiscal|uk\b)/i, imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80", category: "macro" },
+  // Iran (general / Fed / inflation fallback) → oil refinery at night
+  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80", category: "macro" },
   // Lululemon / athletic retail → yoga fitness class; strip inline image
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80", clearInlineImage: true },
   // Stagflation / GDP collapse → stock market crash / red tape; strip foreign market inline image
