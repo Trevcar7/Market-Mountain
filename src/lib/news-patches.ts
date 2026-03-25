@@ -43,8 +43,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bterafab\b|\bmusk\b.*\b(?:chip|twitter|tesla)\b/i, imageUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1200&q=80", category: "markets", clearChartLabels: /dollar|dxy|dtwex/i },
   // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%; category → markets
   { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
-  // Nexstar / Tegna acquisition → markets category
-  { test: /\bnexstar\b|\btegna\b/i, imageUrl: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80", category: "markets" },
+  // Nexstar / Tegna acquisition → TV news broadcast studio
+  { test: /\bnexstar\b|\btegna\b/i, imageUrl: "https://images.unsplash.com/photo-1495020689067-958852a7765e?w=1200&q=80", category: "markets" },
   // NVIDIA → official NVIDIA logo (green eye + wordmark); fix category to markets; strip bad AMD inline image
   { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", category: "markets", clearInlineImage: true },
   // Bentley → luxury car (Continental GT logo)
@@ -61,8 +61,10 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
   // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data)
   { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true },
-  // Iran + LNG / Qatar / crude / oil strike → oil tanks with storm clouds; category → macro
-  { test: /\biran\b.*\b(?:lng|qatar|crude|oil|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80", category: "macro" },
+  // Iran + LNG / Qatar / strike → oil tanks with storm clouds; category → macro
+  { test: /\biran\b.*\b(?:lng|qatar|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80", category: "macro" },
+  // Iran + oil / crude / consumer → gas pump / oil price; category → macro (distinct from above)
+  { test: /\biran\b.*\b(?:oil|crude)\b/i, imageUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&q=80", category: "macro" },
   // Iran + gilt / fiscal / UK → London skyline (UK finance); must come BEFORE general fallback
   { test: /\biran\b.*\b(?:gilt|fiscal|uk\b)/i, imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80", category: "macro" },
   // Iran (general / Fed / inflation fallback) → oil refinery at night
@@ -71,8 +73,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80", clearInlineImage: true },
   // Stagflation / GDP collapse → stock market crash / red tape; strip foreign market inline image
   { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=1200&q=80", clearInlineImage: true },
-  // Novartis → keep existing image, strip out-of-place pill inline image
-  { test: /\bnovartis\b/i, imageUrl: "https://images.unsplash.com/photo-1752159684779-0639174cdfac?w=1200&q=80", clearInlineImage: true },
+  // Novartis / pharma M&A → pharmaceutical lab
+  { test: /\bnovartis\b|\bavidity\b/i, imageUrl: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80", clearInlineImage: true },
   // Amazon → e-commerce/logistics; fix category to markets (not macro)
   { test: /\bamazon\b|\bAMZN\b/i, imageUrl: "https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=1200&q=80", category: "markets" },
   // Jio / Reliance IPO → India / emerging market

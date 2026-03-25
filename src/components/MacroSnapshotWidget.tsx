@@ -144,7 +144,11 @@ export default function MacroSnapshotWidget({ initialData }: Props) {
     const fetchFresh = async () => {
       try {
         const fresh = await fetchCombinedData();
-        if (fresh.length > 0) setData(fresh);
+        // Only replace data if we got a meaningful result — never downgrade
+        // from a fuller dataset to a sparser one (prevents partial-load flicker)
+        if (fresh.length >= 3) {
+          setData((prev) => fresh.length >= prev.length ? fresh : prev);
+        }
       } catch {
         // Non-fatal — keep existing data on error
       }
