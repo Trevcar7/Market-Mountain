@@ -847,10 +847,18 @@ function scoreDataVerification(article: NewsItem): QATestResult {
   let score = 0;
   let detail: string | undefined;
 
+  // Check if verification actually ran (0/0 claims means no real verification)
+  const dvDetails = article.dataVerificationDetails ?? "";
+  const noClaimsVerified = dvDetails.startsWith("0/0") || dvDetails === "";
+
   if (dvScore === undefined || dvScore === null) {
-    // No data verification ran (no numeric claims found) — neutral
+    // No data verification ran at all — neutral
     score = 5;
     detail = "no verifiable numeric claims found";
+  } else if (noClaimsVerified) {
+    // Data verification ran but found nothing to verify — partial credit only
+    score = 5;
+    detail = `data verification score ${dvScore} — no claims actually verified against live data`;
   } else if (dvScore >= 90) {
     score = 10;
     detail = article.dataVerificationDetails;
@@ -880,6 +888,7 @@ function scoreDataVerification(article: NewsItem): QATestResult {
 
 function scoreSourceAlignment(article: NewsItem): QATestResult {
   const saScore = article.sourceAlignmentScore;
+  const hallCount = article.hallucinations?.length ?? 0;
   let score = 0;
   let detail: string | undefined;
 
@@ -898,8 +907,15 @@ function scoreSourceAlignment(article: NewsItem): QATestResult {
     detail = `source alignment ${saScore} — some claims not grounded in sources`;
   } else {
     score = 0;
-    const hallCount = article.hallucinations?.length ?? 0;
     detail = `source alignment ${saScore} — ${hallCount} ungrounded claims detected`;
+  }
+
+  // Per-hallucination penalty: each flagged hallucination costs 2 points
+  // Articles with verified hallucinations should be penalized regardless of alignment score
+  if (hallCount > 0) {
+    const penalty = Math.min(hallCount * 2, score); // Can't go below 0
+    score = score - penalty;
+    detail = `${detail}; -${penalty}pts for ${hallCount} flagged hallucination${hallCount > 1 ? "s" : ""}`;
   }
 
   return {
@@ -1455,9 +1471,10 @@ export function runEditorialQA(
       hardRejectReasons.push(`dataVerificationScore=${dvScore} < 70 — numerical claims insufficiently verified`);
     }
 
-    // Source alignment: hard reject if too many hallucinations detected
+    // Source alignment: hard reject if hallucinations detected
+    // Lowered from 3→2: even 2 flagged hallucinations indicate unreliable synthesis
     const hallCount = article.hallucinations?.length ?? 0;
-    if (hallCount >= 3) {
+    if (hallCount >= 2) {
       hardRejectReasons.push(`${hallCount} ungrounded claims detected — possible hallucinations`);
     }
   }

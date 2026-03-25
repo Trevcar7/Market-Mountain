@@ -280,7 +280,7 @@ export async function runDataFactCheck(
   if (fetchPromises.length === 0) {
     return {
       results: [],
-      score: 70, // No verifiable numeric claims — neutral (not penalized, not boosted)
+      score: 50, // No verifiable numeric claims — neutral baseline (not a passing grade)
       claimsChecked: 0,
       claimsVerified: 0,
       claimsFailed: 0,

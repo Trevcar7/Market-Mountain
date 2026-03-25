@@ -18,18 +18,34 @@ interface MarketImpactOverride {
   direction: "up" | "down" | "flat";
 }
 
+interface TextReplacement {
+  from: string;
+  to: string;
+}
+
 interface ArticlePatch {
   test: RegExp;
   imageUrl: string;
   title?: string;
   category?: string;
+  sentiment?: "positive" | "negative" | "neutral";
+  /** Map existing tickers to replacements (e.g. { TSLA: "VWAGY" }) */
   relatedTickers?: Record<string, string>;
+  /** Replace the entire tickers array with these values */
+  setTickers?: string[];
   marketImpactOverrides?: MarketImpactOverride[];
   clearChart?: boolean;
   /** Remove specific charts by matching their chartLabel or title (case-insensitive regex) */
   clearChartLabels?: RegExp;
   clearKeyData?: boolean;
+  /** Clear inline image URL, caption, and position */
   clearInlineImage?: boolean;
+  /** Find/replace in story body text */
+  storyReplacements?: TextReplacement[];
+  /** Find/replace in keyTakeaways array */
+  keyTakeawayReplacements?: TextReplacement[];
+  /** Find/replace in verifiedClaims array */
+  verifiedClaimReplacements?: TextReplacement[];
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
@@ -41,10 +57,10 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bnetflix\b|\bNFLX\b/i, imageUrl: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=1200&q=80" },
   // Musk / Terafab / Tesla semiconductor → AI chip image; category → markets; strip irrelevant dollar chart
   { test: /\bterafab\b|\bmusk\b.*\b(?:chip|twitter|tesla)\b/i, imageUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1200&q=80", category: "markets", clearChartLabels: /dollar|dxy|dtwex/i },
-  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%; category → markets
-  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
-  // Nexstar / Tegna acquisition → TV news broadcast studio
-  { test: /\bnexstar\b|\btegna\b/i, imageUrl: "https://images.unsplash.com/photo-1495020689067-958852a7765e?w=1200&q=80", category: "markets" },
+  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%; category → markets; fix sentiment (indictment is negative, not positive)
+  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets", sentiment: "negative", clearChart: true, clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
+  // Nexstar / Tegna acquisition → TV news broadcast studio; fix tickers (was SPY/XLF/TLT, should be NXST/TGNA)
+  { test: /\bnexstar\b|\btegna\b/i, imageUrl: "https://images.unsplash.com/photo-1495020689067-958852a7765e?w=1200&q=80", category: "markets", setTickers: ["NXST", "TGNA"] },
   // NVIDIA → official NVIDIA logo (green eye + wordmark); fix category to markets; strip bad AMD inline image
   { test: /\bnvidia\b|\bNVDA\b|\bjensen huang\b|\bblackwell\b|\bgeforce\b/i, imageUrl: "/images/nvidia-logo.png", category: "markets", clearInlineImage: true },
   // Bentley → luxury car (Continental GT logo)
@@ -59,27 +75,45 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", title: "MLB Partners With Polymarket Under CFTC Framework, Opening Door for Sports Prediction Markets", category: "markets", clearKeyData: true, clearInlineImage: true },
   // Meta content moderation / AI → Facebook + Messenger 3D icons (strip irrelevant macro data + wall street inline image)
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
-  // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data)
-  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true },
+  // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data); fix sentiment (M&A is neutral, not negative)
+  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", sentiment: "neutral", clearChart: true, clearKeyData: true },
   // Iran + LNG / Qatar / strike → oil tanks with storm clouds; category → macro
   { test: /\biran\b.*\b(?:lng|qatar|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80", category: "macro" },
   // Iran + oil / crude / consumer → industrial refinery; category → macro (distinct from LNG tanks above)
   { test: /\biran\b.*\b(?:oil|crude)\b/i, imageUrl: "https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=1200&q=80", category: "macro" },
-  // Iran + gilt / fiscal / UK → London skyline (UK finance); must come BEFORE general fallback
-  { test: /\biran\b.*\b(?:gilt|fiscal|uk\b)/i, imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80", category: "macro" },
+  // Iran + gilt / fiscal / UK → London skyline (UK finance); clear US yield keyData (article is about UK gilts, not US Treasuries); must come BEFORE general fallback
+  { test: /\biran\b.*\b(?:gilt|fiscal|uk\b)/i, imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80", category: "macro", clearKeyData: true },
   // Iran (general / Fed / inflation fallback) → oil refinery at night
   { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80", category: "macro" },
   // Lululemon / athletic retail → yoga fitness class; strip inline image
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80", clearInlineImage: true },
   // Stagflation / GDP collapse → stock market crash / red tape; strip foreign market inline image
   { test: /\bstagflation\b/i, imageUrl: "https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=1200&q=80", clearInlineImage: true },
-  // Novartis / pharma M&A → pharmaceutical lab
-  { test: /\bnovartis\b|\bavidity\b/i, imageUrl: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80", clearInlineImage: true },
-  // Amazon → e-commerce/logistics; fix category to markets (not macro)
-  { test: /\bamazon\b|\bAMZN\b/i, imageUrl: "https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=1200&q=80", category: "markets" },
+  // Novartis / pharma M&A → pharmaceutical lab; fix "October" → "March 2026" temporal hallucination in claims/takeaways
+  { test: /\bnovartis\b|\bavidity\b/i, imageUrl: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80", clearInlineImage: true,
+    storyReplacements: [{ from: "committed $11 billion in bond financing in October", to: "committed $11 billion in bond financing in March 2026" }],
+    keyTakeawayReplacements: [{ from: "raised $11 billion in October", to: "raised $11 billion in March 2026" }],
+    verifiedClaimReplacements: [{ from: "in bond financing in October", to: "in bond financing in March 2026" }],
+  },
+  // Amazon → e-commerce/logistics; fix category to markets (not macro); fix sentiment (acquisition is positive, not negative)
+  { test: /\bamazon\b|\bAMZN\b/i, imageUrl: "https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=1200&q=80", category: "markets", sentiment: "positive" },
   // Jio / Reliance IPO → India / emerging market
   { test: /\bjio\b|\breliance\b/i, imageUrl: "https://images.unsplash.com/photo-1468254095679-bbcba94a7066?w=1200&q=80" },
 ];
+
+/**
+ * Normalize a change string like "-1.4297%" or "+0.2631%" to 2 decimal places.
+ * Leaves non-percentage values (e.g. "+12bps", "-$3.40") untouched.
+ */
+function normalizeChange(change: string): string {
+  const m = change.match(/^([+-]?)(\d+\.\d{3,})(%?)$/);
+  if (m) {
+    const sign = m[1];
+    const num = parseFloat(m[2]).toFixed(2);
+    return `${sign}${num}${m[3]}`;
+  }
+  return change;
+}
 
 /** Category fallback: used when no patch matches and article has no imageUrl */
 export const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
@@ -104,7 +138,12 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
       if (patch.category) {
         patched.category = patch.category as NewsItem["category"];
       }
-      if (patch.relatedTickers && patched.relatedTickers) {
+      if (patch.sentiment) {
+        patched.sentiment = patch.sentiment;
+      }
+      if (patch.setTickers) {
+        patched.relatedTickers = patch.setTickers;
+      } else if (patch.relatedTickers && patched.relatedTickers) {
         patched.relatedTickers = patched.relatedTickers.map(
           (t) => patch.relatedTickers![t] ?? t
         );
@@ -123,6 +162,8 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
       }
       if (patch.clearInlineImage) {
         patched.inlineImageUrl = undefined;
+        patched.inlineImageCaption = undefined;
+        patched.inlineImagePosition = undefined;
       }
       if (patch.marketImpactOverrides && patched.marketImpact) {
         for (const override of patch.marketImpactOverrides) {
@@ -135,6 +176,32 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
           }
         }
       }
+      // Text replacements in story body
+      if (patch.storyReplacements && patched.story) {
+        for (const { from, to } of patch.storyReplacements) {
+          patched.story = patched.story.split(from).join(to);
+        }
+      }
+      // Text replacements in keyTakeaways
+      if (patch.keyTakeawayReplacements && patched.keyTakeaways) {
+        patched.keyTakeaways = patched.keyTakeaways.map((kt) => {
+          let result = kt;
+          for (const { from, to } of patch.keyTakeawayReplacements!) {
+            result = result.split(from).join(to);
+          }
+          return result;
+        });
+      }
+      // Text replacements in verifiedClaims
+      if (patch.verifiedClaimReplacements && patched.verifiedClaims) {
+        patched.verifiedClaims = patched.verifiedClaims.map((vc) => {
+          let result = vc;
+          for (const { from, to } of patch.verifiedClaimReplacements!) {
+            result = result.split(from).join(to);
+          }
+          return result;
+        });
+      }
       break;
     }
   }
@@ -142,6 +209,20 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
   // Category fallback if still no image
   if (!patched.imageUrl) {
     patched.imageUrl = CATEGORY_FALLBACK_IMAGES[patched.category] ?? CATEGORY_FALLBACK_IMAGES.macro;
+  }
+
+  // Normalize all percentage changes to 2 decimal places (e.g. "-1.4297%" → "-1.43%")
+  if (patched.marketImpact) {
+    patched.marketImpact = patched.marketImpact.map((mi) => ({
+      ...mi,
+      change: normalizeChange(mi.change),
+    }));
+  }
+  if (patched.keyDataPoints) {
+    patched.keyDataPoints = patched.keyDataPoints.map((kd) => ({
+      ...kd,
+      change: kd.change ? normalizeChange(kd.change) : kd.change,
+    }));
   }
 
   return patched;

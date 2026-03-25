@@ -5,6 +5,7 @@ import type { Redis } from "@upstash/redis";
 import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic-client";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
 import { fetchBriefingMacroPanel, fetchBriefingWhatToWatch } from "@/lib/market-data";
+import { applyArticlePatches } from "@/lib/news-patches";
 
 export const maxDuration = 30;
 export const runtime = "nodejs";
@@ -268,6 +269,7 @@ async function generateBriefing(
         const t = new Date(s.publishedAt).getTime();
         return t >= todayStart && t < todayEnd && t >= MARCH_13_CUTOFF_MS;
       })
+      .map(applyArticlePatches)
       .sort(rankForLead);
   } catch (err) {
     console.error("[briefing] Failed to load news from KV:", err);
@@ -278,9 +280,9 @@ async function generateBriefing(
     // Use all available stories if today filter returns too few (e.g., timezone issues)
     try {
       const newsData = await kv.get<NewsCollection>("news");
-      const eligible = (newsData?.news ?? []).filter(
-        (s) => new Date(s.publishedAt).getTime() >= MARCH_13_CUTOFF_MS
-      );
+      const eligible = (newsData?.news ?? [])
+        .filter((s) => new Date(s.publishedAt).getTime() >= MARCH_13_CUTOFF_MS)
+        .map(applyArticlePatches);
       if (eligible.length >= 2) {
         stories = eligible.slice(0, 6).sort(rankForLead);
       } else {

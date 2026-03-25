@@ -769,6 +769,7 @@ These rules prevent stale or fabricated numbers:
 - If the sources and MARKET DATA conflict, prefer MARKET DATA for quantitative claims
 - Remove or soften any unverifiable numeric claim — write "around", "approximately", or omit
 - NEVER use hashtags (e.g., #Stagflation, #Fed). Write plain text without social media formatting.
+- RELEVANCE CHECK: Only cite Treasury yields or the Fed Funds Rate when they are directly relevant to the article's thesis. Do NOT insert yield references as generic filler in company-specific stories (M&A, layoffs, product launches, regulatory actions). If the story is about Bentley cutting jobs or MLB partnering with Polymarket, Treasury yields are not relevant unless the thesis specifically involves borrowing costs or rate sensitivity.
 
 SOURCE CONFLICT RESOLUTION (Step 12a)
 When two sources report different numbers for the same metric:
