@@ -33,8 +33,8 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
-  // Warren / Pentagon / defense policy → US military image; category → policy
-  { test: /\bpentagon\b|\bwarren\b.*\b(?:defense|blacklist|anthropic)\b/i, imageUrl: "https://images.unsplash.com/photo-1569982175971-d92b01cf8694?w=1200&q=80", category: "policy" },
+  // Warren / Pentagon / defense policy → US Capitol building; category → policy
+  { test: /\bpentagon\b|\bwarren\b.*\b(?:defense|blacklist|anthropic)\b/i, imageUrl: "https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=1200&q=80", category: "policy" },
   // Pfizer / pharma → markets category (not macro)
   { test: /\bpfizer\b|\bPFE\b|\bvalneva\b/i, imageUrl: "https://images.unsplash.com/photo-1770461846516-b7e5993a8e4f?w=1200&q=80", category: "markets" },
   // Netflix / streaming → Netflix on TV screen
@@ -63,8 +63,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", clearChart: true, clearKeyData: true },
   // Iran + LNG / Qatar / strike → oil tanks with storm clouds; category → macro
   { test: /\biran\b.*\b(?:lng|qatar|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80", category: "macro" },
-  // Iran + oil / crude / consumer → gas pump / oil price; category → macro (distinct from above)
-  { test: /\biran\b.*\b(?:oil|crude)\b/i, imageUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&q=80", category: "macro" },
+  // Iran + oil / crude / consumer → industrial refinery; category → macro (distinct from LNG tanks above)
+  { test: /\biran\b.*\b(?:oil|crude)\b/i, imageUrl: "https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=1200&q=80", category: "macro" },
   // Iran + gilt / fiscal / UK → London skyline (UK finance); must come BEFORE general fallback
   { test: /\biran\b.*\b(?:gilt|fiscal|uk\b)/i, imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80", category: "macro" },
   // Iran (general / Fed / inflation fallback) → oil refinery at night
