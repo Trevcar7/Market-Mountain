@@ -46,6 +46,8 @@ interface ArticlePatch {
   keyTakeawayReplacements?: TextReplacement[];
   /** Find/replace in verifiedClaims array */
   verifiedClaimReplacements?: TextReplacement[];
+  /** Clear all flagged hallucinations (use when flags are false positives) */
+  clearHallucinations?: boolean;
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
@@ -77,6 +79,31 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
   // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data); fix sentiment (M&A is neutral, not negative)
   { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", sentiment: "neutral", clearChart: true, clearKeyData: true },
+  // Iran peace / oil retreat / equities rally (Mar 26) — comprehensive fact-check patch
+  // Fixes: fabricated Iran Hormuz consent, wrong Fed date, overstated SPY, wrong sentiment/tickers, false-positive hallucination
+  { test: /\boil retreat\b.*\biran\b|\biran peace signals\b/i,
+    imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80",
+    category: "macro",
+    sentiment: "positive",
+    setTickers: ["NKE", "ARM", "USO", "SPY"],
+    clearHallucinations: true,
+    marketImpactOverrides: [
+      { asset: "SPY", change: "+0.4%", direction: "up" },
+    ],
+    storyReplacements: [
+      // Fix 1: Iran did NOT agree to permit shipping — they rejected the plan
+      { from: "with markets across time zones responding to the news that Iran had agreed to permit non-hostile shipping through the Strait of Hormuz. This specific concession suggested that both sides were moving toward a negotiated settlement rather than military escalation, fundamentally altering the risk calculus for energy markets and, by extension, equity valuations.",
+        to: "with markets across time zones responding to reports that the U.S. had transmitted a 15-point peace framework to Iran via Pakistani intermediaries. Although Iran publicly rejected the proposal as unreasonable, the existence of a structured negotiation framework suggested diplomatic channels remained open, temporarily easing the risk calculus for energy markets and equity valuations." },
+      // Fix 2: March 31 is Nike earnings, not an FOMC meeting — the March FOMC was March 17-18
+      { from: "The March 31 Federal Reserve decision and the April CPI print are the next critical data points; if those readings confirm",
+        to: "The next Federal Reserve decision in May and the April CPI print are the critical forward data points; if those readings confirm" },
+    ],
+    keyTakeawayReplacements: [
+      // Fix overstated consensus shift claim based on misread Cramer source
+      { from: "Wall Street's consensus has shifted from denial about market strength to acknowledgment that falling energy costs and de-escalation create a more favorable backdrop for earnings",
+        to: "Falling energy costs and diplomatic signals have created a more favorable near-term backdrop for earnings, though Iran's rejection of the peace plan leaves the de-escalation trajectory uncertain" },
+    ],
+  },
   // Iran + LNG / Qatar / strike → oil tanks with storm clouds; category → macro
   { test: /\biran\b.*\b(?:lng|qatar|strike|brent)\b/i, imageUrl: "https://images.unsplash.com/photo-1693847173071-bd6237101335?w=1200&q=80", category: "macro" },
   // Iran + oil / crude / consumer → industrial refinery; category → macro (distinct from LNG tanks above)
@@ -175,6 +202,9 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
             patched.marketImpact = [...patched.marketImpact, { asset: override.asset, change: override.change, direction: override.direction }];
           }
         }
+      }
+      if (patch.clearHallucinations) {
+        patched.hallucinations = undefined;
       }
       // Text replacements in story body
       if (patch.storyReplacements && patched.story) {
