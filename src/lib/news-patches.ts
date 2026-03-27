@@ -55,8 +55,18 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bpentagon\b|\bwarren\b.*\b(?:defense|blacklist|anthropic)\b/i, imageUrl: "https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=1200&q=80", category: "policy" },
   // Pfizer / pharma → markets category (not macro)
   { test: /\bpfizer\b|\bPFE\b|\bvalneva\b/i, imageUrl: "https://images.unsplash.com/photo-1770461846516-b7e5993a8e4f?w=1200&q=80", category: "markets" },
-  // Netflix / streaming → Netflix on TV screen
+  // Meta data center / AI infrastructure → server room aisle
+  { test: /\bmeta\b.*\b(?:data center|el paso|infrastructure)\b/i, imageUrl: "https://images.unsplash.com/photo-1584169417032-d34e8d805e8b?w=1200&q=80", category: "markets" },
+  // X / Musk advertising boycott lawsuit → Lady Justice statue
+  { test: /\b(?:x's|twitter)\b.*\b(?:boycott|lawsuit|antitrust)\b|\badvertising boycott\b/i, imageUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80", category: "markets" },
+  // Fink / BlackRock → corporate towers (finance/asset management)
+  { test: /\bfink\b|\bblackrock\b|\bBLK\b/i, imageUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=80", category: "markets" },
+  // Netflix experiential bookings / content monetization → movie theater (distinct from TV screen below)
+  { test: /\bnetflix\b.*\b(?:experiential|bookings|monetiz)\b/i, imageUrl: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&q=80" },
+  // Netflix / streaming (general) → Netflix on TV screen
   { test: /\bnetflix\b|\bNFLX\b/i, imageUrl: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=1200&q=80" },
+  // Musk liable / fraud / Twitter verdict → law library (distinct from Lady Justice above)
+  { test: /\bmusk\b.*\b(?:liable|fraud|verdict)\b/i, imageUrl: "https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=1200&q=80", category: "markets" },
   // Musk / Terafab / Tesla semiconductor → AI chip image; category → markets; strip irrelevant dollar chart
   { test: /\bterafab\b|\bmusk\b.*\b(?:chip|twitter|tesla)\b/i, imageUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1200&q=80", category: "markets", clearChartLabels: /dollar|dxy|dtwex/i },
   // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%; category → markets; fix sentiment (indictment is negative, not positive)
@@ -110,8 +120,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\biran\b.*\b(?:oil|crude)\b/i, imageUrl: "https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=1200&q=80", category: "macro" },
   // Iran + gilt / fiscal / UK → London skyline (UK finance); clear US yield keyData (article is about UK gilts, not US Treasuries); must come BEFORE general fallback
   { test: /\biran\b.*\b(?:gilt|fiscal|uk\b)/i, imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80", category: "macro", clearKeyData: true },
-  // Iran (general / Fed / inflation fallback) → oil refinery at night
-  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1580561346873-4a76a13dce92?w=1200&q=80", category: "macro" },
+  // Iran (general / Fed / inflation fallback) → oil pump silhouette at sunset (distinct from Iran peace refinery above)
+  { test: /\biran\b/i, imageUrl: "https://images.unsplash.com/photo-1516199423456-1f1e91b06f25?w=1200&q=80", category: "macro" },
   // Lululemon / athletic retail → yoga fitness class; strip inline image
   { test: /\blululemon\b/i, imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80", clearInlineImage: true },
   // Stagflation / GDP collapse → stock market crash / red tape; strip foreign market inline image
