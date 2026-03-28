@@ -45,9 +45,12 @@ export default async function TrackRecordPage() {
   await Promise.allSettled(
     uniqueTickers.map(async (ticker) => {
       const price = await fetchFmpQuote(ticker);
+      console.log(`[track-record] FMP quote for ${ticker}: ${price ?? "null (API unavailable or key missing)"}`);
       if (price) priceMap.set(ticker, price);
     })
   );
+
+  console.log(`[track-record] Prices fetched: ${priceMap.size}/${uniqueTickers.length} tickers — FMP_API_KEY ${process.env.FMP_API_KEY ? "set" : "MISSING"}`);
 
   // Enrich with live data
   const enrichedPicks = picks.map((pick) => {

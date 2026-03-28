@@ -670,16 +670,31 @@ export async function fetchFmpQuote(
   if (!process.env.FMP_API_KEY) return null;
 
   try {
+    // Try the stable quote-short endpoint first (works on most FMP plans)
     const res = await fetch(
-      fmpUrl(`/api/v3/quote/${symbol}`),
+      fmpUrl(`/stable/quote`, { symbol }),
       { signal: withTimeout() }
     );
-    if (!res.ok) return null;
+    if (res.ok) {
+      const data = await res.json();
+      const quote = Array.isArray(data) ? data[0] : data;
+      const price = quote?.price ?? quote?.close ?? quote?.previousClose ?? null;
+      if (typeof price === "number" && price > 0) return price;
+    }
 
-    const data = await res.json();
-    const quote = Array.isArray(data) ? data[0] : data;
-    const price = quote?.price ?? quote?.close ?? null;
-    return typeof price === "number" ? price : null;
+    // Fallback to v3 quote endpoint
+    const res2 = await fetch(
+      fmpUrl(`/api/v3/quote-short/${symbol}`),
+      { signal: withTimeout() }
+    );
+    if (res2.ok) {
+      const data2 = await res2.json();
+      const quote2 = Array.isArray(data2) ? data2[0] : data2;
+      const price2 = quote2?.price ?? quote2?.close ?? null;
+      if (typeof price2 === "number" && price2 > 0) return price2;
+    }
+
+    return null;
   } catch (err) {
     logWarn("FMP", `quote fetch failed for ${symbol}: ${String(err)}`);
     return null;
