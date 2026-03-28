@@ -670,32 +670,17 @@ export async function fetchFmpQuote(
   if (!process.env.FMP_API_KEY) return null;
 
   try {
-    // Try stable + v3 quote endpoints in parallel (both may fail on free tier)
-    const [stableRes, v3Res] = await Promise.allSettled([
-      fetch(fmpUrl(`/stable/quote`, { symbol }), { signal: withTimeout() }),
-      fetch(fmpUrl(`/api/v3/quote-short/${symbol}`), { signal: withTimeout() }),
-    ]);
-
-    // Check stable endpoint result
-    if (stableRes.status === "fulfilled" && stableRes.value.ok) {
-      const data = await stableRes.value.json();
-      const quote = Array.isArray(data) ? data[0] : data;
-      const price = quote?.price ?? quote?.close ?? quote?.previousClose ?? null;
+    // Use /stable/profile — confirmed working on current FMP plan.
+    // The /api/v3/* legacy endpoints were deprecated Aug 2025.
+    const res = await fetch(
+      fmpUrl(`/stable/profile`, { symbol }),
+      { signal: withTimeout() }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const profile = Array.isArray(data) ? data[0] : data;
+      const price = profile?.price ?? null;
       if (typeof price === "number" && price > 0) return price;
-    }
-
-    // Check v3 quote-short result
-    if (v3Res.status === "fulfilled" && v3Res.value.ok) {
-      const data2 = await v3Res.value.json();
-      const quote2 = Array.isArray(data2) ? data2[0] : data2;
-      const price2 = quote2?.price ?? quote2?.close ?? null;
-      if (typeof price2 === "number" && price2 > 0) return price2;
-    }
-
-    // Last resort: reuse fetchFmpCompanyProfile (confirmed working on FMP free tier)
-    const profile = await fetchFmpCompanyProfile(symbol);
-    if (profile?.price && typeof profile.price === "number" && profile.price > 0) {
-      return profile.price;
     }
 
     return null;
@@ -907,7 +892,8 @@ export async function fetchFmpCompanyProfile(
   if (!process.env.FMP_API_KEY) return null;
 
   try {
-    const res = await fetch(fmpUrl(`/api/v3/profile/${symbol}`), { signal: withTimeout() });
+    // Use /stable/profile — legacy /api/v3/profile was deprecated Aug 2025
+    const res = await fetch(fmpUrl(`/stable/profile`, { symbol }), { signal: withTimeout() });
     if (!res.ok) return null;
 
     const data: FmpCompanyProfile[] = await res.json();
