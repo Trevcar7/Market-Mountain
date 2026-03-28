@@ -11,6 +11,7 @@ priceTarget: 70
 priceAtPublish: 50
 rating: "buy"
 targetHit: true
+coverageStatus: "target-hit"
 ---
 
 ## Company Background and Competition

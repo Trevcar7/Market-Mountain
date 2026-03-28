@@ -11,6 +11,8 @@ priceTarget: 262
 priceAtPublish: 126
 rating: "buy"
 targetHit: true
+coverageStatus: "closed"
+coverageNote: "Price target of $262 reached May 2025. Coverage ended."
 ---
 
 ## Company Background

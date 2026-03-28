@@ -13,11 +13,15 @@ export interface TrackRecordPick {
   rating: string;
   /** Manually confirmed from frontmatter — did the stock reach the price target? */
   targetHitConfirmed: boolean;
+  /** Coverage lifecycle: active (thesis live), target-hit (reached), closed (no longer covering) */
+  coverageStatus: "active" | "target-hit" | "closed";
+  /** Optional note explaining coverage status (e.g., "Target reached May 2025") */
+  coverageNote?: string;
   /** Days since publication */
   holdingDays: number;
   currentPrice?: number;
   returnSincePublish?: number;    // % return from publish price to current
-  targetReturn?: number;           // % return from publish price to target
+  targetReturn?: number;           // % return from publish price to target (thesis return)
   /** True if confirmed via frontmatter OR if current price >= target */
   hitTarget?: boolean;
 }
@@ -54,6 +58,8 @@ export function extractPicks(): TrackRecordPick[] {
       priceAtPublish: a.priceAtPublish,
       rating: a.rating,
       targetHitConfirmed: a.targetHit === true,
+      coverageStatus: a.coverageStatus ?? (a.targetHit ? "target-hit" : "active"),
+      coverageNote: a.coverageNote ?? undefined,
       holdingDays: Math.floor((Date.now() - new Date(a.date).getTime()) / 86400000),
       targetReturn: ((a.priceTarget - a.priceAtPublish) / a.priceAtPublish) * 100,
     }));

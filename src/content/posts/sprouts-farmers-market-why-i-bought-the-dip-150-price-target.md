@@ -11,6 +11,7 @@ priceTarget: 150
 priceAtPublish: 79
 rating: "buy"
 targetHit: false
+coverageStatus: "active"
 ---
 
 ## Background

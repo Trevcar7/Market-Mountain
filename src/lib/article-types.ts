@@ -17,6 +17,8 @@ export interface ArticleMeta {
   priceAtPublish?: number;        // Stock price when article was published
   rating?: "buy" | "hold" | "sell" | "neutral" | "watchlist";
   targetHit?: boolean;             // Manually confirmed: did the stock reach the price target?
+  coverageStatus?: "active" | "target-hit" | "closed";  // Track record status
+  coverageNote?: string;           // e.g., "Target reached May 2025. Coverage ended."
   disclosure?: string;            // Conflict of interest disclosure
 }
 
