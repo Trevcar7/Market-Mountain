@@ -4,14 +4,27 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { SearchResult } from "@/lib/search-types";
 
-export default function SearchBar() {
+interface SearchBarProps {
+  /** "dark" for dark nav backgrounds (hero), "light" for light backgrounds */
+  variant?: "dark" | "light";
+  /** "desktop" shows full button with shortcut, "mobile" shows icon only */
+  display?: "desktop" | "mobile";
+}
+
+export default function SearchBar({ variant = "dark", display = "desktop" }: SearchBarProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isMac, setIsMac] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Detect platform for shortcut display
+  useEffect(() => {
+    setIsMac(navigator.platform?.toLowerCase().includes("mac") ?? true);
+  }, []);
 
   // cmd+K / ctrl+K to open
   useEffect(() => {
@@ -82,19 +95,45 @@ export default function SearchBar() {
     }
   }
 
+  const shortcutLabel = isMac ? "⌘K" : "Ctrl+K";
+
   if (!open) {
+    // Mobile: icon-only button
+    if (display === "mobile") {
+      const mobileColors = variant === "dark"
+        ? "text-white/70 hover:text-white hover:bg-white/10"
+        : "text-text-muted hover:text-navy-900 hover:bg-navy-50";
+      return (
+        <button
+          onClick={() => setOpen(true)}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${mobileColors}`}
+          aria-label={`Search (${shortcutLabel})`}
+        >
+          <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
+      );
+    }
+
+    // Desktop: full button with shortcut hint
+    const desktopColors = variant === "dark"
+      ? "border-white/15 text-white/40 hover:text-white/70 hover:border-white/30"
+      : "border-border text-text-light hover:text-text-muted hover:border-border-2";
+    const kbdColors = variant === "dark" ? "bg-white/10" : "bg-surface-2 text-text-light";
+
     return (
       <button
         onClick={() => setOpen(true)}
-        className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-white/40 hover:text-white/70 hover:border-white/30 text-xs transition-colors"
-        aria-label="Search (Cmd+K)"
+        className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-colors ${desktopColors}`}
+        aria-label={`Search (${shortcutLabel})`}
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <span>Search</span>
-        <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono">
-          &#8984;K
+        <kbd className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono ${kbdColors}`}>
+          {shortcutLabel}
         </kbd>
       </button>
     );

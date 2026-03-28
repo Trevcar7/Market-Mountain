@@ -86,17 +86,20 @@ export default function Navbar() {
                 </Link>
               );
             })}
-            <SearchBar />
-            <ThemeToggle />
+            <SearchBar variant={isHeroPage && !scrolled ? "dark" : "light"} display="desktop" />
+            <ThemeToggle variant={isHeroPage && !scrolled ? "dark" : "light"} />
           </nav>
 
-          {/* Mobile hamburger */}
-          <button
-            className={`md:hidden flex flex-col justify-center items-center w-10 h-10 rounded-md gap-1.5 transition-colors ${
-              isHeroPage && !scrolled
-                ? "hover:bg-white/10"
-                : "hover:bg-navy-50"
-            }`}
+          {/* Mobile: search + theme + hamburger */}
+          <div className="md:hidden flex items-center gap-1">
+            <SearchBar variant={isHeroPage && !scrolled ? "dark" : "light"} display="mobile" />
+            <ThemeToggle variant={isHeroPage && !scrolled ? "dark" : "light"} />
+            <button
+              className={`flex flex-col justify-center items-center w-10 h-10 rounded-md gap-1.5 transition-colors ${
+                isHeroPage && !scrolled
+                  ? "hover:bg-white/10"
+                  : "hover:bg-navy-50"
+              }`}
             onClick={() => setMenuOpen((o) => !o)}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
@@ -117,13 +120,14 @@ export default function Navbar() {
               } ${menuOpen ? "-translate-y-2 -rotate-45" : ""}`}
             />
           </button>
+          </div>
         </div>
       </div>
 
       {/* Mobile menu */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ${
-          menuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
+          menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
         } ${isHeroPage && !scrolled ? "bg-navy-800 border-t border-white/10" : "bg-card border-t border-border"}`}
       >
         <nav className="px-4 py-3 flex flex-col gap-1" aria-label="Mobile navigation">
