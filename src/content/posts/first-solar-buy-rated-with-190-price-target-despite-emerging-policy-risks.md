@@ -8,7 +8,7 @@ disclaimer: true
 coverImage: "/images/first-solar.png"
 ticker: "FSLR"
 priceTarget: 262
-priceAtPublish: 125
+priceAtPublish: 126
 rating: "buy"
 targetHit: true
 ---
@@ -75,3 +75,7 @@ All four valuation methods consistently demonstrate that First Solar is trading 
 <DCFHeatmap variant="firstsolar" />
 
 The combination of strong IRA tailwinds, domestic manufacturing advantages, tariff protections, and robust 2025 guidance makes this a compelling long-term opportunity.
+
+---
+
+**Update (May 14, 2025):** First Solar surpassed the original $190 price target following a strong earnings beat and the U.S.–China trade pause. Based on continued revenue acceleration, margin expansion, and an improved macro backdrop, the price target has been upgraded to **$262 per share**. See the full update in [Markets March Higher](/post/markets-march-higher-first-solar-breaks-190-pt-nextracker-beats-earnings-in-a-big-way).
