@@ -329,7 +329,7 @@ export default async function NewsStoryPage({ params }: Props) {
       </div>
 
       {/* Accent divider */}
-      <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
+      <div className="h-px bg-gradient-to-r from-navy-900 via-accent-500/50 to-navy-900" />
 
       {/* Story body */}
       <div className="bg-card">
