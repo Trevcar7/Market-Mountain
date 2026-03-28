@@ -42,16 +42,23 @@ function formatHoldingPeriod(days: number): string {
 export default async function TrackRecordPage() {
   const picks = extractPicks();
 
-  // Fetch live prices for picks + SPY benchmark
+  // Fetch live prices + SPY history in parallel
   const uniqueTickers = [...new Set([...picks.map((p) => p.ticker), "SPY"])];
   const priceMap = new Map<string, number>();
+  const oldestPick = picks.reduce((oldest, p) =>
+    p.holdingDays > oldest.holdingDays ? p : oldest, picks[0]);
 
-  await Promise.allSettled(
-    uniqueTickers.map(async (ticker) => {
-      const price = await fetchFmpQuote(ticker);
-      if (price) priceMap.set(ticker, price);
-    })
-  );
+  const [, spyHistoryResult] = await Promise.all([
+    // Fetch all quotes in parallel
+    Promise.allSettled(
+      uniqueTickers.map(async (ticker) => {
+        const price = await fetchFmpQuote(ticker);
+        if (price) priceMap.set(ticker, price);
+      })
+    ),
+    // Fetch SPY history concurrently (don't wait for quotes first)
+    fetchFmpStockHistory("SPY", oldestPick.holdingDays + 30),
+  ]);
 
   const spyPrice = priceMap.get("SPY");
   const hasLiveData = priceMap.size > 1; // at least 1 pick + SPY
@@ -108,10 +115,8 @@ export default async function TrackRecordPage() {
     : 0;
 
   if (spyPrice && hasLiveData) {
-    // Get SPY historical data covering all pick dates
-    const oldestPick = enrichedPicks.reduce((oldest, p) =>
-      p.holdingDays > oldest.holdingDays ? p : oldest, enrichedPicks[0]);
-    const spyHistory = await fetchFmpStockHistory("SPY", oldestPick.holdingDays + 30);
+    // Use pre-fetched SPY history (fetched in parallel with quotes above)
+    const spyHistory = spyHistoryResult;
 
     if (spyHistory && spyHistory.labels.length > 0) {
       // Build date→price map from SPY history
