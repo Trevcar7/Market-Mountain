@@ -15,8 +15,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
     return (
       <Link
         href={href}
-        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300"
-        style={{ minHeight: 360 }}
+        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300 aspect-[16/9] min-h-[280px]"
       >
         {article.coverImage ? (
           <Image

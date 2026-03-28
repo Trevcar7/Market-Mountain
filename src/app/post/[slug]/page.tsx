@@ -203,11 +203,11 @@ export default async function ArticlePage({ params }: Props) {
       {/* Accent divider */}
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
-      {/* Article body — with optional ToC sidebar on xl+ screens */}
+      {/* Article body — with optional ToC sidebar on lg+ screens */}
       <div className="bg-white">
-      <div className="mx-auto max-w-[900px] px-4 sm:px-6 py-10 sm:py-14 xl:flex xl:gap-14">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-6 py-10 sm:py-14 lg:flex lg:gap-14">
         {tocHeadings.length >= 3 && (
-          <aside className="hidden xl:block w-44 shrink-0">
+          <aside className="hidden lg:block w-44 shrink-0">
             <TableOfContents headings={tocHeadings} readTime={article.readTime} />
           </aside>
         )}

@@ -1,7 +1,6 @@
 ---
 title: "Reassessing Airline Stocks: A Risky Play for Long-Term Portfolios"
 date: "2025-06-06"
-updated: "2025-12-22"
 readTime: "4 min read"
 excerpt: "Airlines are essential to global travel, but are they essential to your portfolio? High fixed costs, thin margins, economic sensitivity, and bailout dependency make a compelling case to invest elsewhere."
 tags: ["Sector Analysis"]

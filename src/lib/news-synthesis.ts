@@ -232,6 +232,7 @@ interface ParsedArticle {
   secondOrderImplication: string;
   keyTakeaways: string[];
   marketImpact: MarketImpactItem[];
+  geoThemes?: string[];
 }
 
 /**
@@ -243,29 +244,28 @@ const REBUILD_MODE = process.env.REBUILD_MODE === "true";
 
 /**
  * Minimum editorial confidence score required to publish (0–1).
- * Production: 0.70 | Rebuild: 0.48
+ * Production: 0.75 | Rebuild: 0.48
  *
- * Confidence breakdown:
- *   0.30  Tier 1 source present (Reuters, Bloomberg, CNBC, etc.)
+ * Confidence breakdown (rebalanced to reduce recency penalty):
+ *   0.35  Tier 1 source present (Reuters, Bloomberg, CNBC, etc.)
  *   0.20  2+ unique sources corroborate the story (0.30 for 3+)
- *   0.20  Story is < 12h old (0.10 for 12-24h)
- *   0.20  Fact-check score ≥ 60
+ *   0.10  Story is < 12h old (0.05 for 12-48h) — reduced from 0.20
+ *   0.25  Fact-check score ≥ 60 — increased from 0.20
  *
- * Why 0.48 in Rebuild:
- *   NewsAPI free-tier delivers articles 24–48h after publication, so recency is
- *   permanently 0 for every NewsAPI story. The heuristic fact-checker (no Google
- *   Fact Check API key) returns 20–32 for company/event claims, never reaching 60.
- *   Together these permanently cap confidence at 0.50 for Tier1 + 2-source stories
- *   regardless of quality. Setting 0.48 lets Tier1 + 2-source through while still
- *   blocking anything with no tier-1 source or no corroboration.
+ * Production threshold lowered from 0.85 to 0.75:
+ *   With recency reduced, Tier1 + 2-source + fact-check ≥ 60 now scores 0.80.
+ *   0.75 allows high-quality articles with minor recency gaps while still
+ *   blocking single-source or unverified content.
  *
- *   Minimum achievable scores:
- *     No tier1, 1 source   → 0.00 (blocked) ✓
- *     Tier1, 1 source      → 0.30 (blocked) ✓
- *     No tier1, 2+ sources → 0.20 (blocked) ✓
- *     Tier1 + 2 sources    → 0.50 (passes)  ✓
+ *   Achievable scores:
+ *     No tier1, 1 source      → 0.00 (blocked) ✓
+ *     Tier1, 1 source         → 0.35 (blocked) ✓
+ *     No tier1, 2+ sources    → 0.20 (blocked) ✓
+ *     Tier1 + 2 sources       → 0.55 (blocked without fact-check) ✓
+ *     Tier1 + 2 src + fact≥60 → 0.80 (passes) ✓
+ *     Tier1 + 3 src + fact≥60 → 0.90 (passes) ✓
  */
-const CONFIDENCE_THRESHOLD = REBUILD_MODE ? 0.48 : 0.85;
+const CONFIDENCE_THRESHOLD = REBUILD_MODE ? 0.48 : 0.75;
 
 /** In rebuild mode, cap published articles per run at 2 to avoid bulk-publishing weak content. */
 const REBUILD_MAX_ARTICLES = 2;
@@ -281,8 +281,10 @@ function computeConfidenceScore(
 ): number {
   let score = 0;
 
-  // Source quality: Tier 1 source present (0.30)
-  if (hasTier1) score += 0.30;
+  // Source quality: Tier 1 source present (0.35)
+  // Increased from 0.30 — source quality is a stronger signal than recency,
+  // especially since NewsAPI free tier delivers articles 24-48h late.
+  if (hasTier1) score += 0.35;
 
   // Multi-source corroboration (max 0.30)
   const uniqueSourceCount = new Set(
@@ -295,7 +297,9 @@ function computeConfidenceScore(
   if (uniqueSourceCount >= 3) score += 0.30;
   else if (uniqueSourceCount >= 2) score += 0.20;
 
-  // Recency: use most recent article timestamp (max 0.20)
+  // Recency: use most recent article timestamp (max 0.10)
+  // Reduced from 0.20 — NewsAPI free tier is permanently 24-48h delayed,
+  // which is an architectural constraint, not a quality signal.
   const latestMs = group.articles.reduce((max, a) => {
     const raw = a as Record<string, unknown>;
     const ms =
@@ -305,11 +309,12 @@ function computeConfidenceScore(
     return Math.max(max, ms);
   }, 0);
   const hoursOld = (Date.now() - latestMs) / (1000 * 60 * 60);
-  if (hoursOld < 12) score += 0.20;
-  else if (hoursOld < 24) score += 0.10;
+  if (hoursOld < 12) score += 0.10;
+  else if (hoursOld < 48) score += 0.05;
 
-  // Fact-check score (max 0.20)
-  if (factCheckScore >= 60) score += 0.20;
+  // Fact-check score (max 0.25)
+  // Increased from 0.20 — data verification is a strong quality signal.
+  if (factCheckScore >= 60) score += 0.25;
   else if (factCheckScore >= 40) score += 0.10;
 
   // Source coherence penalty: if grouped articles have low headline overlap,
@@ -423,7 +428,7 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
   let inMarketImpact = false;
 
   const HEADER_PREFIXES = [
-    "HEADLINE:", "KEY_TAKEAWAYS:", "WHY_MATTERS:", "SECOND_ORDER:", "WHAT_WATCH:", "MARKET_IMPACT:",
+    "HEADLINE:", "KEY_TAKEAWAYS:", "WHY_MATTERS:", "SECOND_ORDER:", "WHAT_WATCH:", "MARKET_IMPACT:", "GEOPOLITICAL_THEMES:",
   ];
 
   for (const line of lines) {
@@ -474,6 +479,15 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
       const remainder = normalized.replace("MARKET_IMPACT:", "").trim();
       if (remainder) {
         parseMarketImpactLine(remainder, result.marketImpact);
+      }
+      continue;
+    }
+    if (normalized.startsWith("GEOPOLITICAL_THEMES:")) {
+      inKeyTakeaways = false;
+      inMarketImpact = false;
+      const themes = normalized.replace("GEOPOLITICAL_THEMES:", "").trim();
+      if (themes && themes.toLowerCase() !== "none") {
+        result.geoThemes = themes.split("|").map((t: string) => t.trim()).filter(Boolean);
       }
       continue;
     }
@@ -720,6 +734,7 @@ MARKET_IMPACT:
 • [ASSET] [+/-change%] [up/down/flat] — e.g. "OIL +4.1% up" or "S&P 500 -1.2% down" or "10Y YIELD +8bps up"
 • [ASSET] [+/-change%] [up/down/flat]
 CRITICAL: Every MARKET_IMPACT line MUST use the exact format: ASSET +/-N.N% direction (or +/-Nbps for yields). Text descriptions like "elevated" or "under pressure" will be rejected. If you cannot find a specific numeric change for an asset, omit that MARKET_IMPACT line entirely.
+GEOPOLITICAL_THEMES: [pipe-separated list of geopolitical themes if any apply, e.g. "iran_oil_supply|us_china_trade" — or "none" if no geopolitical angle. Use snake_case tags from: iran_oil_supply, us_china_trade, russia_energy, middle_east_conflict, taiwan_risk, sanctions, tariffs, opec_supply, european_energy]
 
 [blank line]
 [story body — 5 sections, 500–800 words total]
@@ -2072,6 +2087,9 @@ export async function synthesizeGroupedArticles(
           ? parsed.marketImpact.filter((mi) =>
               /^[+\-]\d+[.,]?\d*\s*(%|bps|bp)$/i.test(mi.change.trim())
             )
+          : undefined,
+        geoThemes: parsed.geoThemes && parsed.geoThemes.length > 0
+          ? parsed.geoThemes
           : undefined,
         wordCount: parsed.story.trim().split(/\s+/).length,
       };

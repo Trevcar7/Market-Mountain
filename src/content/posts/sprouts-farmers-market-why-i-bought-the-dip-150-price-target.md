@@ -1,7 +1,6 @@
 ---
 title: "Sprouts Farmers Market—Why I Bought the Dip: $150 Price Target"
 date: "2025-11-03"
-updated: "2025-12-22"
 readTime: "3 min read"
 excerpt: "Despite a 25% post-earnings drop driven by cautious Q4 guidance, Sprouts Farmers Market's fundamentals remain strong. My DCF analysis implies a fair value of $153/share — a 94% premium to the October 31 price."
 tags: ["Stock Analysis"]

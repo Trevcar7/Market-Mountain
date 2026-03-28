@@ -1,7 +1,6 @@
 ---
 title: "NEXTracker: Tracking the Future of Solar with a $70 Price Target"
 date: "2025-05-12"
-updated: "2025-12-22"
 readTime: "5 min read"
 excerpt: "NEXTracker holds 23% global market share in solar tracking technology, boasts a CAGR of 30%, and carries a $4.5B backlog. My DCF analysis points to $67/share — I'm placing a $70 price target with 40% upside."
 tags: ["Stock Analysis", "Energy"]

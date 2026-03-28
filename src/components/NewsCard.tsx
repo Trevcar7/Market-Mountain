@@ -64,8 +64,7 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
     return (
       <Link
         href={href}
-        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300"
-        style={{ minHeight: 360 }}
+        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300 aspect-[16/9] min-h-[280px]"
       >
         {/* Background: photo if available, else gradient */}
         {news.imageUrl ? (

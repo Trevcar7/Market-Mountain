@@ -342,7 +342,7 @@ const MIN_IMPORTANCE_SINGLE_SOURCE = 6; // Single-source fallback has a lower fl
 const MAX_GROUPS_PER_RUN = 3;           // 3 groups × ~15s each + sleeps ≈ 50s, safely under 60s maxDuration
 const MAX_GROUPS_FALLBACK = 2;          // Fewer groups when running in single-source fallback mode
 
-const MIN_STORIES_TO_PUBLISH = REBUILD_MODE ? 2 : 3; // Publish Decision Layer threshold
+const MIN_STORIES_TO_PUBLISH = 2; // Publish Decision Layer threshold (was 3 in prod; 2 good stories > 0 stories)
 const MAX_ARTICLES_PER_DAY = 5;                       // Editorial daily publishing cap
 
 // ---------------------------------------------------------------------------
@@ -391,6 +391,24 @@ function healthCheck(): HealthStatus {
     NEWSDATA_API_KEY:      !!process.env.NEWSDATA_API_KEY,
     GNEWS_API_KEY:         !!process.env.GNEWS_API_KEY,
   };
+
+  // Fact-checking degradation warnings — these keys power the data verification
+  // layer (40% of composite fact-check score). Without them, articles fall back
+  // to heuristic-only scoring, which is much less reliable.
+  const factCheckKeys = ["FRED_API_KEY", "BLS_API_KEY", "EIA_API_KEY"];
+  const missingFactCheckKeys = factCheckKeys.filter((k) => !process.env[k]);
+  if (missingFactCheckKeys.length > 0) {
+    warnings.push(
+      `FACT-CHECK DEGRADED: ${missingFactCheckKeys.join(", ")} missing — ` +
+      `data verification layer disabled for ${missingFactCheckKeys.length}/${factCheckKeys.length} sources. ` +
+      `Articles will use heuristic-only scoring (less reliable).`
+    );
+  }
+  if (!process.env.FMP_API_KEY) {
+    warnings.push(
+      "FMP_API_KEY missing — market price verification (S&P, VIX), earnings data, and economic calendar disabled"
+    );
+  }
 
   const status =
     missing.length > 0 ? "critical" : warnings.length > 0 ? "degraded" : "healthy";

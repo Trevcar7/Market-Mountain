@@ -15,11 +15,11 @@
  *
  * Tolerance bands:
  *   - Interest rates / yields: ±0.15 percentage points
- *   - CPI / inflation: ±0.3 percentage points (BLS releases monthly, articles
- *     may reference preliminary or revised figures)
+ *   - CPI / inflation: ±0.2 percentage points (tightened from 0.3; BLS releases
+ *     monthly, preliminary vs. revised figures rarely differ by >0.2pp)
  *   - Unemployment: ±0.2 percentage points
  *   - Oil prices: ±$5 (intraday volatility)
- *   - Payrolls: ±50K (revisions are common)
+ *   - Payrolls: proportional ±15% of claimed value (min 25K) — scales with magnitude
  */
 
 import {
@@ -27,6 +27,7 @@ import {
   fetchFredSeries,
   fetchBlsMultipleSeries,
   fetchWtiCrudePrice,
+  fetchFmpQuote,
   BLS_SERIES,
 } from "./market-data";
 
@@ -68,7 +69,9 @@ interface ClaimPattern {
   /** BLS series ID (if applicable) */
   blsSeries?: string;
   /** Special handler key for non-FRED/BLS data */
-  handler?: "wti" | "cpi_yoy" | "core_cpi_yoy" | "payrolls" | "yield_curve";
+  handler?: "wti" | "cpi_yoy" | "core_cpi_yoy" | "payrolls" | "yield_curve" | "fmp_quote";
+  /** FMP ticker symbol (used when handler is "fmp_quote") */
+  fmpSymbol?: string;
   /** Tolerance for comparison */
   tolerance: number;
   /** Source label */
@@ -114,7 +117,7 @@ const CLAIM_PATTERNS: ClaimPattern[] = [
     regex: /(?:CPI|consumer\s+price\s+index|headline\s+inflation)\s+(?:rose|fell|at|of|came\s+in\s+at|was|reported\s+at|hit)\s+(\d+\.\d+)\s*%\s*(?:year[- ]over[- ]year|y\/y|YoY|annually)/i,
     label: "CPI (YoY)",
     handler: "cpi_yoy",
-    tolerance: 0.3,
+    tolerance: 0.2,
     source: "FRED",
     extractValue: (m) => parseFloat(m[1]),
   },
@@ -123,7 +126,7 @@ const CLAIM_PATTERNS: ClaimPattern[] = [
     regex: /(?:core\s+CPI|core\s+inflation|core\s+consumer\s+price)\s+(?:rose|fell|at|of|came\s+in\s+at|was|reported\s+at|hit)\s+(\d+\.\d+)\s*%\s*(?:year[- ]over[- ]year|y\/y|YoY|annually)/i,
     label: "Core CPI (YoY)",
     handler: "core_cpi_yoy",
-    tolerance: 0.3,
+    tolerance: 0.2,
     source: "FRED",
     extractValue: (m) => parseFloat(m[1]),
   },
@@ -141,7 +144,7 @@ const CLAIM_PATTERNS: ClaimPattern[] = [
     regex: /(?:economy\s+added|nonfarm\s+payrolls?\s+(?:grew|rose|added|came\s+in\s+at|of)|added)\s+(\d{2,4})[,.]?(\d{3})?\s*(?:K|thousand)?\s*(?:jobs|positions)?/i,
     label: "Nonfarm Payrolls",
     handler: "payrolls",
-    tolerance: 50,
+    tolerance: 30, // Base tolerance (overridden by proportional logic in verification)
     source: "BLS",
     extractValue: (m) => {
       const val = m[2] ? parseFloat(`${m[1]}${m[2]}`) : parseFloat(m[1]);
@@ -157,6 +160,62 @@ const CLAIM_PATTERNS: ClaimPattern[] = [
     tolerance: 5,
     source: "EIA",
     extractValue: (m) => parseFloat(m[1]),
+  },
+  // S&P 500 — "S&P 500 at 5,234", "S&P hit 5200", "the index closed at 5,100"
+  {
+    regex: /S&P\s*500\s+(?:at|hit|rose\s+to|fell\s+to|near|around|closed?\s+at|trading\s+at)\s+(\d{1,2}[,.]?\d{3}(?:\.\d+)?)/i,
+    label: "S&P 500",
+    handler: "fmp_quote",
+    fmpSymbol: "^GSPC",
+    tolerance: 75, // ~1.5% of 5000 — covers intraday range
+    source: "FMP",
+    extractValue: (m) => parseFloat(m[1].replace(",", "")),
+  },
+  // VIX — "VIX at 28.5", "VIX spiked to 35", "volatility index hit 25"
+  {
+    regex: /(?:VIX|CBOE\s+Volatility\s+Index|volatility\s+index)\s+(?:at|hit|rose\s+to|fell\s+to|spiked?\s+to|near|around)\s+(\d+(?:\.\d+)?)/i,
+    label: "VIX",
+    fredSeries: "VIXCLS",
+    tolerance: 3, // VIX can swing 2-3 pts intraday
+    source: "FRED",
+    extractValue: (m) => parseFloat(m[1]),
+  },
+  // Dollar Index (DXY) — "dollar index at 104.3", "DXY fell to 103"
+  {
+    regex: /(?:dollar\s+index|DXY|U\.?S\.?\s+dollar\s+index)\s+(?:at|hit|rose\s+to|fell\s+to|near|around)\s+(\d+(?:\.\d+)?)/i,
+    label: "Dollar Index (DXY)",
+    fredSeries: "DTWEXBGS",
+    tolerance: 2, // Broad dollar index daily range
+    source: "FRED",
+    extractValue: (m) => parseFloat(m[1]),
+  },
+  // GDP Growth Rate — "GDP grew 2.1%", "real GDP growth of 3.2%", "GDP came in at 1.8%"
+  {
+    regex: /(?:real\s+)?GDP\s+(?:grew|growth|came\s+in\s+at|was|reported\s+at|expanded|contracted)\s+(?:at\s+|by\s+)?(\d+\.\d+)\s*%/i,
+    label: "Real GDP Growth Rate",
+    fredSeries: "A191RL1Q225SBEA",
+    tolerance: 0.3, // Quarterly, revisions common
+    source: "FRED",
+    extractValue: (m) => parseFloat(m[1]),
+  },
+  // 30-Year Mortgage Rate — "30-year mortgage at 7.2%", "mortgage rates hit 6.8%"
+  {
+    regex: /(?:30[- ]year\s+)?(?:mortgage|home\s+loan)\s+(?:rate|rates?)\s+(?:at|hit|rose\s+to|fell\s+to|near|around|averaged?)\s+(\d+\.\d+)\s*%/i,
+    label: "30-Year Mortgage Rate",
+    fredSeries: "MORTGAGE30US",
+    tolerance: 0.2, // Weekly release, modest volatility
+    source: "FRED",
+    extractValue: (m) => parseFloat(m[1]),
+  },
+  // Gold Price — "gold at $2,100", "gold prices hit $2,050 per ounce"
+  {
+    regex: /gold\s+(?:prices?\s+)?(?:at|hit|rose\s+to|fell\s+to|near|around|trading\s+at)\s+\$(\d{1,2}[,.]?\d{3}(?:\.\d+)?)/i,
+    label: "Gold Price",
+    handler: "fmp_quote",
+    fmpSymbol: "GC=F",
+    tolerance: 40, // ~2% of $2000 — covers intraday moves
+    source: "FMP",
+    extractValue: (m) => parseFloat(m[1].replace(",", "")),
   },
 ];
 
@@ -234,6 +293,11 @@ async function fetchActualValue(pattern: ClaimPattern): Promise<number | null> {
           return Math.round(current - previous); // Monthly change in thousands
         }
         return null;
+      }
+      case "fmp_quote": {
+        const symbol = pattern.fmpSymbol;
+        if (!symbol) return null;
+        return fetchFmpQuote(symbol);
       }
       default:
         return null;
@@ -319,7 +383,11 @@ export async function runDataFactCheck(
     }
 
     const diff = Math.abs(claimedValue - actualValue);
-    const verified = diff <= pattern.tolerance;
+    // Use proportional tolerance for payrolls (15% of claimed value, min 25K)
+    const effectiveTolerance = pattern.handler === "payrolls"
+      ? Math.max(25, Math.abs(claimedValue) * 0.15)
+      : pattern.tolerance;
+    const verified = diff <= effectiveTolerance;
 
     if (verified) {
       claimsVerified++;
@@ -332,12 +400,12 @@ export async function runDataFactCheck(
       dataPoint: pattern.label,
       claimedValue,
       actualValue,
-      tolerance: pattern.tolerance,
+      tolerance: effectiveTolerance,
       verified,
       source: pattern.source,
       detail: verified
-        ? `${pattern.label}: claimed ${claimedValue}, actual ${actualValue} (within ±${pattern.tolerance} tolerance)`
-        : `${pattern.label}: claimed ${claimedValue}, actual ${actualValue} — MISMATCH (deviation ${diff.toFixed(2)} exceeds ±${pattern.tolerance} tolerance)`,
+        ? `${pattern.label}: claimed ${claimedValue}, actual ${actualValue} (within ±${effectiveTolerance} tolerance)`
+        : `${pattern.label}: claimed ${claimedValue}, actual ${actualValue} — MISMATCH (deviation ${diff.toFixed(2)} exceeds ±${effectiveTolerance} tolerance)`,
     });
   }
 

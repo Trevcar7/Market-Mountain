@@ -1,7 +1,6 @@
 ---
 title: "The Power of Patience in the Market"
 date: "2025-12-22"
-updated: "2025-12-22"
 readTime: "4 min read"
 excerpt: "In today's market environment, one of the most important disciplines an investor must practice to be successful is patience — rooted in preparation, valuation, and the willingness to wait."
 tags: ["Market Commentary"]

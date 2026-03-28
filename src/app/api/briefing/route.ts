@@ -145,28 +145,53 @@ function extractLeadParagraph(story: string): string {
 // Active geopolitical themes — ongoing market-moving situations
 // ---------------------------------------------------------------------------
 
+/** Geopolitical theme descriptions keyed by structured tag */
+const GEO_THEME_DESCRIPTIONS: Record<string, string> = {
+  iran_oil_supply: "Iran/Middle East oil supply risk: U.S. sanctions on Iranian crude and Strait of Hormuz tensions — monitor WTI crude above $70, Brent-WTI spread, and energy sector ETFs (XLE)",
+  us_china_trade: "U.S.-China trade escalation: tariff announcements and retaliatory measures — monitor USD/CNY, semiconductor supply chains (SMH), and container shipping rates",
+  russia_energy: "European energy security: Russian gas supply dynamics — monitor TTF natural gas futures, EUR/USD, and European industrial production",
+  middle_east_conflict: "Middle East conflict escalation: military operations and humanitarian crisis — monitor oil prices, defense sector (ITA), and safe-haven assets (gold, USD, treasuries)",
+  taiwan_risk: "Taiwan Strait risk: military posturing and semiconductor supply chain disruption — monitor TSM, semiconductor ETFs (SMH/SOXX), and USD/TWD",
+  sanctions: "Sanctions escalation: new financial or trade restrictions — monitor affected country currencies, commodity flows, and sanctioned sector equities",
+  tariffs: "Tariff policy shifts: new duties or exemptions affecting trade flows — monitor affected sector ETFs, import-dependent companies, and consumer prices",
+  opec_supply: "OPEC+ supply dynamics: production quota changes and compliance — monitor WTI/Brent crude, energy sector equities (XLE), and inflation expectations",
+  european_energy: "European energy security: supply disruptions and storage levels — monitor TTF natural gas futures, EUR/USD, and European industrial production",
+};
+
 /**
- * Detects active geopolitical themes from published stories that should
- * surface in "What to Watch" even when not the day's lead story.
- * Returns human-readable theme descriptions for the Claude prompt.
+ * Detects active geopolitical themes from published stories.
+ * Primary: uses structured geoThemes tags from synthesis (reliable).
+ * Fallback: regex detection for stories without structured tags.
  */
 function detectActiveGeoThemes(stories: NewsItem[]): string[] {
   const themes: string[] = [];
-  const allText = stories.map((s) => `${s.title} ${s.story}`).join(" ").toLowerCase();
+  const seenTags = new Set<string>();
 
-  // Oil / Iran / Middle East supply risk
-  if (/\biran\b|\bstrait of hormuz\b|\bmiddle east.*oil\b|\boil.*iran\b|\bsanctions.*iran\b|\bopec\b/.test(allText)) {
-    themes.push("Iran/Middle East oil supply risk: U.S. sanctions on Iranian crude and Strait of Hormuz tensions — monitor WTI crude above $70, Brent-WTI spread, and energy sector ETFs (XLE)");
+  // Primary: use structured geoThemes tags from synthesis
+  for (const story of stories) {
+    if (story.geoThemes) {
+      for (const tag of story.geoThemes) {
+        if (!seenTags.has(tag) && GEO_THEME_DESCRIPTIONS[tag]) {
+          seenTags.add(tag);
+          themes.push(GEO_THEME_DESCRIPTIONS[tag]);
+        }
+      }
+    }
   }
 
-  // U.S.-China trade / tariffs
-  if (/\btariff\b.*\bchina\b|\bchina\b.*\btariff\b|\btrade war\b|\bu\.?s\.?\s*china\b/i.test(allText)) {
-    themes.push("U.S.-China trade escalation: tariff announcements and retaliatory measures — monitor USD/CNY, semiconductor supply chains (SMH), and container shipping rates");
-  }
+  // Fallback: regex detection for stories without structured tags
+  if (seenTags.size === 0) {
+    const allText = stories.map((s) => `${s.title} ${s.story}`).join(" ").toLowerCase();
 
-  // European energy / Russia
-  if (/\brussia\b.*\benergy\b|\benergy\b.*\brussia\b|\bnord stream\b|\beuropean gas\b/.test(allText)) {
-    themes.push("European energy security: Russian gas supply dynamics — monitor TTF natural gas futures, EUR/USD, and European industrial production");
+    if (/\biran\b|\bstrait of hormuz\b|\bmiddle east.*oil\b|\boil.*iran\b|\bsanctions.*iran\b|\bopec\b/.test(allText)) {
+      themes.push(GEO_THEME_DESCRIPTIONS.iran_oil_supply);
+    }
+    if (/\btariff\b.*\bchina\b|\bchina\b.*\btariff\b|\btrade war\b|\bu\.?s\.?\s*china\b/i.test(allText)) {
+      themes.push(GEO_THEME_DESCRIPTIONS.us_china_trade);
+    }
+    if (/\brussia\b.*\benergy\b|\benergy\b.*\brussia\b|\bnord stream\b|\beuropean gas\b/.test(allText)) {
+      themes.push(GEO_THEME_DESCRIPTIONS.russia_energy);
+    }
   }
 
   return themes;
@@ -335,6 +360,33 @@ async function generateBriefing(
     // Non-fatal — Claude will generate without calendar data
   }
 
+  // ── Fetch yesterday's briefing for editorial continuity ──
+  // Provides Claude with context to avoid repeating What to Watch items
+  // and to generate follow-up items on resolved events.
+  let yesterdayBriefing: DailyBriefing | null = null;
+  try {
+    const yesterday = new Date(new Date(date + "T12:00:00Z").getTime() - 24 * 60 * 60 * 1000)
+      .toISOString().split("T")[0];
+    yesterdayBriefing = await kv.get<DailyBriefing>(getDateKey(yesterday));
+    if (yesterdayBriefing) {
+      console.log(`[briefing] Loaded yesterday's briefing (${yesterday}) for continuity`);
+    }
+  } catch {
+    // Non-fatal — generate without continuity context
+  }
+
+  const yesterdayBlock = yesterdayBriefing
+    ? `\n\nYESTERDAY'S BRIEFING (${yesterdayBriefing.date}) — for continuity:
+Lead story: ${yesterdayBriefing.leadStory.title}
+What to Watch items:
+${yesterdayBriefing.whatToWatch.map((w, i) => `${i + 1}. ${w.event} — ${w.significance}`).join("\n")}
+
+CONTINUITY RULES:
+- Do NOT repeat the same "What to Watch" items from yesterday unless there is a genuine new development
+- If any of yesterday's watch items have resolved or had new data, generate a brief follow-up in the "followUpItems" array
+- If none of yesterday's items resolved, omit the "followUpItems" field`
+    : "";
+
   // Use Claude to generate structured editorial summaries
   const client = getAnthropicClient();
 
@@ -381,7 +433,7 @@ WHAT TO WATCH RULES:
 
 Today's published stories:
 
-${storyContext}${macroCalendarBlock}${geoThemesBlock}
+${storyContext}${macroCalendarBlock}${geoThemesBlock}${yesterdayBlock}
 
 Generate a concise editorial briefing with this exact JSON structure. Return ONLY valid JSON — no markdown, no explanation.
 CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MUST have exactly 3 items. No more, no fewer.
@@ -397,6 +449,9 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     {"event": "[MUST be from UPCOMING MACRO CALENDAR if available — specific scheduled release name and date]", "timing": "[monitoring label from the list above]", "significance": "[1-2 sentences: the economic mechanism and what outcome would move markets]", "watchMetric": "[specific level or threshold to monitor, e.g. '10-Year Treasury above 4.30%']"},
     {"event": "[second calendar event or high-impact geopolitical/policy event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]", "watchMetric": "[level or null if none applies]"},
     {"event": "[third item — a forward-looking signal or remaining calendar event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]"}
+  ],
+  "followUpItems": [
+    {"originalEvent": "[yesterday's watch item that resolved]", "outcome": "[1 sentence: what happened — e.g. 'CPI came in at 2.6% vs 2.7% expected, reinforcing June rate cut expectations']"}
   ]
 }`;
 
@@ -404,12 +459,13 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     leadSummary: string;
     topDevelopmentsSummaries: string[];
     whatToWatch: Array<{ event: string; timing: string; significance: string; watchMetric?: string }>;
+    followUpItems?: Array<{ originalEvent: string; outcome: string }>;
   } | null = null;
 
   try {
     const response = await client.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 800,
+      max_tokens: 1000,
       temperature: 0.5,
       messages: [{ role: "user", content: prompt }],
     });
@@ -531,6 +587,16 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     whatToWatch,
     storiesPublished: stories.length,
     generatedFrom: stories.map((s) => s.id),
+    // Include follow-up items if Claude generated any from yesterday's context
+    ...(generated?.followUpItems && generated.followUpItems.length > 0 && yesterdayBriefing
+      ? {
+          followUpItems: generated.followUpItems.map((f) => ({
+            originalEvent: f.originalEvent,
+            originalDate: yesterdayBriefing!.date,
+            outcome: f.outcome,
+          })),
+        }
+      : {}),
   };
 
   // Save to KV with 48-hour TTL

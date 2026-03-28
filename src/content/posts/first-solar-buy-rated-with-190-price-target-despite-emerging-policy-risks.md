@@ -1,7 +1,6 @@
 ---
 title: "First Solar: Buy-Rated with $190 Price Target Despite Emerging Policy Risks"
 date: "2025-03-31"
-updated: "2025-12-22"
 readTime: "5 min read"
 excerpt: "Despite a 41% post-election selloff driven by IRA uncertainty, First Solar's fundamentals remain compelling. My multi-model valuation — DCF, EV/EBITDA, PE, P/CF — all converge below fair value, supporting a $190 price target."
 tags: ["Stock Analysis", "Energy"]

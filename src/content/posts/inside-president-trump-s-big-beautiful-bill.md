@@ -1,7 +1,6 @@
 ---
 title: "Inside President Trump's \"Big Beautiful Bill\""
 date: "2025-07-13"
-updated: "2025-12-22"
 readTime: "6 min read"
 excerpt: "On July 4th, 2025, President Trump signed the One Big Beautiful Bill Act into law. Here's a breakdown of the key provisions: Medicaid work requirements, SNAP changes, new tax deductions, SALT expansion, and more."
 tags: ["Policy & Economics", "Macro"]

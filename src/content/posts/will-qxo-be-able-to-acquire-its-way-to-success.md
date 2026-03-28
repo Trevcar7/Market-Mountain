@@ -1,7 +1,6 @@
 ---
 title: "Can Brad Jacobs Repeat His M&A Playbook with QXO?"
 date: "2025-08-17"
-updated: "2025-12-22"
 readTime: "5 min read"
 excerpt: "Brad Jacobs has built five billion-dollar companies through disciplined M&A. Now with QXO, he's targeting the $800B building products distribution industry. Can he do it again?"
 tags: ["Stock Analysis", "Macro"]

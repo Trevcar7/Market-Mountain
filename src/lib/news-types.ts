@@ -98,6 +98,9 @@ export interface NewsItem {
   dataVerificationDetails?: string; // Human-readable summary of data verification results
   hallucinations?: string[];       // Claims not grounded in any source article
 
+  // Geopolitical themes (structured tags from synthesis, replaces regex detection)
+  geoThemes?: string[];            // e.g., ["iran_oil_supply", "us_china_trade"]
+
   // Event-first architecture
   eventId?: string;                // Links article to a NewsEvent (optional)
   marketImpact?: MarketImpactItem[]; // Asset-level impact strip (e.g., OIL +4.1%, S&P -1.2%)
@@ -161,6 +164,12 @@ export interface DailyBriefing {
   }>;
   storiesPublished: number;
   generatedFrom: string[]; // Story IDs used to generate briefing
+  /** Follow-up on yesterday's briefing items — tracks editorial continuity */
+  followUpItems?: Array<{
+    originalEvent: string;   // From yesterday's whatToWatch
+    originalDate: string;    // YYYY-MM-DD
+    outcome: string;         // What actually happened
+  }>;
 }
 
 // ---------------------------------------------------------------------------

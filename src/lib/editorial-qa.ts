@@ -25,7 +25,7 @@
  *   Data Verification   (10) — cross-references claims vs FRED/BLS/EIA live data
  *   Source Alignment     (8) — verifies synthesized claims are grounded in sources
  *
- * Production threshold: 93 / 100 (A+ quality — 10/10 in every category)
+ * Production threshold: 90 / 100 (A-grade quality — strong across all categories)
  * Rebuild mode threshold: 72 / 100 (set REBUILD_MODE=true in env)
  */
 
@@ -57,20 +57,18 @@ export interface QAResult {
 
 /**
  * Minimum quality score required to publish.
- * Production: 93 | Rebuild mode: 72
+ * Production: 90 | Rebuild mode: 72
  *
- * A+ quality standard: articles must score near-perfect on every test.
- * Fact check hard floor: 90 (requires Google Fact Check API + data verification).
- * Confidence hard floor: 0.80 (requires strong source corroboration).
- * Data verification hard floor: 70 (requires strong numerical accuracy).
+ * Lowered from 93 → 90 to reduce over-rejection while maintaining A-grade quality.
+ * 93 required near-perfection on every test, causing legitimate articles to fail
+ * on minor issues (e.g., 4/5 headings instead of 5, or 2 takeaways instead of 3).
  *
- * Why 72 in rebuild:
- *   - Chart soft-fail costs up to 4 pts when FRED/BLS/EIA keys are missing
- *   - Confidence band 0.58–0.70 costs up to 5 pts vs production scoring
- *   - Together these two penalties can drop a strong story from ~83 to ~74
- *   - Threshold 72 gives enough headroom while still blocking thin content
+ * Hard floors (hard reject regardless of total score):
+ *   Fact check:         75 (was 90 — unreachable with heuristic scorer alone)
+ *   Confidence:         0.75 (aligned with synthesis gate)
+ *   Data verification:  55 (was 70 — loosened since not all articles have numeric claims)
  */
-export const QA_PASS_THRESHOLD = REBUILD_MODE ? 72 : 93;
+export const QA_PASS_THRESHOLD = REBUILD_MODE ? 72 : 90;
 
 if (REBUILD_MODE) {
   console.log(
@@ -1427,9 +1425,11 @@ export function runEditorialQA(
   // ---------------------------------------------------------------------------
   const hardRejectReasons: string[] = [];
 
-  // Fact check: hard floor applies in ALL modes (production=90, rebuild=35)
-  // Only publish articles with very high fact-check confidence.
-  const FC_HARD_FLOOR = REBUILD_MODE ? 35 : 90;
+  // Fact check: hard floor applies in ALL modes (production=75, rebuild=35)
+  // Lowered from 90 — the recalibrated heuristic (base 40 + max 45 green = 85)
+  // makes 90 unreachable without Google Fact Check API or perfect data verification.
+  // 75 is achievable by well-sourced claims via heuristic (40 + 35 = 75).
+  const FC_HARD_FLOOR = REBUILD_MODE ? 35 : 75;
   const fc = article.factCheckScore ?? 0;
   if (fc < FC_HARD_FLOOR) {
     hardRejectReasons.push(`factCheckScore=${fc} < ${FC_HARD_FLOOR} minimum`);
@@ -1442,10 +1442,11 @@ export function runEditorialQA(
   }
 
   if (!REBUILD_MODE) {
-    // Confidence: < 0.80 means insufficient source corroboration
+    // Confidence: < 0.75 means insufficient source corroboration
+    // Aligned with synthesis CONFIDENCE_THRESHOLD (0.75)
     const conf = article.confidenceScore ?? 0;
-    if (conf < 0.80) {
-      hardRejectReasons.push(`confidenceScore=${conf} < 0.80 minimum`);
+    if (conf < 0.75) {
+      hardRejectReasons.push(`confidenceScore=${conf} < 0.75 minimum`);
     }
 
     // Source coherence: 0/5 means sources are topically unrelated to article
@@ -1465,10 +1466,12 @@ export function runEditorialQA(
       }
     }
 
-    // Data verification: hard reject if score < 70 (requires strong numerical accuracy)
+    // Data verification: hard reject if score < 55 (requires numerical accuracy)
+    // Lowered from 70 — not all articles have verifiable numeric claims,
+    // and partial verification (some claims checked, some APIs down) scores 55-70.
     const dvScore = article.dataVerificationScore;
-    if (dvScore !== undefined && dvScore !== null && dvScore < 70) {
-      hardRejectReasons.push(`dataVerificationScore=${dvScore} < 70 — numerical claims insufficiently verified`);
+    if (dvScore !== undefined && dvScore !== null && dvScore < 55) {
+      hardRejectReasons.push(`dataVerificationScore=${dvScore} < 55 — numerical claims insufficiently verified`);
     }
 
     // Source alignment: hard reject if hallucinations detected

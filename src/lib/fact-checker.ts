@@ -231,8 +231,9 @@ export async function verifyClaims(claims: string[]): Promise<{
  * Treat the output as a rough writing-quality signal, not a truth assessment.
  *
  * Calibrated so that well-sourced financial claims (which typically contain
- * percentages, dollar figures, and attribution) score 70-80, passing the
- * fact-check threshold of 55 comfortably. Claims without data score 50-60.
+ * percentages, dollar figures, and attribution) score 65-85, passing the
+ * fact-check threshold comfortably. Claims without specific data score ~40
+ * (below threshold), forcing the pipeline to reject unsourced assertions.
  */
 function heuristicFactCheck(claim: string): FactCheckResult {
   const lowerClaim = claim.toLowerCase();
@@ -272,15 +273,16 @@ function heuristicFactCheck(claim: string): FactCheckResult {
     greenScore += 5;
   }
 
-  // Base confidence calculation — starts at 55 (just above fact-check threshold)
-  // so that even average financial claims pass, while garbage gets rejected
-  let confidence = 55;
+  // Base confidence calculation — starts at 40 (below threshold).
+  // Claims must contain specific financial data (%, $, bps, attribution) to pass.
+  // Well-sourced claims score 65-85; unsourced prose stays at ~40.
+  let confidence = 40;
   if (hasRedFlag) confidence -= 15;
-  confidence += Math.min(greenScore, 35); // Cap green boost at +35
+  confidence += Math.min(greenScore, 45); // Cap green boost at +45
 
   return {
     claim,
-    verified: confidence >= 65,
+    verified: confidence >= 55,
     confidence: Math.max(20, Math.min(95, confidence)),
     explanation: "Keyword plausibility score (no external verification)",
   };

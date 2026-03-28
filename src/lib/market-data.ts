@@ -660,6 +660,33 @@ function fmpUrl(path: string, params: Record<string, string> = {}): string {
 }
 
 /**
+ * Fetch a real-time quote (price) for a symbol from FMP.
+ * Used by data-fact-checker to verify S&P 500, VIX, DXY, and gold claims.
+ * Returns the current price or null if unavailable.
+ */
+export async function fetchFmpQuote(
+  symbol: string
+): Promise<number | null> {
+  if (!process.env.FMP_API_KEY) return null;
+
+  try {
+    const res = await fetch(
+      fmpUrl(`/api/v3/quote/${symbol}`),
+      { signal: withTimeout() }
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const quote = Array.isArray(data) ? data[0] : data;
+    const price = quote?.price ?? quote?.close ?? null;
+    return typeof price === "number" ? price : null;
+  } catch (err) {
+    logWarn("FMP", `quote fetch failed for ${symbol}: ${String(err)}`);
+    return null;
+  }
+}
+
+/**
  * Fetch daily stock price history from FMP for chart display.
  * Returns a chart-ready series with labels and closing prices.
  * Used by earnings articles to show the stock's performance around announcements.
