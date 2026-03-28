@@ -189,7 +189,7 @@ body {
   line-height: 0.8;
   padding-right: 0.08em;
   padding-top: 0.05em;
-  color: var(--color-navy-900);
+  color: var(--tw-prose-headings);
   font-weight: 700;
 }
 

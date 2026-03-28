@@ -53,7 +53,7 @@ function SnapshotChip({ item }: { item: MarketSnapshotItem }) {
       <span className="text-[10px] font-medium tracking-wide text-text-muted uppercase whitespace-nowrap">
         {displayLabel}
       </span>
-      <span className="text-[15px] font-bold text-navy-900 whitespace-nowrap tabular-nums leading-none">
+      <span className="text-[15px] font-bold text-text whitespace-nowrap tabular-nums leading-none">
         {item.value}
       </span>
       <span className={`text-[11px] font-semibold flex items-center gap-0.5 whitespace-nowrap tabular-nums leading-none ${changeColor}`}>

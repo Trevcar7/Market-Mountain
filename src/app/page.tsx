@@ -133,7 +133,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-8 sm:mb-10">
           <div className="flex items-center gap-3">
             <span className="block w-[3px] h-5 rounded-full bg-accent-500 shrink-0" aria-hidden="true" />
-            <h2 className="text-xl sm:text-2xl font-bold text-navy-900 font-playfair tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-text font-playfair tracking-tight">
               Market News
             </h2>
           </div>
@@ -175,7 +175,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-8 sm:mb-10">
           <div className="flex items-center gap-3">
             <span className="block w-[3px] h-5 rounded-full bg-accent-500 shrink-0" aria-hidden="true" />
-            <h2 className="text-xl sm:text-2xl font-bold text-navy-900 font-playfair tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-text font-playfair tracking-tight">
               Latest Analysis
             </h2>
           </div>
@@ -235,7 +235,7 @@ export default function HomePage() {
               About the Author
             </p>
             <h2
-              className="text-2xl font-bold text-navy-900 mb-3 font-playfair"
+              className="text-2xl font-bold text-text mb-3 font-playfair"
             >
               Trevor Carnovsky
             </h2>

@@ -78,7 +78,7 @@ export default function Navbar() {
                   {active && (
                     <span
                       className={`absolute bottom-0 left-4 right-4 h-[2px] rounded-full ${
-                        isHeroPage && !scrolled ? "bg-accent-400" : "bg-navy-600"
+                        isHeroPage && !scrolled ? "bg-accent-400" : "bg-accent-500"
                       }`}
                       aria-hidden="true"
                     />
@@ -106,17 +106,17 @@ export default function Navbar() {
           >
             <span
               className={`block w-5 h-0.5 transition-all duration-200 ${
-                isHeroPage && !scrolled ? "bg-white" : "bg-navy-900"
+                isHeroPage && !scrolled ? "bg-white" : "bg-text"
               } ${menuOpen ? "translate-y-2 rotate-45" : ""}`}
             />
             <span
               className={`block w-5 h-0.5 transition-all duration-200 ${
-                isHeroPage && !scrolled ? "bg-white" : "bg-navy-900"
+                isHeroPage && !scrolled ? "bg-white" : "bg-text"
               } ${menuOpen ? "opacity-0 scale-x-0" : ""}`}
             />
             <span
               className={`block w-5 h-0.5 transition-all duration-200 ${
-                isHeroPage && !scrolled ? "bg-white" : "bg-navy-900"
+                isHeroPage && !scrolled ? "bg-white" : "bg-text"
               } ${menuOpen ? "-translate-y-2 -rotate-45" : ""}`}
             />
           </button>

@@ -246,7 +246,7 @@ export default async function ArticlePage({ params }: Props) {
               ? "border-l-4 border-l-amber-400 border border-amber-200/50 bg-amber-50/50"
               : "border border-border bg-surface-2"
           }`}>
-            <strong className="text-navy-800 font-semibold">Disclaimer: </strong>
+            <strong className="text-text font-semibold">Disclaimer: </strong>
             This article is for informational purposes only and does not
             constitute financial advice. Please perform your own research and
             due diligence before making any investment decisions.
@@ -264,7 +264,7 @@ export default async function ArticlePage({ params }: Props) {
               className="rounded-full ring-2 ring-border flex-shrink-0"
             />
             <div className="flex-1">
-              <Link href="/about" className="text-base font-semibold text-navy-900 hover:text-accent-600 transition-colors">
+              <Link href="/about" className="text-base font-semibold text-text hover:text-accent-600 transition-colors">
                 Trevor Carnovsky
               </Link>
               <p className="text-xs text-text-light mt-0.5">Equity Researcher · CFA Research Challenge Champion</p>
@@ -288,7 +288,7 @@ export default async function ArticlePage({ params }: Props) {
                 </svg>
                 LinkedIn
               </a>
-              <Link href="/articles" className="text-sm text-text-muted hover:text-navy-900 transition-colors">
+              <Link href="/articles" className="text-sm text-text-muted hover:text-text transition-colors">
                 All articles
               </Link>
             </div>
@@ -312,7 +312,7 @@ export default async function ArticlePage({ params }: Props) {
         <section className="border-t border-border bg-surface-2 py-12 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2
-              className="text-xl font-bold text-navy-900 mb-6 font-playfair"
+              className="text-xl font-bold text-text mb-6 font-playfair"
             >
               More Research
             </h2>

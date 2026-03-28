@@ -102,7 +102,7 @@ export default function SearchBar({ variant = "dark", display = "desktop" }: Sea
     if (display === "mobile") {
       const mobileColors = variant === "dark"
         ? "text-white/70 hover:text-white hover:bg-white/10"
-        : "text-text-muted hover:text-navy-900 hover:bg-navy-50";
+        : "text-text-muted hover:text-text hover:bg-surface-2";
       return (
         <button
           onClick={() => setOpen(true)}
