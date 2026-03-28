@@ -2117,6 +2117,22 @@ function getMacroSignificance(eventName: string, estimate?: number | null, previ
  * (2) notable earnings as secondary fill only.
  * Returns up to 3 events.
  */
+/**
+ * 2026 FOMC meeting dates (from federalreserve.gov).
+ * These are hardcoded because FMP's calendar may not list them far enough in advance.
+ * Format: [startDate, endDate, hasSEP] — SEP = Summary of Economic Projections.
+ */
+const FOMC_2026_MEETINGS = [
+  { start: "2026-01-27", end: "2026-01-28", sep: false },
+  { start: "2026-03-17", end: "2026-03-18", sep: true },
+  { start: "2026-04-28", end: "2026-04-29", sep: false },
+  { start: "2026-06-16", end: "2026-06-17", sep: true },
+  { start: "2026-07-28", end: "2026-07-29", sep: false },
+  { start: "2026-09-15", end: "2026-09-16", sep: true },
+  { start: "2026-10-27", end: "2026-10-28", sep: false },
+  { start: "2026-12-08", end: "2026-12-09", sep: true },
+];
+
 export async function fetchBriefingWhatToWatch(): Promise<Array<{
   event: string;
   timing: string;
@@ -2124,6 +2140,25 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
   watchMetric?: string;
 }>> {
   const events: Array<{ event: string; timing: string; significance: string; watchMetric?: string }> = [];
+
+  // 0. Check for upcoming FOMC meeting (hardcoded — always takes top priority)
+  const today = new Date().toISOString().split("T")[0];
+  const nextFomc = FOMC_2026_MEETINGS.find((m) => m.end >= today);
+  if (nextFomc) {
+    const daysUntil = Math.floor((new Date(nextFomc.start).getTime() - Date.now()) / 86400000);
+    if (daysUntil <= 14) {
+      // FOMC is within 2 weeks — make it the top watch item
+      const dateRange = `${nextFomc.start.slice(5)} to ${nextFomc.end.slice(5)}`;
+      events.push({
+        event: `FOMC Meeting (${dateRange})${nextFomc.sep ? " — includes SEP & dot plot" : ""}`,
+        timing: daysUntil <= 0 ? "This week" : `${daysUntil} days away`,
+        significance: nextFomc.sep
+          ? "Rate decision + Summary of Economic Projections + dot plot. The SEP provides the committee's median rate, GDP, and inflation forecasts — the single most important data release for rates markets."
+          : "Rate decision + press conference. Markets will parse Powell's tone on inflation persistence and the pace of future cuts.",
+        watchMetric: "Fed Funds target range; 10-Year Treasury yield reaction",
+      });
+    }
+  }
 
   // 1. FMP economic calendar — macro events are ABSOLUTE first priority
   try {

@@ -51,8 +51,10 @@ interface ArticlePatch {
 }
 
 export const ARTICLE_PATCHES: ArticlePatch[] = [
+  // Anthropic / Claude / AI companies → AI/technology image; category → markets
+  { test: /\banthropic\b|\bclaude\b.*\bai\b|\banthropic\b.*\bban\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets" },
   // Warren / Pentagon / defense policy → US Capitol building; category → policy
-  { test: /\bpentagon\b|\bwarren\b.*\b(?:defense|blacklist|anthropic)\b/i, imageUrl: "https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=1200&q=80", category: "policy" },
+  { test: /\bpentagon\b|\bwarren\b.*\b(?:defense|blacklist)\b/i, imageUrl: "https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=1200&q=80", category: "policy" },
   // Pfizer / pharma → markets category (not macro)
   { test: /\bpfizer\b|\bPFE\b|\bvalneva\b/i, imageUrl: "https://images.unsplash.com/photo-1770461846516-b7e5993a8e4f?w=1200&q=80", category: "markets" },
   // Meta data center / AI infrastructure → server room aisle

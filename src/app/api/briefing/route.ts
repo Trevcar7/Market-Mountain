@@ -415,21 +415,24 @@ Summary: ${extractLeadParagraph(s.story)}`
   const prompt = `You are a macro strategist generating a Daily Markets Briefing for Market Mountain, a financial publication read by institutional investors, macro traders, and portfolio managers.
 This briefing publishes at 8:00 AM Eastern each trading day. Your tone must match Bloomberg, the Financial Times, or sell-side macro research notes.
 
-FOCUS: Lead with the story that will move markets most. Skip incremental updates or low-impact developments.
+FOCUS: Lead with the story driving the largest market reaction TODAY. Skip incremental updates. Prioritize:
+1. What is moving prices RIGHT NOW (rates, equities, commodities, FX)
+2. What macro data is driving the reaction (CPI, NFP, FOMC, GDP)
+3. What is the forward-looking signal (next data release, policy shift, earnings)
 
 STYLE RULES:
 - Always write "U.S." (with periods) when referring to the United States — never "US"
+- Be direct and specific — every sentence must contain either a number, a date, or a clear mechanism
+- Write like a sell-side morning note, not a news summary
 
 WHAT TO WATCH RULES:
-- ABSOLUTE PRIORITY: Use the UPCOMING MACRO CALENDAR events below as the first 1-2 "whatToWatch" items. These are real scheduled economic releases from the FMP economic calendar — they MUST take precedence over story-derived themes.
-- PRIORITY ORDER: (1) scheduled macro releases from the calendar below (FOMC decisions, CPI, PCE, Non-Farm Payrolls, GDP, PMI/ISM, Retail Sales, PPI, Fed speakers), (2) geopolitical / policy events with market-moving potential from today's stories, (3) major earnings only if no macro events apply
-- Each item must identify a specific macro or market driver and explain the mechanism driving markets
-- Do NOT use generic phrases like "markets reacted", "this highlights", "investors are watching", "in today's environment"
-- Do NOT generate vague ongoing themes like "tariff regime uncertainty" or "inflation persistence" — be specific about WHAT event and WHEN
-- Every item must explain the economic cause-and-effect mechanism
-- Use one of these monitoring labels for "timing": "Ongoing this week", "Intraday monitoring", "Earnings season updates", "Upcoming economic data", "Policy watch"
-- Include a "watchMetric" when a specific price level or threshold is economically meaningful (e.g., "10-Year Treasury above 4.30%", "WTI crude above $95", "S&P 500 testing 50-day MA")
-- Significance must be 1-2 sentences maximum, analytical and concise — no speculation or exaggerated predictions
+- ABSOLUTE PRIORITY: Use the UPCOMING MACRO CALENDAR events below as the first 1-2 "whatToWatch" items. These are real scheduled economic releases — they MUST take precedence over story-derived themes.
+- PRIORITY ORDER: (1) FOMC meetings, CPI, PCE, Non-Farm Payrolls, GDP — these are the events that MOVE markets (2) geopolitical events with clear market impact (tariffs, sanctions, supply disruptions) (3) mega-cap earnings ($100B+ market cap) ONLY if no macro events are upcoming
+- Each item MUST answer: "What specific event? When exactly? What price/rate level matters? What happens if it beats/misses?"
+- Do NOT use: "markets reacted", "investors are watching", "remains to be seen", "this highlights", "in today's environment"
+- Do NOT generate vague themes — every item must reference a specific event, date, or data release
+- "watchMetric" is REQUIRED for every item — pick the specific price level or threshold that matters most (e.g., "10-Year above 4.50%", "Core PCE above 2.8%", "S&P 500 support at 5,600")
+- Significance: 1-2 sentences MAX. State the mechanism: "If X happens → Y moves because Z"
 
 Today's published stories:
 
