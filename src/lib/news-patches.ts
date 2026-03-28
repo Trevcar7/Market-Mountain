@@ -152,7 +152,41 @@ function normalizeChange(change: string): string {
   return change;
 }
 
-/** Category fallback: used when no patch matches and article has no imageUrl */
+/**
+ * Topic-level fallback images — more specific than category fallbacks.
+ * Used when Unsplash API is unavailable but article has a topicKey.
+ * Each URL is a curated, verified Unsplash image (landscape, high quality).
+ */
+export const TOPIC_FALLBACK_IMAGES: Record<string, string> = {
+  // Macro / Central Bank
+  federal_reserve:     "https://images.unsplash.com/photo-1621264448270-9ef00e88a935?w=1200&q=80", // Federal Reserve building
+  fed_macro:           "https://images.unsplash.com/photo-1621264448270-9ef00e88a935?w=1200&q=80",
+  inflation:           "https://images.unsplash.com/photo-1553729459-afe8f2e2b300?w=1200&q=80", // Shopping cart / consumer prices
+  gdp:                 "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80", // Economic data / growth charts
+  employment:          "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80", // Handshake / hiring
+  bond_market:         "https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1200&q=80", // Treasury bonds / yields
+
+  // Markets
+  broad_market:        "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80", // Trading screens
+  earnings:            "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80", // Business meeting / earnings
+  merger_acquisition:  "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200&q=80", // Corporate deal / signing
+  ipo:                 "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1200&q=80", // Stock exchange bell
+  bankruptcy:          "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80", // Courthouse / legal
+  layoffs:             "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=80", // Corporate building
+
+  // Sector-Specific
+  energy:              "https://images.unsplash.com/photo-1513828583688-c52646db42da?w=1200&q=80", // Oil refinery
+  crypto:              "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80", // Bitcoin
+  commodities:         "https://images.unsplash.com/photo-1610375461246-83df859d849d?w=1200&q=80", // Gold bars
+  currency:            "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=1200&q=80", // Currency exchange
+
+  // Policy / Geopolitics
+  trade_policy:        "https://images.unsplash.com/photo-1494412574643-ff11b0a5eb19?w=1200&q=80", // Shipping containers
+  trade_policy_tariff: "https://images.unsplash.com/photo-1494412574643-ff11b0a5eb19?w=1200&q=80",
+  geopolitics:         "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=1200&q=80", // Globe / world map
+};
+
+/** Category fallback: used when no topic-level or patch image matches */
 export const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
   macro:    "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",
   earnings: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",
@@ -246,9 +280,12 @@ export function applyArticlePatches(item: NewsItem): NewsItem {
     }
   }
 
-  // Category fallback if still no image
+  // Image fallback chain: topic-specific → category-level → default macro
   if (!patched.imageUrl) {
-    patched.imageUrl = CATEGORY_FALLBACK_IMAGES[patched.category] ?? CATEGORY_FALLBACK_IMAGES.macro;
+    patched.imageUrl =
+      TOPIC_FALLBACK_IMAGES[patched.topicKey ?? ""] ??
+      CATEGORY_FALLBACK_IMAGES[patched.category] ??
+      CATEGORY_FALLBACK_IMAGES.macro;
   }
 
   // Normalize all percentage changes to 2 decimal places (e.g. "-1.4297%" → "-1.43%")

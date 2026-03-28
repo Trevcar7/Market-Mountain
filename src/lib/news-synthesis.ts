@@ -31,8 +31,8 @@ const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   fed_macro:      "federal reserve building washington dc monetary policy exterior",
   // Inflation: CPI/BLS data context — NOT the Fed building (to avoid duplicate with federal_reserve)
   inflation:      "consumer price index inflation economic statistics bureau data",
-  gdp:            "wall street new york city aerial skyline financial district",
-  employment:     "american corporate office workers white collar employment hiring",
+  gdp:            "economic growth chart data analysis financial report quarterly",
+  employment:     "job fair hiring recruitment corporate employment workforce",
   trade_policy:   "cargo shipping containers port united states trade logistics",
   broad_market:   "new york stock exchange wall street trading floor finance",
   crypto:         "bitcoin cryptocurrency digital trading screen blockchain",
@@ -41,7 +41,7 @@ const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   bond_market:    "us treasury bonds government securities fixed income finance",
   // Energy: explicitly oil infrastructure — NOT wind turbines or solar panels
   energy:         "crude oil refinery petroleum offshore drilling platform infrastructure",
-  earnings:       "quarterly earnings financial results stock market data screen",
+  earnings:       "corporate earnings quarterly report financial statements business",
   layoffs:        "corporate downsizing workforce reduction office empty desk",
   ipo:            "stock market listing nasdaq new york exchange bell ringing",
   trade_policy_tariff: "us customs border trade tariff shipping containers port",
@@ -53,7 +53,7 @@ const TOPIC_IMAGE_QUERIES: Record<string, string> = {
   nvidia:            "nvidia gpu chip artificial intelligence data center green technology",
 };
 
-const DEFAULT_IMAGE_QUERY = "wall street financial markets stock exchange data";
+const DEFAULT_IMAGE_QUERY = "financial markets stock exchange trading institutional";
 
 /**
  * Hardcoded fallback Unsplash URLs — used when UNSPLASH_ACCESS_KEY is not set or API fails.
