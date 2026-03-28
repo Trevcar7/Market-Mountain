@@ -17,6 +17,8 @@ export interface TrackRecordPick {
   coverageStatus: "active" | "target-hit" | "closed";
   /** Optional note explaining coverage status (e.g., "Target reached May 2025") */
   coverageNote?: string;
+  /** Date when price target was hit (YYYY-MM-DD) — used for closed picks to lock in returns */
+  targetHitDate?: string;
   /** Days since publication */
   holdingDays: number;
   currentPrice?: number;
@@ -60,6 +62,7 @@ export function extractPicks(): TrackRecordPick[] {
       targetHitConfirmed: a.targetHit === true,
       coverageStatus: a.coverageStatus ?? (a.targetHit ? "target-hit" : "active"),
       coverageNote: a.coverageNote ?? undefined,
+      targetHitDate: a.targetHitDate ?? undefined,
       holdingDays: Math.floor((Date.now() - new Date(a.date).getTime()) / 86400000),
       targetReturn: ((a.priceTarget - a.priceAtPublish) / a.priceAtPublish) * 100,
     }));

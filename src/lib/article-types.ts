@@ -19,6 +19,7 @@ export interface ArticleMeta {
   targetHit?: boolean;             // Manually confirmed: did the stock reach the price target?
   coverageStatus?: "active" | "target-hit" | "closed";  // Track record status
   coverageNote?: string;           // e.g., "Target reached May 2025. Coverage ended."
+  targetHitDate?: string;          // YYYY-MM-DD when price target was reached (for closed/target-hit picks)
   disclosure?: string;            // Conflict of interest disclosure
 }
 

@@ -51,6 +51,7 @@ export function getArticleMeta(slug: string): ArticleMeta | null {
     targetHit: data.targetHit ?? undefined,
     coverageStatus: data.coverageStatus ?? undefined,
     coverageNote: data.coverageNote ?? undefined,
+    targetHitDate: data.targetHitDate ?? undefined,
     disclosure: data.disclosure ?? undefined,
   };
 }
@@ -82,6 +83,7 @@ export function getArticle(slug: string): Article | null {
     targetHit: data.targetHit ?? undefined,
     coverageStatus: data.coverageStatus ?? undefined,
     coverageNote: data.coverageNote ?? undefined,
+    targetHitDate: data.targetHitDate ?? undefined,
     disclosure: data.disclosure ?? undefined,
     content: cleaned,
   };

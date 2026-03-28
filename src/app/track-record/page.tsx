@@ -57,13 +57,21 @@ export default async function TrackRecordPage() {
   const hasLiveData = priceMap.size > 1; // at least 1 pick + SPY
 
   // Enrich with live data
+  // For CLOSED picks: use thesis return (entry → target price), not live price
+  // For ACTIVE/TARGET-HIT picks: use live return (entry → current price)
   const enrichedPicks = picks.map((pick) => {
     const currentPrice = priceMap.get(pick.ticker);
-    const returnPct = currentPrice
-      ? ((currentPrice - pick.priceAtPublish) / pick.priceAtPublish) * 100
-      : null;
+    const isClosed = pick.coverageStatus === "closed";
+
+    // Closed picks lock in the thesis return; active picks use live
+    const returnPct = isClosed
+      ? pick.targetReturn ?? null
+      : currentPrice
+        ? ((currentPrice - pick.priceAtPublish) / pick.priceAtPublish) * 100
+        : null;
+
     const hitTarget = pick.targetHitConfirmed || (currentPrice ? currentPrice >= pick.priceTarget : false);
-    return { ...pick, currentPrice, returnPct, hitTarget };
+    return { ...pick, currentPrice: isClosed ? pick.priceTarget : currentPrice, returnPct, hitTarget };
   });
 
   // Aggregate stats
@@ -79,9 +87,14 @@ export default async function TrackRecordPage() {
       : 0;
 
   // Portfolio value: $1K per pick
+  // Closed picks: use thesis return (entry → target). Active: use live price.
   const investmentPerPick = 1000;
   const totalInvested = enrichedPicks.length * investmentPerPick;
   const portfolioValue = enrichedPicks.reduce((sum, p) => {
+    if (p.coverageStatus === "closed") {
+      // Closed: lock in at price target
+      return sum + investmentPerPick * (p.priceTarget / p.priceAtPublish);
+    }
     const growth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
     return sum + investmentPerPick * growth;
   }, 0);
@@ -107,24 +120,37 @@ export default async function TrackRecordPage() {
         spyPriceMap.set(spyHistory.labels[i], spyHistory.values[i]);
       }
 
-      // For each pick, find SPY price on/near entry date → calculate what $1K in SPY would be worth
-      spyPortfolioValue = enrichedPicks.reduce((sum, pick) => {
-        const entryDate = pick.date;
-        // Find closest SPY price to entry date (within 5 trading days)
-        let spyEntryPrice: number | null = null;
+      // Helper: find SPY price on/near a date
+      function findSpyPrice(targetDate: string): number | null {
         for (let offset = 0; offset <= 5; offset++) {
-          const checkDate = new Date(new Date(entryDate).getTime() + offset * 86400000)
-            .toISOString().split("T")[0];
-          const checkDateBack = new Date(new Date(entryDate).getTime() - offset * 86400000)
-            .toISOString().split("T")[0];
-          if (spyPriceMap.has(checkDate)) { spyEntryPrice = spyPriceMap.get(checkDate)!; break; }
-          if (spyPriceMap.has(checkDateBack)) { spyEntryPrice = spyPriceMap.get(checkDateBack)!; break; }
+          const fwd = new Date(new Date(targetDate).getTime() + offset * 86400000).toISOString().split("T")[0];
+          const bwd = new Date(new Date(targetDate).getTime() - offset * 86400000).toISOString().split("T")[0];
+          if (spyPriceMap.has(fwd)) return spyPriceMap.get(fwd)!;
+          if (spyPriceMap.has(bwd)) return spyPriceMap.get(bwd)!;
         }
-        if (spyEntryPrice && spyPrice) {
-          const spyGrowth = spyPrice / spyEntryPrice;
-          return sum + investmentPerPick * spyGrowth;
+        return null;
+      }
+
+      // For each pick, calculate what $1K in SPY would have returned over the SAME period
+      // Closed picks: entry date → target hit date (not today)
+      // Active picks: entry date → today
+      spyPortfolioValue = enrichedPicks.reduce((sum, pick) => {
+        const spyEntryPrice = findSpyPrice(pick.date);
+        if (!spyEntryPrice) return sum + investmentPerPick;
+
+        let spyExitPrice: number | null;
+        if (pick.coverageStatus === "closed" && pick.targetHitDate) {
+          // Closed: SPY return over entry → target hit date
+          spyExitPrice = findSpyPrice(pick.targetHitDate);
+        } else {
+          // Active/target-hit: SPY return over entry → today
+          spyExitPrice = spyPrice;
         }
-        return sum + investmentPerPick; // No SPY data for this date — assume flat
+
+        if (spyExitPrice) {
+          return sum + investmentPerPick * (spyExitPrice / spyEntryPrice);
+        }
+        return sum + investmentPerPick;
       }, 0);
       spyDataAvailable = true;
     }
@@ -237,7 +263,7 @@ export default async function TrackRecordPage() {
         <section className="mx-auto max-w-4xl px-4 sm:px-6 mt-6">
           <div className="bg-card rounded-xl border border-border shadow-sm p-5 sm:p-6">
             <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-4">
-              Live Returns by Pick
+              Returns by Pick
             </h2>
             <div className="space-y-3">
               {enrichedPicks.map((pick) => {
@@ -302,7 +328,11 @@ export default async function TrackRecordPage() {
                     <div className="flex items-center gap-2 ml-auto text-[11px] text-text-light">
                       <span>{formatDateShort(pick.date)}</span>
                       <span className="text-border">|</span>
-                      <span>{formatHoldingPeriod(pick.holdingDays)} held</span>
+                      <span>
+                        {pick.coverageStatus === "closed" && pick.targetHitDate
+                          ? `${formatHoldingPeriod(Math.floor((new Date(pick.targetHitDate).getTime() - new Date(pick.date).getTime()) / 86400000))} to target`
+                          : `${formatHoldingPeriod(pick.holdingDays)} held`}
+                      </span>
                     </div>
                   </div>
                   <p className="text-sm font-medium text-text line-clamp-1">{pick.title}</p>
