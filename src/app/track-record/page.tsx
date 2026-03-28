@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { extractPicks } from "@/lib/track-record";
-import { fetchFmpQuote } from "@/lib/market-data";
+import { fetchFmpQuote, fetchFmpStockHistory } from "@/lib/market-data";
 
 export const revalidate = 300; // ISR: 5 min
 
@@ -86,14 +86,56 @@ export default async function TrackRecordPage() {
     return sum + investmentPerPick * growth;
   }, 0);
 
-  // S&P 500 benchmark: what would $3K in SPY have returned over the avg holding period?
-  // Simple approximation: SPY averages ~10% annual return
+  // S&P 500 benchmark: actual SPY return over each pick's holding period
+  // Fetch SPY historical prices to find the price on each pick's entry date
+  let spyPortfolioValue = 0;
+  let spyDataAvailable = false;
   const avgHoldingDays = enrichedPicks.length > 0
     ? enrichedPicks.reduce((sum, p) => sum + p.holdingDays, 0) / enrichedPicks.length
     : 0;
-  const spyAnnualReturn = 0.10; // ~10% long-term avg
-  const spyEstReturn = ((1 + spyAnnualReturn) ** (avgHoldingDays / 365) - 1) * 100;
-  const spyPortfolioValue = totalInvested * (1 + spyEstReturn / 100);
+
+  if (spyPrice && hasLiveData) {
+    // Get SPY historical data covering all pick dates
+    const oldestPick = enrichedPicks.reduce((oldest, p) =>
+      p.holdingDays > oldest.holdingDays ? p : oldest, enrichedPicks[0]);
+    const spyHistory = await fetchFmpStockHistory("SPY", oldestPick.holdingDays + 30);
+
+    if (spyHistory && spyHistory.labels.length > 0) {
+      // Build date→price map from SPY history
+      const spyPriceMap = new Map<string, number>();
+      for (let i = 0; i < spyHistory.labels.length; i++) {
+        spyPriceMap.set(spyHistory.labels[i], spyHistory.values[i]);
+      }
+
+      // For each pick, find SPY price on/near entry date → calculate what $1K in SPY would be worth
+      spyPortfolioValue = enrichedPicks.reduce((sum, pick) => {
+        const entryDate = pick.date;
+        // Find closest SPY price to entry date (within 5 trading days)
+        let spyEntryPrice: number | null = null;
+        for (let offset = 0; offset <= 5; offset++) {
+          const checkDate = new Date(new Date(entryDate).getTime() + offset * 86400000)
+            .toISOString().split("T")[0];
+          const checkDateBack = new Date(new Date(entryDate).getTime() - offset * 86400000)
+            .toISOString().split("T")[0];
+          if (spyPriceMap.has(checkDate)) { spyEntryPrice = spyPriceMap.get(checkDate)!; break; }
+          if (spyPriceMap.has(checkDateBack)) { spyEntryPrice = spyPriceMap.get(checkDateBack)!; break; }
+        }
+        if (spyEntryPrice && spyPrice) {
+          const spyGrowth = spyPrice / spyEntryPrice;
+          return sum + investmentPerPick * spyGrowth;
+        }
+        return sum + investmentPerPick; // No SPY data for this date — assume flat
+      }, 0);
+      spyDataAvailable = true;
+    }
+  }
+
+  // Fallback: estimate if historical data unavailable
+  if (!spyDataAvailable) {
+    const spyAnnualReturn = 0.10;
+    const spyEstReturn = ((1 + spyAnnualReturn) ** (avgHoldingDays / 365) - 1) * 100;
+    spyPortfolioValue = totalInvested * (1 + spyEstReturn / 100);
+  }
 
   const activePicks = enrichedPicks.filter((p) => p.coverageStatus === "active").length;
   const closedPicks = enrichedPicks.filter((p) => p.coverageStatus === "closed").length;
@@ -155,10 +197,12 @@ export default async function TrackRecordPage() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="text-center sm:text-left">
                   <p className="text-[10px] font-bold tracking-widest uppercase text-text-light">
-                    Portfolio vs. S&P 500 Benchmark
+                    Portfolio vs. S&P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ${totalInvested.toLocaleString()} invested ($1K per pick) over avg {formatHoldingPeriod(Math.round(avgHoldingDays))}
+                    ${totalInvested.toLocaleString()} invested ($1K per pick){spyDataAvailable
+                      ? " — SPY returns matched to each pick\u2019s entry date"
+                      : ` over avg ${formatHoldingPeriod(Math.round(avgHoldingDays))}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
@@ -337,8 +381,8 @@ export default async function TrackRecordPage() {
             <strong className="text-text">Thesis Return</strong> represents the upside from entry price to published price target —
             this is the research call as published. <strong className="text-text">Live Return</strong> shows the actual return from
             entry to current market price, updated every 5 minutes. &ldquo;Target Hit&rdquo; is confirmed when the stock reaches
-            the price target at any point after publication. &ldquo;Closed&rdquo; means coverage has ended. S&amp;P 500 benchmark
-            assumes 10% annualized return over the same holding period. Past performance does not guarantee future results.
+            the price target at any point after publication. &ldquo;Closed&rdquo; means coverage has ended. The S&amp;P 500 benchmark uses actual SPY closing prices on each pick&apos;s publication date,
+            comparing to the current SPY price over the same holding period. Past performance does not guarantee future results.
           </p>
         </div>
       </section>
