@@ -55,14 +55,15 @@ export default async function TrackRecordPage() {
     const returnPct = currentPrice
       ? ((currentPrice - pick.priceAtPublish) / pick.priceAtPublish) * 100
       : null;
-    const hitTarget = currentPrice ? currentPrice >= pick.priceTarget : null;
+    // hitTarget: use confirmed frontmatter flag, OR live price check as fallback
+    const hitTarget = pick.targetHitConfirmed || (currentPrice ? currentPrice >= pick.priceTarget : false);
     return { ...pick, currentPrice, returnPct, hitTarget };
   });
 
   // Aggregate stats
-  const withReturns = enrichedPicks.filter((p) => p.returnPct !== null);
-  const winners = withReturns.filter((p) => (p.returnPct ?? 0) > 0);
-  const targetHits = withReturns.filter((p) => p.hitTarget);
+  const withReturns = enrichedPicks.filter((p) => p.returnPct !== null || p.targetHitConfirmed);
+  const winners = withReturns.filter((p) => (p.returnPct ?? 0) > 0 || p.targetHitConfirmed);
+  const targetHits = enrichedPicks.filter((p) => p.hitTarget);
   const avgReturn =
     withReturns.length > 0
       ? withReturns.reduce((sum, p) => sum + (p.returnPct ?? 0), 0) / withReturns.length
@@ -87,16 +88,16 @@ export default async function TrackRecordPage() {
       </section>
 
       {/* Stats Cards */}
-      {withReturns.length > 0 && (
+      {enrichedPicks.length > 0 && (
         <section className="mx-auto max-w-4xl px-4 sm:px-6 -mt-8">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
-              <p className="text-2xl font-bold text-text">{withReturns.length}</p>
+              <p className="text-2xl font-bold text-text">{enrichedPicks.length}</p>
               <p className="text-xs text-text-muted mt-1">Total Picks</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className="text-2xl font-bold text-accent-600">
-                {Math.round((winners.length / withReturns.length) * 100)}%
+                {enrichedPicks.length > 0 ? Math.round((winners.length / enrichedPicks.length) * 100) : 0}%
               </p>
               <p className="text-xs text-text-muted mt-1">Win Rate</p>
             </div>
@@ -108,7 +109,7 @@ export default async function TrackRecordPage() {
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className="text-2xl font-bold text-accent-600">
-                {targetHits.length}/{withReturns.length}
+                {targetHits.length}/{enrichedPicks.length}
               </p>
               <p className="text-xs text-text-muted mt-1">Targets Hit</p>
             </div>
@@ -142,7 +143,7 @@ export default async function TrackRecordPage() {
             >
               {/* Stock info */}
               <div className="col-span-2 mb-2 sm:mb-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-bold text-text">{pick.ticker}</span>
                   <span
                     className={`text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded ${
@@ -151,6 +152,14 @@ export default async function TrackRecordPage() {
                   >
                     {ratingLabels[pick.rating] ?? pick.rating}
                   </span>
+                  {pick.hitTarget && (
+                    <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-accent-500 text-white flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      TARGET HIT
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-text-muted mt-0.5 line-clamp-1">{pick.title}</p>
                 <p className="text-[11px] text-text-light">{formatDate(pick.date)}</p>

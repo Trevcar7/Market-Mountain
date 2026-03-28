@@ -48,6 +48,7 @@ export function getArticleMeta(slug: string): ArticleMeta | null {
     priceTarget: data.priceTarget ?? undefined,
     priceAtPublish: data.priceAtPublish ?? undefined,
     rating: data.rating ?? undefined,
+    targetHit: data.targetHit ?? undefined,
     disclosure: data.disclosure ?? undefined,
   };
 }
@@ -76,6 +77,7 @@ export function getArticle(slug: string): Article | null {
     priceTarget: data.priceTarget ?? undefined,
     priceAtPublish: data.priceAtPublish ?? undefined,
     rating: data.rating ?? undefined,
+    targetHit: data.targetHit ?? undefined,
     disclosure: data.disclosure ?? undefined,
     content: cleaned,
   };

@@ -10,8 +10,13 @@ export function getResendClient(): Resend | null {
   return new Resend(apiKey);
 }
 
-/** The sender address for all Market Mountain emails. */
-export const EMAIL_FROM = "Market Mountain <briefing@marketmountainfinance.com>";
+/**
+ * The sender address for all Market Mountain emails.
+ * Set RESEND_FROM_EMAIL env var to override (e.g., for domain verification).
+ * Default: Resend onboarding address (works without domain verification for testing).
+ */
+export const EMAIL_FROM =
+  process.env.RESEND_FROM_EMAIL ?? "Market Mountain <onboarding@resend.dev>";
 
 /** Resend Audience ID for subscriber management. */
 export const AUDIENCE_ID = process.env.RESEND_AUDIENCE_ID ?? "";

@@ -16,6 +16,7 @@ export interface ArticleMeta {
   priceTarget?: number;           // Price target in dollars
   priceAtPublish?: number;        // Stock price when article was published
   rating?: "buy" | "hold" | "sell" | "neutral" | "watchlist";
+  targetHit?: boolean;             // Manually confirmed: did the stock reach the price target?
   disclosure?: string;            // Conflict of interest disclosure
 }
 

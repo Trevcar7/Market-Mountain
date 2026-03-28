@@ -10,6 +10,7 @@ ticker: "NXT"
 priceTarget: 70
 priceAtPublish: 50
 rating: "buy"
+targetHit: true
 ---
 
 ## Company Background and Competition

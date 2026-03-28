@@ -7,9 +7,10 @@ tags: ["Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/first-solar.png"
 ticker: "FSLR"
-priceTarget: 190
-priceAtPublish: 130
+priceTarget: 262
+priceAtPublish: 125
 rating: "buy"
+targetHit: true
 ---
 
 ## Company Background
