@@ -2227,14 +2227,19 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
     }
   }
 
-  // 3. Fallback if still nothing
-  if (events.length === 0) {
-    events.push({
-      event: "Next FOMC meeting",
-      timing: "Policy watch",
-      significance: "Rate decisions drive bond yields and rate-sensitive equity sectors.",
-      watchMetric: "Fed Funds futures pricing for next meeting",
-    });
+  // 3. Fallback: if no calendar events found, use the hardcoded FOMC schedule
+  if (events.length === 0 && nextFomc) {
+    // Only add if the FOMC event wasn't already added in step 0 (within 14 days)
+    const alreadyHasFomc = events.some((e) => e.event.includes("FOMC"));
+    if (!alreadyHasFomc) {
+      const daysUntil = Math.floor((new Date(nextFomc.start).getTime() - Date.now()) / 86400000);
+      events.push({
+        event: `Next FOMC Meeting: ${nextFomc.start.slice(5).replace("-", "/")}–${nextFomc.end.slice(8)}`,
+        timing: `${daysUntil} days away — Policy watch`,
+        significance: "Rate decisions and forward guidance set the tone for Treasury yields, equity valuations, and credit spreads.",
+        watchMetric: "Fed Funds futures; 2-Year Treasury yield; CME FedWatch probability",
+      });
+    }
   }
 
   return events;
