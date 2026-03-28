@@ -235,10 +235,9 @@ export default async function TrackRecordPage() {
 
         {/* Disclaimer */}
         <p className="text-xs text-text-light mt-6 leading-relaxed max-w-2xl">
-          Performance data is based on closing prices at the time of publication and live market
-          prices from Financial Modeling Prep. Past performance does not guarantee future results.
-          All investment research is for informational purposes only and does not constitute
-          financial advice.
+          Performance data is based on closing prices at the time of publication and live
+          market data. Past performance does not guarantee future results. All investment
+          research is for informational purposes only and does not constitute financial advice.
         </p>
       </section>
     </div>
