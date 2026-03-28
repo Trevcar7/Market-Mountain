@@ -43,6 +43,12 @@ export function getArticleMeta(slug: string): ArticleMeta | null {
     tags: data.tags ?? [],
     updated: data.updated ?? undefined,
     disclaimer: data.disclaimer ?? false,
+    // Research metadata
+    ticker: data.ticker ?? undefined,
+    priceTarget: data.priceTarget ?? undefined,
+    priceAtPublish: data.priceAtPublish ?? undefined,
+    rating: data.rating ?? undefined,
+    disclosure: data.disclosure ?? undefined,
   };
 }
 
@@ -66,6 +72,11 @@ export function getArticle(slug: string): Article | null {
     tags: data.tags ?? [],
     updated: data.updated ?? undefined,
     disclaimer: data.disclaimer ?? false,
+    ticker: data.ticker ?? undefined,
+    priceTarget: data.priceTarget ?? undefined,
+    priceAtPublish: data.priceAtPublish ?? undefined,
+    rating: data.rating ?? undefined,
+    disclosure: data.disclosure ?? undefined,
     content: cleaned,
   };
 }

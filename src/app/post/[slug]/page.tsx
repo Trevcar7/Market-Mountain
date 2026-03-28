@@ -231,6 +231,14 @@ export default async function ArticlePage({ params }: Props) {
           />
         </div>
 
+        {/* Conflict of Interest Disclosure */}
+        {article.disclosure && (
+          <div className="mt-10 p-4 sm:p-5 rounded-xl border-l-4 border-l-amber-500 border border-amber-200/50 bg-amber-50/50 text-sm leading-relaxed">
+            <strong className="text-amber-800 font-semibold">Disclosure: </strong>
+            <span className="text-amber-900/80">{article.disclosure}</span>
+          </div>
+        )}
+
         {/* Disclaimer */}
         {article.disclaimer !== false && (
           <div className={`mt-10 p-4 sm:p-5 rounded-xl text-text-muted text-sm leading-relaxed ${
