@@ -10,6 +10,13 @@ interface DCFConfig {
   baseCaseCol: number;
 }
 
+/** Publication dates for each variant — used in "as of" caption */
+const PUBLISH_DATES: Record<DCFVariant, string> = {
+  nextracker: "May 2025",
+  firstsolar: "Mar 2025",
+  sprouts: "Nov 2025",
+};
+
 const CONFIGS: Record<DCFVariant, DCFConfig> = {
   nextracker: {
     baseCaseValue: 67,
@@ -162,11 +169,11 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
       <div className="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
         <span>
           Base case:{" "}
-          <span className="font-semibold text-slate-600">
+          <span className="font-semibold text-text-muted">
             {cfg.waccValues[cfg.baseCaseCol]} WACC · {cfg.ltgrValues[cfg.baseCaseRow]} LTGR → ${cfg.baseCaseValue}/share
           </span>
         </span>
-        <span>Current price: ${cfg.currentPrice}</span>
+        <span>Price at publication: ${cfg.currentPrice} ({PUBLISH_DATES[variant]})</span>
       </div>
     </div>
   );

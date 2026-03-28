@@ -124,7 +124,7 @@ export default async function ArticlePage({ params }: Props) {
       {/* Article hero */}
       <div className="bg-navy-900 text-white">
         {article.coverImage && (
-          <div className="relative h-56 sm:h-72 md:h-96 overflow-hidden">
+          <div className="relative h-44 sm:h-56 md:h-72 overflow-hidden">
             <Image
               src={article.coverImage}
               alt={article.title}
@@ -138,7 +138,7 @@ export default async function ArticlePage({ params }: Props) {
           </div>
         )}
 
-        <div className="mx-auto max-w-[680px] px-4 sm:px-6 py-12 sm:py-18 md:py-22">
+        <div className="mx-auto max-w-[680px] px-4 sm:px-6 py-8 sm:py-12 md:py-14">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-[11px] text-white/35 mb-5" aria-label="Breadcrumb">
             <Link href="/" className="hover:text-white/60 transition-colors">Home</Link>

@@ -148,23 +148,23 @@ body {
   font-size: 1.125rem;
 }
 
+/* Editorial typography — WSJ/Barron's standard: ~17px, tighter leading */
 .prose p,
 .prose li {
-  line-height: 1.75;
-  font-size: 1.125rem;
+  line-height: 1.7;
+  font-size: 1.0625rem; /* 17px — denser than blog-standard 18px */
 }
 
 @media (min-width: 640px) {
   .prose p,
   .prose li {
-    line-height: 1.8;
+    line-height: 1.72;
   }
 }
 
-
-/* Paragraph spacing — generous for financial analysis readability */
+/* Paragraph spacing — editorial standard (tighter than blog) */
 .prose p + p {
-  margin-top: 1.5em;
+  margin-top: 1.2em;
 }
 
 .prose h2 {

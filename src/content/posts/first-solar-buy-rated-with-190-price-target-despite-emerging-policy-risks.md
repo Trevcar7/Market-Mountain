@@ -16,6 +16,8 @@ coverageNote: "Price target of $262 reached October 2025. Coverage ended."
 targetHitDate: "2025-10-31"
 ---
 
+> **Update:** Price target upgraded from $190 to **$262** in May 2025 following a strong earnings beat and favorable trade developments. Target reached October 2025. Coverage now closed. [See full update →](/post/markets-march-higher-first-solar-breaks-190-pt-nextracker-beats-earnings-in-a-big-way)
+
 ## Company Background
 
 First Solar, a leading U.S. solar company based in Tempe, Arizona, was founded by Harold McMaster on **November 29, 1984**, and went public through an IPO in 2006. The company produces **thin-film photovoltaic solar panels**, fueled by a unique compound called cadmium telluride. These panels promise to be more energy efficient, scalable, and cheaper than traditional solar panels, which utilize crystalline silicon.

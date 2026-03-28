@@ -49,7 +49,7 @@ function PreferencesContent() {
                     Lead story, key data, and what to watch — every trading day at 8 AM ET
                   </p>
                 </div>
-                <div className="w-10 h-6 bg-accent-500 rounded-full relative cursor-default" title="Active">
+                <div className="w-10 h-6 bg-accent-500 rounded-full relative" role="switch" aria-checked="true" aria-label="Daily Markets Briefing enabled">
                   <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow" />
                 </div>
               </div>
@@ -61,7 +61,7 @@ function PreferencesContent() {
                     New equity research and price target updates
                   </p>
                 </div>
-                <div className="w-10 h-6 bg-accent-500 rounded-full relative cursor-default" title="Active">
+                <div className="w-10 h-6 bg-accent-500 rounded-full relative" role="switch" aria-checked="true" aria-label="Research Alerts enabled">
                   <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow" />
                 </div>
               </div>
