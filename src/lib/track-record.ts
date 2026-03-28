@@ -6,11 +6,15 @@ export interface TrackRecordPick {
   title: string;
   slug: string;
   date: string;
+  excerpt: string;
+  tags: string[];
   priceTarget: number;
   priceAtPublish: number;
   rating: string;
   /** Manually confirmed from frontmatter — did the stock reach the price target? */
   targetHitConfirmed: boolean;
+  /** Days since publication */
+  holdingDays: number;
   currentPrice?: number;
   returnSincePublish?: number;    // % return from publish price to current
   targetReturn?: number;           // % return from publish price to target
@@ -44,10 +48,13 @@ export function extractPicks(): TrackRecordPick[] {
       title: a.title,
       slug: a.slug,
       date: a.date,
+      excerpt: a.excerpt,
+      tags: a.tags ?? [],
       priceTarget: a.priceTarget,
       priceAtPublish: a.priceAtPublish,
       rating: a.rating,
       targetHitConfirmed: a.targetHit === true,
+      holdingDays: Math.floor((Date.now() - new Date(a.date).getTime()) / 86400000),
       targetReturn: ((a.priceTarget - a.priceAtPublish) / a.priceAtPublish) * 100,
     }));
 }
