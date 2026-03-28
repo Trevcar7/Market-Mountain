@@ -342,6 +342,10 @@ async function generateBriefing(
   // ── Fetch upcoming macro calendar events FIRST so Claude can prioritize them ──
   // This is the critical fix: Claude must see real scheduled macro events
   // (FOMC, CPI, NFP, etc.) to generate proper "What to Watch" items.
+  // Store FULL calendar events (with significance + watchMetric) for use as
+  // high-quality dynamic replacements. Also build a simplified version for
+  // the Claude prompt context.
+  let calendarWatchItems: Array<{ event: string; timing: string; significance: string; watchMetric?: string }> = [];
   let upcomingMacroEvents: Array<{
     event: string;
     date: string;
@@ -349,8 +353,8 @@ async function generateBriefing(
     previous?: number | null;
   }> = [];
   try {
-    const calendarEvents = await fetchBriefingWhatToWatch();
-    upcomingMacroEvents = calendarEvents.map((e) => ({
+    calendarWatchItems = await fetchBriefingWhatToWatch();
+    upcomingMacroEvents = calendarWatchItems.map((e) => ({
       event: e.event,
       date: e.timing.replace("Upcoming economic data — ", ""),
       estimate: null,
@@ -595,26 +599,40 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     }
   }
 
-  // Safety net fillers — pad to exactly 3 items.
-  // Each filler covers a DISTINCT macro category so replacements always add diversity.
-  const WATCH_FILLERS = [
+  // ── Build dynamic replacement pool from real calendar data + stories ──
+  // These are used when Claude's output needs padding or overlap replacement.
+  // Dynamic items have real dates and specific significance (not static boilerplate).
+  const replacementPool: Array<{ event: string; timing: string; significance: string; watchMetric?: string }> = [];
+
+  // 1. Calendar events — real upcoming macro releases with dates
+  for (const evt of calendarWatchItems) {
+    // Skip if already present in whatToWatch
+    if (whatToWatch.some((w) => w.event.toLowerCase().includes(evt.event.toLowerCase().split(" ")[0]))) continue;
+    replacementPool.push(evt);
+  }
+
+  // 2. Story-derived items — built from actual published story headlines
+  for (const story of stories.slice(0, 6)) {
+    const eventTitle = story.title.length > 80 ? story.title.substring(0, 77) + "..." : story.title;
+    // Skip if story headline already present
+    if (whatToWatch.some((w) => w.event.toLowerCase().includes(eventTitle.toLowerCase().substring(0, 20)))) continue;
+    replacementPool.push({
+      event: eventTitle,
+      timing: "Forward-looking signal",
+      significance: (story.whyThisMatters ?? extractLeadParagraph(story.story)).substring(0, 200),
+      watchMetric: story.marketImpact?.[0]
+        ? `${story.marketImpact[0].asset}: ${story.marketImpact[0].direction}`
+        : undefined,
+    });
+  }
+
+  // 3. Static fallbacks — only used if calendar and stories exhausted
+  const STATIC_FILLERS = [
     {
       event: "U.S. tariff and trade policy developments",
       timing: "Policy watch — ongoing",
       significance: "Tariff announcements directly impact import costs, corporate margins, and sector rotation between domestic producers and importers.",
       watchMetric: "USD/CNY; tariff-exposed sector ETFs; container shipping rates",
-    },
-    {
-      event: "Upcoming inflation data (CPI/PCE)",
-      timing: "Upcoming economic data",
-      significance: "Core inflation prints drive Fed rate expectations, moving Treasury yields, mortgage rates, and rate-sensitive equity sectors.",
-      watchMetric: "Core CPI MoM vs. 0.3% consensus; 10-Year breakeven inflation rate",
-    },
-    {
-      event: "U.S. labor market data",
-      timing: "Upcoming economic data",
-      significance: "Non-farm payrolls, unemployment rate, and wage growth influence Fed rate timing and consumer spending trajectory.",
-      watchMetric: "NFP vs. consensus; unemployment rate; average hourly earnings MoM",
     },
     {
       event: "Earnings season forward guidance",
@@ -623,9 +641,10 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
       watchMetric: "S&P 500 forward P/E ratio; earnings revision breadth",
     },
   ];
+  replacementPool.push(...STATIC_FILLERS);
 
   while (whatToWatch.length < 3) {
-    const filler = WATCH_FILLERS.find(
+    const filler = replacementPool.find(
       (f) => !whatToWatch.some((w) => w.event === f.event)
     );
     if (!filler) break;
@@ -718,52 +737,22 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
         for (const c of getItemClusters(whatToWatch[k])) keptClusters.add(c);
       }
 
-      // Try story-derived replacement first — build a watch item from an actual
-      // published story that covers a different theme cluster.
-      let replaced = false;
-      for (const story of stories) {
-        const storyText = `${story.title} ${story.whyThisMatters ?? ""} ${story.category}`.toLowerCase();
-        const storyClusters = new Set<string>();
-        for (const cluster of ENTITY_CLUSTERS) {
-          if (cluster.terms.some((term) => storyText.includes(term))) {
-            storyClusters.add(cluster.name);
-          }
+      // Search the dynamic replacement pool for a non-overlapping item
+      // (calendar events first, then story-derived, then static fallbacks)
+      const replacement = replacementPool.find((candidate) => {
+        // Skip if this candidate is already in whatToWatch
+        if (whatToWatch.some((w, idx) => idx !== weakerIdx && w.event === candidate.event)) return false;
+        // Skip if it overlaps with kept items
+        const fc = getItemClusters(candidate);
+        for (const c of fc) {
+          if (keptClusters.has(c)) return false;
         }
-        // Check that this story doesn't overlap with kept items
-        let overlapsKept = false;
-        for (const c of storyClusters) {
-          if (keptClusters.has(c)) { overlapsKept = true; break; }
-        }
-        if (overlapsKept || storyClusters.size === 0) continue;
+        return fc.size > 0 || true; // Allow items with no cluster match (unique topics)
+      });
 
-        // Build a watch item from this story
-        const eventTitle = story.title.length > 80 ? story.title.substring(0, 77) + "..." : story.title;
-        whatToWatch[weakerIdx] = {
-          event: eventTitle,
-          timing: "Forward-looking signal",
-          significance: (story.whyThisMatters ?? extractLeadParagraph(story.story)).substring(0, 200),
-          watchMetric: story.marketImpact?.[0]
-            ? `${story.marketImpact[0].asset}: ${story.marketImpact[0].direction}`
-            : undefined,
-        };
-        replaced = true;
-        console.log(`[briefing] Items ${i} and ${j} overlap — replaced item ${weakerIdx} with story: "${eventTitle}"`);
-        break;
-      }
-
-      // Fallback to WATCH_FILLERS if no story available
-      if (!replaced) {
-        const filler = WATCH_FILLERS.find((f) => {
-          const fc = getItemClusters(f);
-          for (const c of fc) {
-            if (keptClusters.has(c)) return false;
-          }
-          return true;
-        });
-        if (filler) {
-          whatToWatch[weakerIdx] = filler;
-          console.log(`[briefing] Items ${i} and ${j} overlap — replaced item ${weakerIdx} with filler: "${filler.event}"`);
-        }
+      if (replacement) {
+        console.log(`[briefing] Items ${i} and ${j} overlap — replacing "${whatToWatch[weakerIdx].event}" with "${replacement.event}"`);
+        whatToWatch[weakerIdx] = replacement;
       }
       break; // Fix one overlap per pass; re-entering would need a fresh scan
     }
