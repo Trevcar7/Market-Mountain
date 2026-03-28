@@ -163,7 +163,7 @@ export default async function TrackRecordPage() {
     spyPortfolioValue = totalInvested * (1 + spyEstReturn / 100);
   }
 
-  const activePicks = enrichedPicks.filter((p) => p.coverageStatus === "active").length;
+  const activePicks = enrichedPicks.filter((p) => p.coverageStatus !== "closed").length;
   const closedPicks = enrichedPicks.filter((p) => p.coverageStatus === "closed").length;
 
   return (
@@ -178,8 +178,7 @@ export default async function TrackRecordPage() {
             Track Record
           </h1>
           <p className="text-white/60 text-lg max-w-2xl leading-relaxed">
-            Every price target. Every pick. Two metrics per pick: the thesis return (what we predicted)
-            and the live return (what the stock is doing now). Full transparency.
+            Every price target. Every pick. Full transparency — no cherry-picking.
           </p>
         </div>
       </section>
@@ -190,12 +189,7 @@ export default async function TrackRecordPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className="text-2xl font-bold text-text">{enrichedPicks.length}</p>
-              <p className="text-xs text-text-muted mt-1">
-                Research Picks
-                <span className="block text-text-light">
-                  {activePicks} active{closedPicks > 0 ? `, ${closedPicks} closed` : ""}
-                </span>
-              </p>
+              <p className="text-xs text-text-muted mt-1">Picks</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className="text-2xl font-bold text-accent-600">
@@ -207,13 +201,13 @@ export default async function TrackRecordPage() {
               <p className="text-2xl font-bold text-accent-600">
                 +{avgTargetUpside.toFixed(0)}%
               </p>
-              <p className="text-xs text-text-muted mt-1">Avg Thesis Upside</p>
+              <p className="text-xs text-text-muted mt-1">Avg Target Upside</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className={`text-2xl font-bold ${avgReturn >= 0 ? "text-accent-600" : "text-red-500"}`}>
                 {hasLiveData ? `${avgReturn >= 0 ? "+" : ""}${avgReturn.toFixed(1)}%` : "—"}
               </p>
-              <p className="text-xs text-text-muted mt-1">Avg Live Return</p>
+              <p className="text-xs text-text-muted mt-1">Avg Return</p>
             </div>
           </div>
 
@@ -226,9 +220,7 @@ export default async function TrackRecordPage() {
                     Portfolio vs. S&P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ${totalInvested.toLocaleString()} invested ($1K per pick){spyDataAvailable
-                      ? " — SPY returns matched to each pick\u2019s entry date"
-                      : ` over avg ${formatHoldingPeriod(Math.round(avgHoldingDays))}`}
+                    ${totalInvested.toLocaleString()} invested ($1K per pick)
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
@@ -239,7 +231,7 @@ export default async function TrackRecordPage() {
                     <p className={`text-[10px] font-semibold ${portfolioValue >= totalInvested ? "text-accent-600" : "text-red-500"}`}>
                       {portfolioValue >= totalInvested ? "+" : ""}{(((portfolioValue - totalInvested) / totalInvested) * 100).toFixed(1)}%
                     </p>
-                    <p className="text-[10px] text-text-muted">Our Picks</p>
+                    <p className="text-[10px] text-text-muted">My Picks</p>
                   </div>
                   <div className="text-text-light text-xs">vs</div>
                   <div className="text-center">
@@ -258,42 +250,40 @@ export default async function TrackRecordPage() {
         </section>
       )}
 
-      {/* Performance Bars */}
-      {hasLiveData && enrichedPicks.length > 0 && (
-        <section className="mx-auto max-w-4xl px-4 sm:px-6 mt-6">
-          <div className="bg-card rounded-xl border border-border shadow-sm p-5 sm:p-6">
-            <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-4">
-              Returns by Pick
-            </h2>
-            <div className="space-y-3">
-              {enrichedPicks.map((pick) => {
-                const pct = pick.returnPct ?? 0;
-                const maxReturn = Math.max(...enrichedPicks.map((p) => Math.abs(p.returnPct ?? 0)), 1);
-                const barWidth = Math.min(100, (Math.abs(pct) / maxReturn) * 100);
-                return (
-                  <div key={pick.ticker} className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 w-24 shrink-0">
-                      <span className="text-sm font-bold text-text">{pick.ticker}</span>
-                      <span className={`text-[9px] font-semibold tracking-wider uppercase px-1 py-0.5 rounded ${statusColors[pick.coverageStatus]}`}>
-                        {pick.coverageStatus === "closed" ? "C" : pick.coverageStatus === "target-hit" ? "✓" : "•"}
+      {/* Performance Bars — active picks only */}
+      {(() => {
+        const activeBars = enrichedPicks.filter((p) => p.coverageStatus !== "closed");
+        return hasLiveData && activeBars.length > 0 && (
+          <section className="mx-auto max-w-4xl px-4 sm:px-6 mt-6">
+            <div className="bg-card rounded-xl border border-border shadow-sm p-5 sm:p-6">
+              <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-4">
+                Active Picks — Current Prices
+              </h2>
+              <div className="space-y-3">
+                {activeBars.map((pick) => {
+                  const pct = pick.returnPct ?? 0;
+                  const maxReturn = Math.max(...activeBars.map((p) => Math.abs(p.returnPct ?? 0)), 1);
+                  const barWidth = Math.min(100, (Math.abs(pct) / maxReturn) * 100);
+                  return (
+                    <div key={pick.ticker} className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-text w-12 shrink-0">{pick.ticker}</span>
+                      <div className="flex-1 h-6 bg-surface-2 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${pct >= 0 ? "bg-accent-500" : "bg-red-500"}`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                      <span className={`text-sm font-bold w-16 text-right shrink-0 ${pct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                        {pick.returnPct !== null ? `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` : "—"}
                       </span>
                     </div>
-                    <div className="flex-1 h-6 bg-surface-2 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${pct >= 0 ? "bg-accent-500" : "bg-red-500"}`}
-                        style={{ width: `${barWidth}%` }}
-                      />
-                    </div>
-                    <span className={`text-sm font-bold w-16 text-right shrink-0 ${pct >= 0 ? "text-accent-600" : "text-red-500"}`}>
-                      {pick.returnPct !== null ? `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` : "—"}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        );
+      })()}
 
       {/* All Research Picks */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-10 sm:py-14">
@@ -343,7 +333,7 @@ export default async function TrackRecordPage() {
                 <div className="px-5 py-3 grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">
-                      Thesis Return
+                      Price Target
                     </p>
                     <p className="text-lg font-bold text-accent-600">
                       +{targetUpside.toFixed(0)}%
@@ -355,7 +345,7 @@ export default async function TrackRecordPage() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">
-                      Live Return
+                      Current Price
                     </p>
                     {pick.returnPct !== null ? (
                       <>
@@ -414,11 +404,10 @@ export default async function TrackRecordPage() {
             How We Track Performance
           </h3>
           <p className="text-xs text-text-muted leading-relaxed">
-            <strong className="text-text">Thesis Return</strong> represents the upside from entry price to published price target —
-            this is the research call as published. <strong className="text-text">Live Return</strong> shows the actual return from
-            entry to current market price, updated every 5 minutes. &ldquo;Target Hit&rdquo; is confirmed when the stock reaches
-            the price target at any point after publication. &ldquo;Closed&rdquo; means coverage has ended. The S&amp;P 500 benchmark uses actual SPY closing prices on each pick&apos;s publication date,
-            comparing to the current SPY price over the same holding period. Past performance does not guarantee future results.
+            Entry prices are the closing price on publication date. <strong className="text-text">Price Target</strong> is the
+            published valuation target. <strong className="text-text">Current Price</strong> updates every 5 minutes from live market data.
+            Closed picks lock in the return at the price target. The S&amp;P 500 benchmark uses actual SPY prices
+            over each pick&apos;s holding period. Past performance does not guarantee future results.
           </p>
         </div>
       </section>
