@@ -437,6 +437,8 @@ STYLE RULES:
 WHAT TO WATCH RULES:
 - ABSOLUTE PRIORITY: Use the UPCOMING MACRO CALENDAR events below as the first 1-2 "whatToWatch" items. These are real scheduled economic releases — they MUST take precedence over story-derived themes.
 - PRIORITY ORDER: (1) FOMC meetings, CPI, PCE, Non-Farm Payrolls, GDP — these are the events that MOVE markets (2) geopolitical events with clear market impact (tariffs, sanctions, supply disruptions) (3) mega-cap earnings ($100B+ market cap) ONLY if no macro events are upcoming
+- CRITICAL DIVERSITY RULE: Each of the 3 whatToWatch items MUST cover a DIFFERENT macro category. NEVER have two items about the same topic. For example: DO NOT have two items about the Fed/FOMC/rates. DO NOT have two items about inflation/CPI/PCE. Each item should be a distinct theme: e.g., (1) upcoming FOMC decision, (2) oil prices / energy supply, (3) trade policy / tariffs — or similar variety. If you only have one calendar event, fill the remaining 2 slots with DIFFERENT story-derived macro themes from today's news.
+- TIMING ACCURACY: Use the EXACT dates from the UPCOMING MACRO CALENDAR. Do NOT say "this week" or "next week" unless the event is actually within 7 days. If an event is 14+ days away, say "on [date]" or "[X] days away". NEVER guess timing.
 - Each item MUST answer: "What specific event? When exactly? What price/rate level matters? What happens if it beats/misses?"
 - Do NOT use: "markets reacted", "investors are watching", "remains to be seen", "this highlights", "in today's environment"
 - Do NOT generate vague themes — every item must reference a specific event, date, or data release
@@ -588,6 +590,121 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
 
   // Hard cap at 3
   whatToWatch = whatToWatch.slice(0, 3);
+
+  // ── Post-processing: fix FOMC timing hallucinations ──
+  // Claude may say "this week" or "next week" for FOMC when it's actually 30+ days away.
+  // Replace with the actual date from the hardcoded calendar.
+  if (nextFomc) {
+    const daysToFomc = Math.floor((new Date(nextFomc.start).getTime() - Date.now()) / 86400000);
+    const fomcDateLabel = `${nextFomc.start} to ${nextFomc.end}`;
+    const fomcMonth = new Date(nextFomc.start + "T12:00:00Z").toLocaleString("en-US", { month: "long" });
+    const fomcShortLabel = `${fomcMonth} ${parseInt(nextFomc.start.slice(8), 10)}–${parseInt(nextFomc.end.slice(8), 10)}`;
+
+    for (const item of whatToWatch) {
+      const itemText = `${item.event} ${item.significance ?? ""} ${item.timing ?? ""}`;
+      const isFomcItem = /fomc|federal open market|fed\s+meeting|rate\s+decision/i.test(itemText);
+      if (!isFomcItem) continue;
+
+      // Fix "this week" / "next week" when FOMC is >7 days away
+      if (daysToFomc > 7) {
+        item.event = item.event.replace(/\b(this|next)\s+week(?:'s)?\b/gi, fomcShortLabel);
+        if (item.significance) {
+          item.significance = item.significance.replace(/\b(this|next)\s+week(?:'s)?\b/gi, `on ${fomcShortLabel}`);
+        }
+      }
+
+      // Ensure timing field includes actual date, not just a vague label
+      if (item.timing && !/\d{4}/.test(item.timing) && !/\d+\s+days?\s+away/i.test(item.timing)) {
+        item.timing = `${daysToFomc} days away — ${fomcDateLabel}`;
+      }
+    }
+  }
+
+  // ── Post-processing: enforce topic diversity ──
+  // Classify items by macro theme. If 2+ items share the same theme,
+  // keep the most detailed one and replace the duplicate with an alternative.
+  const THEME_PATTERNS: Array<[string, RegExp]> = [
+    ["fed_rates", /fomc|federal reserve|fed\s+meeting|rate\s+(decision|cut|hike)|fed\s+funds|monetary\s+policy/i],
+    ["inflation", /\bcpi\b|\bpce\b|\binflation\b|\bppi\b|\bprice\s+index/i],
+    ["employment", /\bnon-?farm\b|\bpayroll\b|\bjobs?\s+(report|data|growth)\b|\bunemployment\b|\bjobless\b/i],
+    ["oil_energy", /\boil\b|\bcrude\b|\bwti\b|\bbrent\b|\benergy\b|\bopec\b|\bgas\s+price/i],
+    ["trade_tariffs", /\btariff\b|\btrade\s+(war|policy|deal)\b|\bsanctions?\b|\bimport\s+dut/i],
+    ["gdp_growth", /\bgdp\b|\brecession\b|\bism\b|\bpmi\b/i],
+    ["earnings", /\bearnings\b|\brevenue\b|\bguidance\b|\bquarter\s+results/i],
+    ["treasury", /\btreasury\b|\byield\s+curve\b|\b10-?year\b|\bbond\s+auction/i],
+  ];
+
+  function classifyWatchTheme(item: { event: string; significance?: string }): string {
+    const text = `${item.event} ${item.significance ?? ""}`;
+    for (const [theme, pattern] of THEME_PATTERNS) {
+      if (pattern.test(text)) return theme;
+    }
+    return `unique_${whatToWatch.indexOf(item as typeof whatToWatch[0])}`;
+  }
+
+  const itemThemeMap = whatToWatch.map((item) => ({
+    item,
+    theme: classifyWatchTheme(item),
+  }));
+
+  // Find duplicate themes
+  const themeCounts = new Map<string, number>();
+  for (const { theme } of itemThemeMap) {
+    themeCounts.set(theme, (themeCounts.get(theme) ?? 0) + 1);
+  }
+
+  for (const [dupTheme, themeCount] of themeCounts.entries()) {
+    if (themeCount <= 1) continue;
+
+    // Keep the item with the longest significance (most detailed)
+    const dupes = itemThemeMap
+      .filter((t) => t.theme === dupTheme)
+      .sort((a, b) => (b.item.significance?.length ?? 0) - (a.item.significance?.length ?? 0));
+
+    // Replace weaker duplicate(s) with alternatives
+    for (let i = 1; i < dupes.length; i++) {
+      const idx = whatToWatch.indexOf(dupes[i].item);
+      if (idx === -1) continue;
+
+      const usedThemes = new Set(whatToWatch.map((w) => classifyWatchTheme(w)));
+
+      // Try geo themes first — ongoing geopolitical events are high quality alternatives
+      let replaced = false;
+      for (const geoDesc of activeGeoThemes) {
+        const geoTheme = classifyWatchTheme({ event: geoDesc, significance: geoDesc });
+        if (usedThemes.has(geoTheme)) continue;
+
+        // Parse geo description: "Label: description — monitor X"
+        const colonIdx = geoDesc.indexOf(":");
+        const eventLabel = colonIdx > 0 ? geoDesc.substring(0, colonIdx).trim() : geoDesc.substring(0, 60);
+        const descPart = colonIdx > 0 ? geoDesc.substring(colonIdx + 1).trim() : "";
+        const monitorMatch = descPart.match(/monitor\s+(.+)/i);
+
+        whatToWatch[idx] = {
+          event: eventLabel,
+          timing: "Ongoing — monitor key levels",
+          significance: descPart.replace(/\s*—\s*monitor\s+.+$/i, "").trim() || geoDesc.substring(0, 150),
+          watchMetric: monitorMatch?.[1] ?? undefined,
+        };
+        replaced = true;
+        console.log(`[briefing] Replaced duplicate "${dupTheme}" watch item with geo theme: ${eventLabel}`);
+        break;
+      }
+
+      // Fallback to WATCH_FILLERS
+      if (!replaced) {
+        const fillerThemes = WATCH_FILLERS.map((f) => ({
+          filler: f,
+          theme: classifyWatchTheme(f),
+        }));
+        const unusedFiller = fillerThemes.find((ft) => !usedThemes.has(ft.theme));
+        if (unusedFiller) {
+          whatToWatch[idx] = unusedFiller.filler;
+          console.log(`[briefing] Replaced duplicate "${dupTheme}" watch item with filler: ${unusedFiller.filler.event}`);
+        }
+      }
+    }
+  }
 
   const briefing: DailyBriefing = {
     date,
