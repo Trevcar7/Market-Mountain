@@ -34,7 +34,7 @@ function SearchResults() {
         setResults(data.results ?? []);
         setTotal(data.total ?? 0);
       })
-      .catch(() => setResults([]))
+      .catch(() => { setResults([]); setTotal(0); })
       .finally(() => setLoading(false));
   }, [query]);
 

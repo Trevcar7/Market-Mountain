@@ -47,6 +47,7 @@ export default async function TickerPage({ params }: Props) {
             n.relatedTickers?.some((t) => t.toUpperCase() === ticker) ||
             n.title.toUpperCase().includes(ticker)
         )
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
         .slice(0, 10);
     } catch {
       // Non-fatal
