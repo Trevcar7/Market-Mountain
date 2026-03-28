@@ -152,12 +152,12 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
 
       {/* Body */}
       <div className="flex flex-col flex-1 p-4 sm:p-5">
-        <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-700 bg-accent-100 px-2 py-0.5 rounded mb-2.5 w-fit">
+        <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-600 bg-accent-500/10 px-2 py-0.5 rounded mb-2.5 w-fit">
           {categoryLabel}
         </span>
 
         <h3
-          className="text-navy-900 text-[1.05rem] font-bold leading-snug mb-1.5 group-hover:text-navy-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3 font-playfair"
+          className="text-text text-[1.05rem] font-bold leading-snug mb-1.5 group-hover:text-accent-600 transition-colors duration-150 line-clamp-2 sm:line-clamp-3 font-playfair"
         >
           {news.title}
         </h3>

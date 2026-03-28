@@ -19,7 +19,7 @@ export default function ArticlesPage() {
           Research & Analysis
         </p>
         <h1
-          className="text-3xl sm:text-4xl font-bold text-navy-900 mb-3 font-playfair"
+          className="text-3xl sm:text-4xl font-bold text-text mb-3 font-playfair"
         >
           All Articles
         </h1>

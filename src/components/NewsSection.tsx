@@ -210,7 +210,7 @@ export default function NewsSection({
               className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
                 category === "all"
                   ? "bg-accent-500 text-white"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  : "bg-surface-2 text-text hover:bg-border"
               }`}
             >
               All
@@ -224,7 +224,7 @@ export default function NewsSection({
                 className={`px-3 py-1.5 text-sm font-medium rounded transition-colors capitalize ${
                   category === cat
                     ? "bg-accent-500 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    : "bg-surface-2 text-text hover:bg-border"
                 }`}
               >
                 {cat}
@@ -237,7 +237,7 @@ export default function NewsSection({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="px-3 py-1.5 text-sm border border-slate-300 rounded bg-white text-slate-700 hover:border-slate-400"
+            className="px-3 py-1.5 text-sm border border-border rounded bg-card text-text hover:border-border-2"
           >
             <option value="recent">Most Recent</option>
             <option value="importance">Most Important</option>
@@ -250,17 +250,17 @@ export default function NewsSection({
       {loading && (
         <>
           <div className="mb-6 sm:mb-8">
-            <div className="animate-pulse rounded-xl bg-navy-900/10 h-[360px] w-full" />
+            <div className="animate-pulse rounded-xl bg-border h-[360px] w-full" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="animate-pulse rounded-lg border border-border overflow-hidden">
-                <div className="bg-slate-200 aspect-video w-full" />
+                <div className="bg-border aspect-video w-full" />
                 <div className="p-5 space-y-3">
-                  <div className="h-2 bg-slate-200 rounded w-16" />
-                  <div className="h-4 bg-slate-200 rounded w-full" />
-                  <div className="h-4 bg-slate-200 rounded w-3/4" />
-                  <div className="h-3 bg-slate-100 rounded w-1/2 mt-4" />
+                  <div className="h-2 bg-border rounded w-16" />
+                  <div className="h-4 bg-border rounded w-full" />
+                  <div className="h-4 bg-border rounded w-3/4" />
+                  <div className="h-3 bg-surface-2 rounded w-1/2 mt-4" />
                 </div>
               </div>
             ))}
@@ -269,14 +269,14 @@ export default function NewsSection({
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-500">
           <p className="font-semibold">Error loading news</p>
           <p className="text-sm mt-1">{error}</p>
         </div>
       )}
 
       {!loading && !error && filtered.length === 0 && (
-        <div className="text-center py-12 text-slate-600">
+        <div className="text-center py-12 text-text-muted">
           <p className="text-lg">No news articles found</p>
           <p className="text-sm mt-1">Check back soon for market updates</p>
         </div>

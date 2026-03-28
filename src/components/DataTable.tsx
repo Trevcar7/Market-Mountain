@@ -25,7 +25,7 @@ function cellCls(type: CellType, isHeader: boolean): string {
     case "hi":     return "bg-emerald-50 text-emerald-700 font-semibold";
     case "pos":    return "text-emerald-600 font-semibold";
     case "neg":    return "text-red-500";
-    case "muted":  return "text-slate-400";
+    case "muted":  return "text-text-light";
     default:       return "";
   }
 }
@@ -131,9 +131,9 @@ const MARKET_SHARE = [
 
 function StandardTable({ cfg }: { cfg: TableConfig }) {
   return (
-    <div className="not-prose my-8 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
-        <p className="text-sm font-semibold text-slate-800">{cfg.title}</p>
+    <div className="not-prose my-8 rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 bg-surface-2 border-b border-border">
+        <p className="text-sm font-semibold text-text">{cfg.title}</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
@@ -142,7 +142,7 @@ function StandardTable({ cfg }: { cfg: TableConfig }) {
               {cfg.headers.map((cell, ci) => (
                 <th
                   key={ci}
-                  className={`px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap border-b border-slate-200 ${cellCls(getType(cell), true)}`}
+                  className={`px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap border-b border-border ${cellCls(getType(cell), true)}`}
                 >
                   {getText(cell)}
                 </th>
@@ -151,12 +151,12 @@ function StandardTable({ cfg }: { cfg: TableConfig }) {
           </thead>
           <tbody>
             {cfg.rows.map((row, ri) => (
-              <tr key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-slate-50/60"}>
+              <tr key={ri} className={ri % 2 === 0 ? "bg-card" : "bg-surface-2/60"}>
                 {row.map((cell, ci) => (
                   <td
                     key={ci}
-                    className={`px-4 py-3 border-b border-slate-100 whitespace-nowrap tabular-nums ${
-                      ci === 0 ? "font-medium text-slate-700" : "text-center"
+                    className={`px-4 py-3 border-b border-border whitespace-nowrap tabular-nums ${
+                      ci === 0 ? "font-medium text-text" : "text-center"
                     } ${cellCls(getType(cell), false)}`}
                   >
                     {getText(cell)}
@@ -168,7 +168,7 @@ function StandardTable({ cfg }: { cfg: TableConfig }) {
         </table>
       </div>
       {cfg.caption && (
-        <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-400">
+        <div className="bg-surface-2 border-t border-border px-5 py-2.5 text-[11px] text-text-light">
           {cfg.caption}
         </div>
       )}
@@ -179,23 +179,23 @@ function StandardTable({ cfg }: { cfg: TableConfig }) {
 function MarketShareTable() {
   const max = MARKET_SHARE[0].pct;
   return (
-    <div className="not-prose my-8 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
-        <p className="text-sm font-semibold text-slate-800">
+    <div className="not-prose my-8 rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 bg-surface-2 border-b border-border">
+        <p className="text-sm font-semibold text-text">
           Global PV Tracker Market Share by Shipments, 2023
         </p>
       </div>
-      <div className="bg-white divide-y divide-slate-100">
+      <div className="bg-card divide-y divide-border">
         {MARKET_SHARE.map((item, i) => (
           <div key={i} className="flex items-center gap-3 px-5 py-2.5">
             <span
               className={`text-xs font-medium w-28 flex-shrink-0 ${
-                item.highlight ? "text-emerald-700 font-semibold" : "text-slate-600"
+                item.highlight ? "text-emerald-700 font-semibold" : "text-text-muted"
               }`}
             >
               {item.name}
             </span>
-            <div className="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="flex-1 h-5 bg-surface-2 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -206,7 +206,7 @@ function MarketShareTable() {
             </div>
             <span
               className={`text-xs font-semibold tabular-nums w-8 text-right flex-shrink-0 ${
-                item.highlight ? "text-emerald-700" : "text-slate-500"
+                item.highlight ? "text-emerald-700" : "text-text-muted"
               }`}
             >
               {item.pct}%
@@ -214,7 +214,7 @@ function MarketShareTable() {
           </div>
         ))}
       </div>
-      <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-400">
+      <div className="bg-surface-2 border-t border-border px-5 py-2.5 text-[11px] text-text-light">
         Total global shipments: 92 GW. Source: Wood Mackenzie.
       </div>
     </div>

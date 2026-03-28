@@ -29,7 +29,7 @@ export default function AboutPage() {
             />
           </div>
           <h1
-            className="text-3xl sm:text-4xl font-bold text-navy-900 font-playfair"
+            className="text-3xl sm:text-4xl font-bold text-text font-playfair"
           >
             Trevor Carnovsky
           </h1>
@@ -125,7 +125,7 @@ export default function AboutPage() {
           href="https://www.linkedin.com/in/trevor-carnovsky/"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border hover:border-navy-300 text-text-muted hover:text-navy-900 font-medium text-sm transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border hover:border-accent-400 text-text-muted hover:text-text font-medium text-sm transition-colors"
           aria-label="Trevor Carnovsky on LinkedIn"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

@@ -109,7 +109,7 @@ export default async function BriefingPage() {
           {/* Lead Story */}
           <section>
             <div className="flex items-center gap-3 mb-5">
-              <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-accent-600 bg-accent-100 px-2.5 py-1 rounded">
+              <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-accent-600 bg-accent-500/15 px-2.5 py-1 rounded">
                 Lead Story
               </span>
               <div className="flex-1 h-px bg-border" />
@@ -155,7 +155,7 @@ export default async function BriefingPage() {
               {briefing.topDevelopments.length > 0 && (
                 <section>
                   <div className="flex items-center gap-3 mb-5">
-                    <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-navy-600 bg-slate-100 px-2.5 py-1 rounded">
+                    <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-text-muted bg-surface-2 px-2.5 py-1 rounded">
                       Top Developments
                     </span>
                     <div className="flex-1 h-px bg-border" />
@@ -166,7 +166,7 @@ export default async function BriefingPage() {
                       <Link
                         key={dev.id}
                         href={`/news/${dev.id}`}
-                        className="group flex gap-4 p-4 rounded-lg border border-border hover:border-navy-200 hover:bg-white hover:shadow-sm transition-all duration-200"
+                        className="group flex gap-4 p-4 rounded-lg border border-border hover:border-border hover:bg-card hover:shadow-sm transition-all duration-200"
                       >
                         <div className="shrink-0 w-1 rounded-full bg-accent-500 self-stretch" />
                         <div className="min-w-0">
@@ -178,7 +178,7 @@ export default async function BriefingPage() {
                             </span>
                           </div>
                           <h3
-                            className="text-navy-900 font-semibold text-[0.95rem] leading-snug mb-1.5 group-hover:text-navy-600 transition-colors font-playfair"
+                            className="text-text font-semibold text-[0.95rem] leading-snug mb-1.5 group-hover:text-text-muted transition-colors font-playfair"
                           >
                             {dev.headline}
                           </h3>
@@ -196,7 +196,7 @@ export default async function BriefingPage() {
               {briefing.whatToWatch.length > 0 && (
                 <section>
                   <div className="flex items-center gap-3 mb-5">
-                    <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-navy-600 bg-slate-100 px-2.5 py-1 rounded">
+                    <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-text-muted bg-surface-2 px-2.5 py-1 rounded">
                       What to Watch
                     </span>
                     <div className="flex-1 h-px bg-border" />
@@ -204,16 +204,16 @@ export default async function BriefingPage() {
 
                   <div className="space-y-3">
                     {briefing.whatToWatch.map((item, i) => (
-                      <div key={i} className="p-4 rounded-lg bg-white border border-border">
+                      <div key={i} className="p-4 rounded-lg bg-card border border-border">
                         <div className="flex items-start gap-3 mb-2">
                           <span className="shrink-0 text-[11px] font-bold text-accent-600 tabular-nums w-5 text-right mt-0.5 leading-snug">
                             {i + 1}.
                           </span>
                           <div className="min-w-0">
-                            <h4 className="font-semibold text-navy-900 text-sm leading-snug">
+                            <h4 className="font-semibold text-text text-sm leading-snug">
                               {item.event}
                             </h4>
-                            <span className="inline-block mt-1 text-[9px] font-semibold tracking-wider uppercase text-navy-500 bg-navy-50 px-2 py-0.5 rounded">
+                            <span className="inline-block mt-1 text-[9px] font-semibold tracking-wider uppercase text-text-muted bg-surface-2 px-2 py-0.5 rounded">
                               {item.timing}
                             </span>
                           </div>
@@ -222,7 +222,7 @@ export default async function BriefingPage() {
                           {item.significance}
                         </p>
                         {(item as { watchMetric?: string }).watchMetric && (
-                          <p className="ml-9 mt-2 text-[11px] font-semibold text-navy-700 tabular-nums">
+                          <p className="ml-9 mt-2 text-[11px] font-semibold text-text-muted tabular-nums">
                             <span className="text-accent-600">Watch:</span>{" "}
                             {(item as { watchMetric?: string }).watchMetric}
                           </p>
@@ -267,13 +267,13 @@ function NoBriefingState() {
   return (
     <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-16 sm:py-24">
       {/* Main empty state card */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         {/* Top accent bar */}
         <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
         <div className="px-8 sm:px-12 py-12 sm:py-16 text-center">
           {/* Icon */}
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-navy-50 mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 mb-6">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
               <rect x="3" y="18" width="5" height="9" rx="1" fill="currentColor" className="text-navy-300" />
               <rect x="11" y="12" width="5" height="15" rx="1" fill="currentColor" className="text-navy-500" />
@@ -283,7 +283,7 @@ function NoBriefingState() {
           </div>
 
           <h2
-            className="text-2xl sm:text-3xl font-bold text-navy-900 mb-3 font-playfair"
+            className="text-2xl sm:text-3xl font-bold text-text mb-3 font-playfair"
           >
             Today&apos;s briefing is on its way
           </h2>
@@ -307,7 +307,7 @@ function NoBriefingState() {
             </Link>
             <Link
               href="/articles"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-border hover:border-navy-300 text-text-muted hover:text-navy-900 text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-border hover:border-accent-400 text-text-muted hover:text-text text-sm font-medium transition-colors"
             >
               Read research articles
             </Link>
@@ -315,7 +315,7 @@ function NoBriefingState() {
         </div>
 
         {/* What to expect section */}
-        <div className="border-t border-border bg-navy-50 px-8 sm:px-12 py-8">
+        <div className="border-t border-border bg-surface-2 px-8 sm:px-12 py-8">
           <p className="text-[10px] font-semibold tracking-widest uppercase text-text-light mb-5 text-center">
             What&apos;s in the daily briefing
           </p>
@@ -326,7 +326,7 @@ function NoBriefingState() {
               { label: "What to Watch", desc: "Forward-looking events and signals to monitor" },
             ].map((item) => (
               <div key={item.label} className="text-center">
-                <p className="text-xs font-semibold text-navy-900 mb-1">{item.label}</p>
+                <p className="text-xs font-semibold text-text mb-1">{item.label}</p>
                 <p className="text-xs text-text-muted leading-relaxed">{item.desc}</p>
               </div>
             ))}

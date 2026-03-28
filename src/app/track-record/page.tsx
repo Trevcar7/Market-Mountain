@@ -12,11 +12,11 @@ export const metadata: Metadata = {
 };
 
 const ratingColors: Record<string, string> = {
-  buy: "bg-accent-100 text-accent-700",
-  hold: "bg-amber-100 text-amber-700",
-  sell: "bg-red-100 text-red-700",
-  watchlist: "bg-navy-100 text-navy-600",
-  neutral: "bg-slate-100 text-slate-600",
+  buy: "bg-accent-500/15 text-accent-600",
+  hold: "bg-amber-500/15 text-amber-600",
+  sell: "bg-red-500/15 text-red-500",
+  watchlist: "bg-navy-500/15 text-navy-300",
+  neutral: "bg-surface-2 text-text-muted",
 };
 
 const ratingLabels: Record<string, string> = {

@@ -72,8 +72,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 function MarketImpactBox({ items }: { items: MarketImpactItem[] }) {
   return (
-    <div className="mt-8 p-5 rounded-lg bg-navy-50 border border-border">
-      <p className="text-[10px] font-bold tracking-widest uppercase text-navy-600 mb-3">
+    <div className="mt-8 p-5 rounded-lg bg-surface-2 border border-border">
+      <p className="text-[10px] font-bold tracking-widest uppercase text-text-muted mb-3">
         Market Impact
       </p>
       <div className="flex flex-wrap gap-3">
@@ -82,10 +82,10 @@ function MarketImpactBox({ items }: { items: MarketImpactItem[] }) {
             key={i}
             className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-semibold ${
               item.direction === "up"
-                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-700 dark:text-emerald-400"
                 : item.direction === "down"
-                ? "bg-red-50 border-red-200 text-red-700"
-                : "bg-slate-50 border-slate-200 text-slate-600"
+                ? "bg-red-500/10 border-red-500/25 text-red-700 dark:text-red-400"
+                : "bg-surface-2 border-border text-text-muted"
             }`}
           >
             <span className="font-bold tabular-nums tracking-wide">{item.asset}</span>
@@ -347,7 +347,7 @@ export default async function NewsStoryPage({ params }: Props) {
               <React.Fragment key={i}>
                 {/* Render ## headings as styled <h2> section dividers */}
                 {isHeading ? (
-                  <h2 className="text-lg font-bold text-navy-900 mt-8 mb-3 font-playfair tracking-tight">
+                  <h2 className="text-lg font-bold text-text mt-8 mb-3 font-playfair tracking-tight">
                     {para.slice(3)}
                   </h2>
                 ) : isBlockquote ? (
@@ -359,15 +359,15 @@ export default async function NewsStoryPage({ params }: Props) {
                   </blockquote>
                 ) : isFirstTextPara ? (
                   /* Lead paragraph — slightly larger for editorial weight */
-                  <p className="text-base leading-relaxed text-navy-800 font-medium">{para}</p>
+                  <p className="text-base leading-relaxed text-text font-medium">{para}</p>
                 ) : (
                   <p>{para}</p>
                 )}
 
                 {/* Pull quote — visual break for longer articles without inline images */}
                 {pullQuote && pullQuoteAfterParagraph === i && (
-                  <div className={`not-prose my-8 py-4 pl-5 border-l-3 ${accentBorder} bg-slate-50 rounded-r-lg`}>
-                    <p className="text-base font-medium text-navy-900 leading-relaxed italic">
+                  <div className={`not-prose my-8 py-4 pl-5 border-l-3 ${accentBorder} bg-surface-2 rounded-r-lg`}>
+                    <p className="text-base font-medium text-text leading-relaxed italic">
                       &ldquo;{pullQuote}&rdquo;
                     </p>
                   </div>
@@ -411,7 +411,7 @@ export default async function NewsStoryPage({ params }: Props) {
               {item.relatedTickers.map((ticker) => (
                 <span
                   key={ticker}
-                  className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded text-xs font-mono font-semibold"
+                  className="px-2.5 py-1 bg-surface-2 text-text rounded text-xs font-mono font-semibold"
                 >
                   {ticker}
                 </span>
@@ -421,11 +421,11 @@ export default async function NewsStoryPage({ params }: Props) {
 
           {/* Second-order implication */}
           {item.secondOrderImplication && (
-            <div className="mt-8 p-5 rounded-lg bg-navy-50 border border-border">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-navy-600 mb-1.5">
+            <div className="mt-8 p-5 rounded-lg bg-surface-2 border border-border">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-text-muted mb-1.5">
                 Second-Order Implication
               </p>
-              <p className="text-navy-900 text-sm leading-relaxed">
+              <p className="text-text text-sm leading-relaxed">
                 {item.secondOrderImplication}
               </p>
             </div>
@@ -433,11 +433,11 @@ export default async function NewsStoryPage({ params }: Props) {
 
           {/* What to watch next */}
           {item.whatToWatchNext && (
-            <div className="mt-4 p-5 rounded-lg bg-accent-50 border border-accent-200">
+            <div className="mt-4 p-5 rounded-lg bg-accent-500/10 border border-accent-500/25">
               <p className="text-[10px] font-bold tracking-widest uppercase text-accent-700 mb-1.5">
                 What to Watch Next
               </p>
-              <p className="text-navy-900 text-sm leading-relaxed">{item.whatToWatchNext}</p>
+              <p className="text-text text-sm leading-relaxed">{item.whatToWatchNext}</p>
             </div>
           )}
 
@@ -462,8 +462,8 @@ export default async function NewsStoryPage({ params }: Props) {
                     rel="noopener noreferrer"
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors break-words min-w-0 max-w-full ${
                       isTier1
-                        ? "bg-accent-50 text-accent-700 hover:bg-accent-100"
-                        : "bg-surface-2 text-accent-700 hover:bg-border"
+                        ? "bg-accent-500/10 text-accent-600 hover:bg-accent-500/15"
+                        : "bg-surface-2 text-accent-600 hover:bg-border"
                     }`}
                   >
                     {badge}
@@ -495,7 +495,7 @@ export default async function NewsStoryPage({ params }: Props) {
             </Link>
             <Link
               href="/briefing"
-              className="text-sm font-medium text-text-muted hover:text-navy-900 transition-colors"
+              className="text-sm font-medium text-text-muted hover:text-text transition-colors"
             >
               Today&apos;s Briefing
             </Link>

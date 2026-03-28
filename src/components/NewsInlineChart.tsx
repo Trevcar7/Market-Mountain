@@ -173,7 +173,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   };
 
   const renderChartHeader = () => (
-    <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+    <div className="bg-slate-50 border-b border-border px-5 py-3">
       {chart.chartLabel && (
         <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
           {chart.chartLabel}
@@ -189,7 +189,7 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const renderChartFooter = () => {
     if (!chart.source && !chart.caption) return null;
     return (
-      <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 space-y-0.5">
+      <div className="bg-slate-50 border-t border-border px-5 py-2.5 space-y-0.5">
         {chart.caption && (
           <p className="text-xs text-slate-600 italic leading-relaxed">{chart.caption}</p>
         )}
@@ -205,9 +205,9 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     const legendY = H - 14;
 
     return (
-      <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <figure className="not-prose my-8 rounded-xl border border-border overflow-hidden shadow-sm">
         {renderChartHeader()}
-        <div className="bg-white px-4 py-4">
+        <div className="bg-card px-4 py-4">
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 280 }} aria-label={chart.title}>
             {renderGrid()}
             {renderRefLine()}
@@ -332,9 +332,9 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     const labelX = labelAnchor === "end" ? lastPt.x - 2 : lastPt.x;
 
     return (
-      <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <figure className="not-prose my-8 rounded-xl border border-border overflow-hidden shadow-sm">
         {renderChartHeader()}
-        <div className="bg-white px-4 py-4">
+        <div className="bg-card px-4 py-4">
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }} aria-label={chart.title}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -378,9 +378,9 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const zeroY = PADDING.top + toY(0);
 
   return (
-    <figure className="not-prose my-8 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+    <figure className="not-prose my-8 rounded-xl border border-border overflow-hidden shadow-sm">
       {renderChartHeader()}
-      <div className="bg-white px-4 py-4">
+      <div className="bg-card px-4 py-4">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }} aria-label={chart.title}>
           {renderGrid()}
 

@@ -91,7 +91,7 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
       </div>
 
       {/* Chart */}
-      <div className="bg-white px-6 pt-5 pb-3">
+      <div className="bg-card px-6 pt-5 pb-3">
         <div
           className="relative flex items-end gap-2 sm:gap-4"
           style={{ height: `${CHART_HEIGHT}px` }}

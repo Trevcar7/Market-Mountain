@@ -70,8 +70,8 @@ export default function Navbar() {
                         ? "text-white"
                         : "text-white/60 hover:text-white"
                       : active
-                      ? "text-navy-900"
-                      : "text-text-muted hover:text-navy-900"
+                      ? "text-text"
+                      : "text-text-muted hover:text-text"
                   }`}
                 >
                   {link.label}
@@ -98,7 +98,7 @@ export default function Navbar() {
               className={`flex flex-col justify-center items-center w-10 h-10 rounded-md gap-1.5 transition-colors ${
                 isHeroPage && !scrolled
                   ? "hover:bg-white/10"
-                  : "hover:bg-navy-50"
+                  : "hover:bg-surface-2"
               }`}
             onClick={() => setMenuOpen((o) => !o)}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -146,8 +146,8 @@ export default function Navbar() {
                       ? "bg-white/15 text-accent-400"
                       : "text-white/80 hover:bg-white/10 hover:text-white"
                     : active
-                    ? "bg-navy-50 text-navy-900"
-                    : "text-text-muted hover:bg-navy-50 hover:text-navy-900"
+                    ? "bg-surface-2 text-text"
+                    : "text-text-muted hover:bg-surface-2 hover:text-text"
                 }`}
               >
                 {link.label}
