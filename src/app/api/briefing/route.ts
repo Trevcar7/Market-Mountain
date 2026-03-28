@@ -537,162 +537,19 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     // Fall back to using existing story fields
   }
 
-  // Build "What to Watch" — ensure real macro calendar events take priority
-  let whatToWatch = generated?.whatToWatch ?? [];
+  // =====================================================================
+  // UNIFIED WHAT TO WATCH PIPELINE
+  // One clean flow: Claude output → cleanup → overlap-aware pad/replace
+  // =====================================================================
 
-  // Strip prompt-leak text from Claude's output (e.g., "(Story-derived ...)")
-  for (const item of whatToWatch) {
-    item.event = item.event.replace(PROMPT_LEAK_RE, "").trim();
-    if (item.significance) item.significance = item.significance.replace(PROMPT_LEAK_RE, "").trim();
-  }
-
-  // Post-processing: verify Claude actually used the macro calendar events.
-  // If Claude generated vague themes instead of real calendar events,
-  // replace the weakest items with actual FMP data.
-  if (upcomingMacroEvents.length > 0 && whatToWatch.length > 0) {
-    // Check which Claude items reference real calendar events
-    const calendarNames = upcomingMacroEvents.map((e) => e.event.toLowerCase());
-    const isCalendarItem = (item: { event: string }) =>
-      calendarNames.some((name) => item.event.toLowerCase().includes(name.split(" ")[0]));
-
-    const calendarItemCount = whatToWatch.filter(isCalendarItem).length;
-
-    // If Claude didn't include enough calendar events, inject them
-    if (calendarItemCount < Math.min(upcomingMacroEvents.length, 2)) {
-      try {
-        const fmpEvents = await fetchBriefingWhatToWatch();
-        // Replace from the back — keep Claude's best item (usually #1), replace #2 and #3
-        const keep = whatToWatch.filter(isCalendarItem);
-        const fill = fmpEvents.filter(
-          (f) => !keep.some((k) => k.event.toLowerCase().includes(f.event.toLowerCase().split(" ")[0]))
-        );
-        // Calendar events first, then Claude's items
-        whatToWatch = [...keep, ...fill, ...whatToWatch.filter((w) => !isCalendarItem(w))]
-          .slice(0, 3);
-      } catch {
-        // Non-fatal
-      }
-    }
-  }
-
-  // Dedup: remove duplicate FOMC items (Claude may generate one AND fallback may inject one)
-  const fomcItems = whatToWatch.filter((w) => /fomc|federal open market/i.test(w.event));
-  if (fomcItems.length > 1) {
-    // Keep the longest/most detailed FOMC item, remove the rest
-    const bestFomc = fomcItems.reduce((best, item) =>
-      item.significance.length > best.significance.length ? item : best
-    );
-    whatToWatch = whatToWatch.filter((w) => !(/fomc|federal open market/i.test(w.event)) || w === bestFomc);
-  }
-
-  // Fill remaining slots if Claude returned fewer than 3
-  if (whatToWatch.length < 3) {
-    try {
-      const fmpEvents = await fetchBriefingWhatToWatch();
-      // Filter out FOMC from fmpEvents if we already have one
-      const hasFomc = whatToWatch.some((w) => /fomc|federal open market/i.test(w.event));
-      const filtered = hasFomc ? fmpEvents.filter((e) => !/fomc|federal open market/i.test(e.event)) : fmpEvents;
-      const merged = [...whatToWatch, ...filtered].slice(0, 3);
-      whatToWatch = merged.length > 0 ? merged : whatToWatch;
-    } catch {
-      // Non-fatal
-    }
-  }
-
-  // ── Build dynamic replacement pool from real calendar data + stories ──
-  // These are used when Claude's output needs padding or overlap replacement.
-  // Dynamic items have real dates and specific significance (not static boilerplate).
-  const replacementPool: Array<{ event: string; timing: string; significance: string; watchMetric?: string }> = [];
-
-  // 1. Calendar events — real upcoming macro releases with dates
-  for (const evt of calendarWatchItems) {
-    // Skip if already present in whatToWatch
-    if (whatToWatch.some((w) => w.event.toLowerCase().includes(evt.event.toLowerCase().split(" ")[0]))) continue;
-    replacementPool.push(evt);
-  }
-
-  // 2. Story-derived items — built from actual published story headlines
-  for (const story of stories.slice(0, 6)) {
-    const eventTitle = story.title.length > 80 ? story.title.substring(0, 77) + "..." : story.title;
-    // Skip if story headline already present
-    if (whatToWatch.some((w) => w.event.toLowerCase().includes(eventTitle.toLowerCase().substring(0, 20)))) continue;
-    replacementPool.push({
-      event: eventTitle,
-      timing: "Forward-looking signal",
-      significance: (story.whyThisMatters ?? extractLeadParagraph(story.story)).substring(0, 200),
-      watchMetric: story.marketImpact?.[0]
-        ? `${story.marketImpact[0].asset}: ${story.marketImpact[0].direction}`
-        : undefined,
-    });
-  }
-
-  // 3. Static fallbacks — only used if calendar and stories exhausted
-  const STATIC_FILLERS = [
-    {
-      event: "U.S. tariff and trade policy developments",
-      timing: "Policy watch — ongoing",
-      significance: "Tariff announcements directly impact import costs, corporate margins, and sector rotation between domestic producers and importers.",
-      watchMetric: "USD/CNY; tariff-exposed sector ETFs; container shipping rates",
-    },
-    {
-      event: "Earnings season forward guidance",
-      timing: "Earnings season",
-      significance: "Management guidance and margin trends from mega-cap reports reveal whether current valuations can hold.",
-      watchMetric: "S&P 500 forward P/E ratio; earnings revision breadth",
-    },
-  ];
-  replacementPool.push(...STATIC_FILLERS);
-
-  while (whatToWatch.length < 3) {
-    const filler = replacementPool.find(
-      (f) => !whatToWatch.some((w) => w.event === f.event)
-    );
-    if (!filler) break;
-    whatToWatch.push(filler);
-  }
-
-  // Hard cap at 3
-  whatToWatch = whatToWatch.slice(0, 3);
-
-  // ── Post-processing: fix FOMC timing hallucinations ──
-  // Claude may say "this week" or "next week" for FOMC when it's actually 30+ days away.
-  // Replace with the actual date from the hardcoded calendar.
-  if (nextFomc) {
-    const daysToFomc = Math.floor((new Date(nextFomc.start).getTime() - Date.now()) / 86400000);
-    const fomcDateLabel = `${nextFomc.start} to ${nextFomc.end}`;
-    const fomcMonth = new Date(nextFomc.start + "T12:00:00Z").toLocaleString("en-US", { month: "long" });
-    const fomcShortLabel = `${fomcMonth} ${parseInt(nextFomc.start.slice(8), 10)}–${parseInt(nextFomc.end.slice(8), 10)}`;
-
-    for (const item of whatToWatch) {
-      const itemText = `${item.event} ${item.significance ?? ""} ${item.timing ?? ""}`;
-      const isFomcItem = /fomc|federal open market|fed\s+meeting|rate\s+decision/i.test(itemText);
-      if (!isFomcItem) continue;
-
-      // Fix "this week" / "next week" when FOMC is >7 days away
-      if (daysToFomc > 7) {
-        item.event = item.event.replace(/\b(this|next)\s+week(?:'s)?\b/gi, fomcShortLabel);
-        if (item.significance) {
-          item.significance = item.significance.replace(/\b(this|next)\s+week(?:'s)?\b/gi, `on ${fomcShortLabel}`);
-        }
-      }
-
-      // Ensure timing field includes actual date, not just a vague label
-      if (item.timing && !/\d{4}/.test(item.timing) && !/\d+\s+days?\s+away/i.test(item.timing)) {
-        item.timing = `${daysToFomc} days away — ${fomcDateLabel}`;
-      }
-    }
-  }
-
-  // ── Post-processing: enforce topic diversity via entity-cluster overlap ──
-  // The old theme-based classifier only picked ONE category per item, so two items
-  // about Iran/oil could be classified as different themes ("inflation" vs "oil_energy")
-  // and slip through. This approach groups related entities into clusters and checks
-  // whether any two items share a cluster — catching editorial overlap reliably.
+  // Entity clusters for overlap detection — groups related terms so that
+  // e.g. two items about FOMC are caught even if one says "Fed meeting"
+  // and the other says "rate decision".
   const ENTITY_CLUSTERS: Array<{ name: string; terms: string[] }> = [
-    { name: "fed_monetary", terms: ["fomc", "federal reserve", "fed meeting", "rate decision", "rate cut", "rate hike", "fed funds", "monetary policy", "powell"] },
+    { name: "fed_monetary", terms: ["fomc", "federal reserve", "fed meeting", "rate decision", "rate cut", "rate hike", "fed funds", "monetary policy", "powell", "federal open market"] },
     { name: "oil_iran_energy", terms: ["oil", "crude", "wti", "brent", "opec", "iran", "energy sector", "strait of hormuz", "middle east oil", "petroleum", "refinery"] },
     { name: "inflation_prices", terms: ["cpi", "pce", "inflation", "ppi", "consumer price", "price index"] },
-    { name: "trade_tariffs", terms: ["tariff", "trade war", "trade policy", "china trade", "import dut", "trade deal"] },
+    { name: "trade_tariffs", terms: ["tariff", "trade war", "trade policy", "china trade", "import dut", "trade deal", "sanctions"] },
     { name: "employment_labor", terms: ["non-farm", "nonfarm", "payroll", "unemployment", "jobless", "jobs report", "labor market"] },
     { name: "gdp_growth", terms: ["gdp", "recession", "economic growth", "ism ", "pmi "] },
     { name: "earnings", terms: ["earnings", "revenue", "guidance", "quarter results", "eps"] },
@@ -710,51 +567,126 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     return matched;
   }
 
-  function itemsOverlap(
-    a: { event: string; significance?: string; timing?: string },
-    b: { event: string; significance?: string; timing?: string },
+  /** Check if candidate overlaps with ANY existing item in the list */
+  function overlapsAnyExisting(
+    candidate: { event: string; significance?: string; timing?: string },
+    existing: Array<{ event: string; significance?: string; timing?: string }>,
   ): boolean {
-    const clustersA = getItemClusters(a);
-    const clustersB = getItemClusters(b);
-    for (const c of clustersA) {
-      if (clustersB.has(c)) return true;
+    const cc = getItemClusters(candidate);
+    if (cc.size === 0) return false; // Unique topic — no overlap possible
+    for (const item of existing) {
+      const ic = getItemClusters(item);
+      for (const c of cc) {
+        if (ic.has(c)) return true;
+      }
     }
     return false;
   }
 
-  // Pairwise overlap check — replace the weaker item in each overlapping pair
-  for (let i = 0; i < whatToWatch.length; i++) {
-    for (let j = i + 1; j < whatToWatch.length; j++) {
-      if (!itemsOverlap(whatToWatch[i], whatToWatch[j])) continue;
+  // Step 1: Start with Claude's output, strip prompt-leak text
+  let whatToWatch = generated?.whatToWatch ?? [];
+  for (const item of whatToWatch) {
+    item.event = item.event.replace(PROMPT_LEAK_RE, "").trim();
+    if (item.significance) item.significance = item.significance.replace(PROMPT_LEAK_RE, "").trim();
+  }
 
-      // Keep the item with longer significance (more detailed); replace the other
-      const weakerIdx = (whatToWatch[i].significance?.length ?? 0) >= (whatToWatch[j].significance?.length ?? 0) ? j : i;
+  // Step 2: Build the replacement pool (ordered by quality)
+  // Calendar events with real dates → story-derived → static fallbacks
+  const replacementPool: Array<{ event: string; timing: string; significance: string; watchMetric?: string }> = [];
 
-      // Collect clusters used by the items we're keeping
-      const keptClusters = new Set<string>();
-      for (let k = 0; k < whatToWatch.length; k++) {
-        if (k === weakerIdx) continue;
-        for (const c of getItemClusters(whatToWatch[k])) keptClusters.add(c);
+  for (const evt of calendarWatchItems) {
+    replacementPool.push(evt);
+  }
+  for (const story of stories.slice(0, 6)) {
+    const title = story.title.length > 80 ? story.title.substring(0, 77) + "..." : story.title;
+    // Trim significance at sentence boundary, not mid-word
+    const rawSig = story.whyThisMatters ?? extractLeadParagraph(story.story);
+    const sigSentences = rawSig.match(/[^.!?]+[.!?]+/g) ?? [rawSig];
+    let significance = "";
+    for (const s of sigSentences) {
+      if ((significance + s).length > 200) break;
+      significance += s;
+    }
+    if (!significance) significance = rawSig.substring(0, 200);
+
+    replacementPool.push({
+      event: title,
+      timing: "Forward-looking signal",
+      significance: significance.trim(),
+      watchMetric: story.marketImpact?.[0]
+        ? `${story.marketImpact[0].asset}: ${story.marketImpact[0].direction}`
+        : undefined,
+    });
+  }
+  replacementPool.push(
+    {
+      event: "U.S. tariff and trade policy developments",
+      timing: "Policy watch — ongoing",
+      significance: "Tariff announcements directly impact import costs, corporate margins, and sector rotation between domestic producers and importers.",
+      watchMetric: "USD/CNY; tariff-exposed sector ETFs; container shipping rates",
+    },
+    {
+      event: "Earnings season forward guidance",
+      timing: "Earnings season",
+      significance: "Management guidance and margin trends from mega-cap reports reveal whether current valuations can hold.",
+      watchMetric: "S&P 500 forward P/E ratio; earnings revision breadth",
+    },
+  );
+
+  // Step 3: Remove overlapping items from Claude's output (keep the better one)
+  // Run multiple passes to catch cascading overlaps (e.g., 3 FOMC items)
+  for (let pass = 0; pass < 2; pass++) {
+    let foundOverlap = false;
+    for (let i = 0; i < whatToWatch.length && !foundOverlap; i++) {
+      for (let j = i + 1; j < whatToWatch.length && !foundOverlap; j++) {
+        const ci = getItemClusters(whatToWatch[i]);
+        const cj = getItemClusters(whatToWatch[j]);
+        let overlap = false;
+        for (const c of ci) { if (cj.has(c)) { overlap = true; break; } }
+        if (!overlap) continue;
+
+        // Remove the weaker item (shorter significance)
+        const removeIdx = (whatToWatch[i].significance?.length ?? 0) >= (whatToWatch[j].significance?.length ?? 0) ? j : i;
+        console.log(`[briefing] Overlap detected: removing "${whatToWatch[removeIdx].event}"`);
+        whatToWatch.splice(removeIdx, 1);
+        foundOverlap = true;
       }
+    }
+    if (!foundOverlap) break;
+  }
 
-      // Search the dynamic replacement pool for a non-overlapping item
-      // (calendar events first, then story-derived, then static fallbacks)
-      const replacement = replacementPool.find((candidate) => {
-        // Skip if this candidate is already in whatToWatch
-        if (whatToWatch.some((w, idx) => idx !== weakerIdx && w.event === candidate.event)) return false;
-        // Skip if it overlaps with kept items
-        const fc = getItemClusters(candidate);
-        for (const c of fc) {
-          if (keptClusters.has(c)) return false;
+  // Step 4: Pad to exactly 3 items from the replacement pool (overlap-aware)
+  while (whatToWatch.length < 3) {
+    const candidate = replacementPool.find((c) =>
+      !whatToWatch.some((w) => w.event === c.event) && !overlapsAnyExisting(c, whatToWatch)
+    );
+    if (!candidate) break;
+    whatToWatch.push(candidate);
+  }
+
+  // Step 5: Hard cap at 3
+  whatToWatch = whatToWatch.slice(0, 3);
+
+  // Step 6: Fix FOMC timing hallucinations
+  if (nextFomc) {
+    const daysToFomc = Math.floor((new Date(nextFomc.start).getTime() - Date.now()) / 86400000);
+    const fomcDateLabel = `${nextFomc.start} to ${nextFomc.end}`;
+    const fomcMonth = new Date(nextFomc.start + "T12:00:00Z").toLocaleString("en-US", { month: "long" });
+    const fomcShortLabel = `${fomcMonth} ${parseInt(nextFomc.start.slice(8), 10)}–${parseInt(nextFomc.end.slice(8), 10)}`;
+
+    for (const item of whatToWatch) {
+      const itemText = `${item.event} ${item.significance ?? ""} ${item.timing ?? ""}`;
+      if (!/fomc|federal open market|fed\s+meeting|rate\s+decision/i.test(itemText)) continue;
+
+      if (daysToFomc > 7) {
+        item.event = item.event.replace(/\b(this|next)\s+week(?:'s)?\b/gi, fomcShortLabel);
+        if (item.significance) {
+          item.significance = item.significance.replace(/\b(this|next)\s+week(?:'s)?\b/gi, `on ${fomcShortLabel}`);
         }
-        return fc.size > 0 || true; // Allow items with no cluster match (unique topics)
-      });
-
-      if (replacement) {
-        console.log(`[briefing] Items ${i} and ${j} overlap — replacing "${whatToWatch[weakerIdx].event}" with "${replacement.event}"`);
-        whatToWatch[weakerIdx] = replacement;
       }
-      break; // Fix one overlap per pass; re-entering would need a fresh scan
+      if (item.timing && !/\d{4}/.test(item.timing) && !/\d+\s+days?\s+away/i.test(item.timing)) {
+        item.timing = `${daysToFomc} days away — ${fomcDateLabel}`;
+      }
     }
   }
 
