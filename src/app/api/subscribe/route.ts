@@ -57,12 +57,16 @@ export async function POST(request: Request) {
     // Send welcome email + add to Resend Audience (non-blocking)
     const resend = getResendClient();
     if (resend) {
+      console.log(`[/api/subscribe] Resend configured — sending welcome email to ${email} from ${EMAIL_FROM}`);
+
       // Add to Resend Audience for bulk sends
       if (AUDIENCE_ID) {
         resend.contacts.create({
           audienceId: AUDIENCE_ID,
           email,
           unsubscribed: false,
+        }).then(() => {
+          console.log(`[/api/subscribe] Added ${email} to Resend audience`);
         }).catch((err) => {
           console.warn("[/api/subscribe] Resend audience add failed:", err);
         });
@@ -74,9 +78,13 @@ export async function POST(request: Request) {
         to: email,
         subject: "Welcome to Market Mountain",
         react: WelcomeEmail(),
+      }).then((result) => {
+        console.log(`[/api/subscribe] Welcome email sent to ${email}:`, result);
       }).catch((err) => {
         console.warn("[/api/subscribe] Welcome email failed:", err);
       });
+    } else {
+      console.warn("[/api/subscribe] Resend NOT configured — RESEND_API_KEY missing, no welcome email sent");
     }
 
     return NextResponse.json({ success: true });
