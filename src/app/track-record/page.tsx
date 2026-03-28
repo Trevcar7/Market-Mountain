@@ -27,7 +27,7 @@ const ratingLabels: Record<string, string> = {
   neutral: "Neutral",
 };
 
-function formatDate(dateStr: string): string {
+function formatDateShort(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -154,7 +154,7 @@ export default async function TrackRecordPage() {
                         TARGET HIT
                       </span>
                     )}
-                    <span className="text-[11px] text-text-light ml-auto">{formatDate(pick.date)}</span>
+                    <span className="text-[11px] text-text-light ml-auto">{formatDateShort(pick.date)}</span>
                   </div>
                   <p className="text-sm text-text-muted line-clamp-1">{pick.title}</p>
                 </div>

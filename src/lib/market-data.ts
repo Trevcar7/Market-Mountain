@@ -670,31 +670,29 @@ export async function fetchFmpQuote(
   if (!process.env.FMP_API_KEY) return null;
 
   try {
-    // Try the stable quote-short endpoint first (works on most FMP plans)
-    const res = await fetch(
-      fmpUrl(`/stable/quote`, { symbol }),
-      { signal: withTimeout() }
-    );
-    if (res.ok) {
-      const data = await res.json();
+    // Try stable + v3 quote endpoints in parallel (both may fail on free tier)
+    const [stableRes, v3Res] = await Promise.allSettled([
+      fetch(fmpUrl(`/stable/quote`, { symbol }), { signal: withTimeout() }),
+      fetch(fmpUrl(`/api/v3/quote-short/${symbol}`), { signal: withTimeout() }),
+    ]);
+
+    // Check stable endpoint result
+    if (stableRes.status === "fulfilled" && stableRes.value.ok) {
+      const data = await stableRes.value.json();
       const quote = Array.isArray(data) ? data[0] : data;
       const price = quote?.price ?? quote?.close ?? quote?.previousClose ?? null;
       if (typeof price === "number" && price > 0) return price;
     }
 
-    // Fallback to v3 quote-short endpoint
-    const res2 = await fetch(
-      fmpUrl(`/api/v3/quote-short/${symbol}`),
-      { signal: withTimeout() }
-    );
-    if (res2.ok) {
-      const data2 = await res2.json();
+    // Check v3 quote-short result
+    if (v3Res.status === "fulfilled" && v3Res.value.ok) {
+      const data2 = await v3Res.value.json();
       const quote2 = Array.isArray(data2) ? data2[0] : data2;
       const price2 = quote2?.price ?? quote2?.close ?? null;
       if (typeof price2 === "number" && price2 > 0) return price2;
     }
 
-    // Last resort: company profile endpoint (works on FMP free tier)
+    // Last resort: company profile endpoint (confirmed working on FMP free tier)
     const res3 = await fetch(
       fmpUrl(`/api/v3/profile/${symbol}`),
       { signal: withTimeout() }
