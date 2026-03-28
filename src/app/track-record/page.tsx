@@ -116,28 +116,12 @@ export default async function TrackRecordPage() {
       {/* Stats Dashboard */}
       {enrichedPicks.length > 0 && (
         <section className="mx-auto max-w-4xl px-4 sm:px-6 -mt-8">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
-              <p className="text-2xl font-bold text-text">{enrichedPicks.length}</p>
-              <p className="text-xs text-text-muted mt-1">Total Picks</p>
-            </div>
-            <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
-              <p className="text-2xl font-bold text-accent-600">
-                {enrichedPicks.length > 0 ? Math.round((winners.length / enrichedPicks.length) * 100) : 0}%
-              </p>
-              <p className="text-xs text-text-muted mt-1">Win Rate</p>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className="text-2xl font-bold text-accent-600">
                 {targetHits.length}/{enrichedPicks.length}
               </p>
-              <p className="text-xs text-text-muted mt-1">Targets Hit</p>
-            </div>
-            <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
-              <p className={`text-2xl font-bold ${avgReturn >= 0 ? "text-accent-600" : "text-red-500"}`}>
-                {hasLiveData ? `${avgReturn >= 0 ? "+" : ""}${avgReturn.toFixed(1)}%` : "—"}
-              </p>
-              <p className="text-xs text-text-muted mt-1">Avg Return</p>
+              <p className="text-xs text-text-muted mt-1">Price Targets Hit</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className="text-2xl font-bold text-accent-600">
@@ -146,19 +130,25 @@ export default async function TrackRecordPage() {
               <p className="text-xs text-text-muted mt-1">Avg Target Upside</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
+              <p className={`text-2xl font-bold ${avgReturn >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                {hasLiveData ? `${avgReturn >= 0 ? "+" : ""}${avgReturn.toFixed(1)}%` : "—"}
+              </p>
+              <p className="text-xs text-text-muted mt-1">Avg Current Return</p>
+            </div>
+            <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               {hasLiveData ? (
                 <>
                   <p className={`text-2xl font-bold ${cumulativeReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
                     ${Math.round(cumulativeValue).toLocaleString()}
                   </p>
                   <p className="text-xs text-text-muted mt-1">
-                    $1K/pick → {cumulativeReturnPct >= 0 ? "+" : ""}{cumulativeReturnPct.toFixed(0)}%
+                    ${totalInvested.toLocaleString()} invested → today
                   </p>
                 </>
               ) : (
                 <>
                   <p className="text-2xl font-bold text-text-light">—</p>
-                  <p className="text-xs text-text-muted mt-1">Cumulative Value</p>
+                  <p className="text-xs text-text-muted mt-1">$1K/pick value today</p>
                 </>
               )}
             </div>
@@ -253,33 +243,64 @@ export default async function TrackRecordPage() {
 
                 {/* Progress to target bar */}
                 <div className="px-5 pb-3 pt-2">
-                  <div className="flex items-center justify-between text-[10px] text-text-light mb-1">
-                    <span>Entry ${pick.priceAtPublish}</span>
-                    {pick.currentPrice && (
-                      <span className="font-medium text-text">
-                        Current ${pick.currentPrice.toFixed(2)}
-                      </span>
-                    )}
-                    <span>Target ${pick.priceTarget}</span>
-                  </div>
-                  <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        progressToTarget >= 100 ? "bg-accent-500" : progressToTarget > 0 ? "bg-accent-400" : "bg-red-400"
-                      }`}
-                      style={{ width: `${Math.max(2, Math.min(100, progressToTarget))}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[10px] text-text-light">
-                      +{targetUpside.toFixed(0)}% target upside
-                    </span>
-                    {pick.returnPct !== null && (
-                      <span className={`text-[10px] font-semibold ${pick.returnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
-                        {pick.returnPct >= 0 ? "+" : ""}{pick.returnPct.toFixed(1)}% current return
-                      </span>
-                    )}
-                  </div>
+                  {pick.hitTarget ? (
+                    <>
+                      {/* Target was hit — show full bar with success message */}
+                      <div className="flex items-center justify-between text-[10px] text-text-light mb-1">
+                        <span>Entry ${pick.priceAtPublish}</span>
+                        {pick.currentPrice && (
+                          <span className="font-medium text-text">
+                            Now ${pick.currentPrice.toFixed(2)}
+                          </span>
+                        )}
+                        <span className="font-semibold text-accent-600">Target ${pick.priceTarget} reached</span>
+                      </div>
+                      <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-accent-500 w-full" />
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-[10px] font-semibold text-accent-600">
+                          +{targetUpside.toFixed(0)}% target upside — achieved
+                        </span>
+                        {pick.returnPct !== null && (
+                          <span className={`text-[10px] font-semibold ${pick.returnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                            {pick.returnPct >= 0 ? "+" : ""}{pick.returnPct.toFixed(1)}% current return
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Target not yet hit — show progress */}
+                      <div className="flex items-center justify-between text-[10px] text-text-light mb-1">
+                        <span>Entry ${pick.priceAtPublish}</span>
+                        {pick.currentPrice && (
+                          <span className="font-medium text-text">
+                            Current ${pick.currentPrice.toFixed(2)}
+                          </span>
+                        )}
+                        <span>Target ${pick.priceTarget}</span>
+                      </div>
+                      <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            progressToTarget > 0 ? "bg-accent-400" : "bg-red-400"
+                          }`}
+                          style={{ width: `${Math.max(2, Math.min(100, progressToTarget))}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-[10px] text-text-light">
+                          +{targetUpside.toFixed(0)}% target upside
+                        </span>
+                        {pick.returnPct !== null && (
+                          <span className={`text-[10px] font-semibold ${pick.returnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                            {pick.returnPct >= 0 ? "+" : ""}{pick.returnPct.toFixed(1)}% current return
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Price data grid */}
