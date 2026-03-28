@@ -414,11 +414,46 @@ Summary: ${extractLeadParagraph(s.story)}`
     ? `\n\nUPCOMING MACRO CALENDAR:\n${calendarLines.join("\n")}\n\nIMPORTANT: Reference specific upcoming macro events in "whatToWatch". Do NOT duplicate — if you mention FOMC, mention it ONCE with the specific date. Only use story-derived themes for remaining slots.`
     : "";
 
-  // Build active geopolitical themes block — ongoing market-moving situations
-  // that should be considered for What to Watch even if not in today's stories
-  const activeGeoThemes = detectActiveGeoThemes(stories);
-  const geoThemesBlock = activeGeoThemes.length > 0
-    ? `\n\nACTIVE GEOPOLITICAL THEMES (consider for 3rd whatToWatch slot if relevant to today's stories):\n${activeGeoThemes.map((t) => `- ${t}`).join("\n")}`
+  // ── Categorize stories by theme for structured prompt ──
+  // Instead of generic geo theme boilerplate, give Claude real story headlines
+  // grouped by theme so it can pick diverse items.
+  const STORY_THEME_CLUSTERS: Array<{ label: string; terms: string[] }> = [
+    { label: "FED/MONETARY POLICY", terms: ["fomc", "federal reserve", "fed meeting", "rate decision", "rate cut", "rate hike", "fed funds", "monetary policy", "powell"] },
+    { label: "OIL/ENERGY", terms: ["oil", "crude", "wti", "brent", "opec", "iran", "energy sector", "strait of hormuz", "petroleum", "refinery", "natural gas"] },
+    { label: "INFLATION", terms: ["cpi", "pce", "inflation", "ppi", "consumer price", "price index"] },
+    { label: "TRADE/TARIFFS", terms: ["tariff", "trade war", "trade policy", "china trade", "import dut", "trade deal", "sanctions"] },
+    { label: "EMPLOYMENT", terms: ["non-farm", "nonfarm", "payroll", "unemployment", "jobless", "jobs report", "labor market"] },
+    { label: "GDP/GROWTH", terms: ["gdp", "recession", "economic growth"] },
+    { label: "EARNINGS", terms: ["earnings", "revenue", "guidance", "quarter results", "eps estimate"] },
+    { label: "BONDS/RATES", terms: ["treasury", "yield curve", "10-year", "bond auction", "2-year"] },
+    { label: "TECH/AI", terms: ["artificial intelligence", " ai ", "semiconductor", "chip", "nvidia", "openai", "anthropic", "meta platform", "apple", "microsoft", "google", "amazon"] },
+    { label: "CRYPTO", terms: ["bitcoin", "crypto", "ethereum", "btc"] },
+  ];
+
+  function classifyStoryTheme(s: NewsItem): string {
+    const text = `${s.title} ${s.whyThisMatters ?? ""} ${s.category}`.toLowerCase();
+    for (const cluster of STORY_THEME_CLUSTERS) {
+      if (cluster.terms.some((term) => text.includes(term))) {
+        return cluster.label;
+      }
+    }
+    return s.category.toUpperCase();
+  }
+
+  // Group story headlines by theme
+  const themeToHeadlines = new Map<string, string[]>();
+  for (const s of stories) {
+    const theme = classifyStoryTheme(s);
+    const existing = themeToHeadlines.get(theme) ?? [];
+    existing.push(s.title);
+    themeToHeadlines.set(theme, existing);
+  }
+
+  const storyThemesBlock = themeToHeadlines.size > 0
+    ? `\n\nSTORY THEMES FOR WHAT TO WATCH (pick from DIFFERENT themes — never two from the same):
+${[...themeToHeadlines.entries()].map(([theme, headlines]) => `— ${theme}: ${headlines.map((h) => `"${h.length > 70 ? h.substring(0, 67) + "..." : h}"`).join(", ")}`).join("\n")}
+
+USE THESE THEMES to ensure diversity. Each whatToWatch item must come from a DIFFERENT theme row above (or from the MACRO CALENDAR).`
     : "";
 
   const prompt = `You are a macro strategist generating a Daily Markets Briefing for Market Mountain, a financial publication read by institutional investors, macro traders, and portfolio managers.
@@ -435,19 +470,18 @@ STYLE RULES:
 - Write like a sell-side morning note, not a news summary
 
 WHAT TO WATCH RULES:
-- ABSOLUTE PRIORITY: Use the UPCOMING MACRO CALENDAR events below as the first 1-2 "whatToWatch" items. These are real scheduled economic releases — they MUST take precedence over story-derived themes.
-- PRIORITY ORDER: (1) FOMC meetings, CPI, PCE, Non-Farm Payrolls, GDP — these are the events that MOVE markets (2) geopolitical events with clear market impact (tariffs, sanctions, supply disruptions) (3) mega-cap earnings ($100B+ market cap) ONLY if no macro events are upcoming
-- CRITICAL DIVERSITY RULE: Each of the 3 whatToWatch items MUST cover a DIFFERENT macro category. NEVER have two items about the same topic. For example: DO NOT have two items about the Fed/FOMC/rates. DO NOT have two items about inflation/CPI/PCE. Each item should be a distinct theme: e.g., (1) upcoming FOMC decision, (2) oil prices / energy supply, (3) trade policy / tariffs — or similar variety. If you only have one calendar event, fill the remaining 2 slots with DIFFERENT story-derived macro themes from today's news.
+- ABSOLUTE PRIORITY: Use the UPCOMING MACRO CALENDAR events below as the first whatToWatch item. These are real scheduled economic releases.
+- Pick 3 items from 3 DIFFERENT theme rows listed in "STORY THEMES FOR WHAT TO WATCH" below. Never pick two items from the same theme.
 - TIMING ACCURACY: Use the EXACT dates from the UPCOMING MACRO CALENDAR. Do NOT say "this week" or "next week" unless the event is actually within 7 days. If an event is 14+ days away, say "on [date]" or "[X] days away". NEVER guess timing.
 - Each item MUST answer: "What specific event? When exactly? What price/rate level matters? What happens if it beats/misses?"
+- Significance: 1-2 sentences MAX. State the mechanism: "If X happens → Y moves because Z"
+- "watchMetric" is REQUIRED for every item — the specific price level or threshold (e.g., "10-Year above 4.50%", "WTI crude above $72/bbl", "S&P 500 support at 5,600")
 - Do NOT use: "markets reacted", "investors are watching", "remains to be seen", "this highlights", "in today's environment"
 - Do NOT generate vague themes — every item must reference a specific event, date, or data release
-- "watchMetric" is REQUIRED for every item — pick the specific price level or threshold that matters most (e.g., "10-Year above 4.50%", "Core PCE above 2.8%", "S&P 500 support at 5,600")
-- Significance: 1-2 sentences MAX. State the mechanism: "If X happens → Y moves because Z"
 
 Today's published stories:
 
-${storyContext}${macroCalendarBlock}${geoThemesBlock}${yesterdayBlock}
+${storyContext}${macroCalendarBlock}${storyThemesBlock}${yesterdayBlock}
 
 Generate a concise editorial briefing with this exact JSON structure. Return ONLY valid JSON — no markdown, no explanation.
 CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MUST have exactly 3 items. No more, no fewer.
@@ -460,9 +494,9 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     "[1 sentence for story 4 — focus on the market impact, or synthesize a key macro implication if fewer than 4 stories exist]"
   ],
   "whatToWatch": [
-    {"event": "[MUST be from UPCOMING MACRO CALENDAR if available — specific scheduled release name and date]", "timing": "[monitoring label from the list above]", "significance": "[1-2 sentences: the economic mechanism and what outcome would move markets]", "watchMetric": "[specific level or threshold to monitor, e.g. '10-Year Treasury above 4.30%']"},
-    {"event": "[second calendar event or high-impact geopolitical/policy event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]", "watchMetric": "[level or null if none applies]"},
-    {"event": "[third item — a forward-looking signal or remaining calendar event]", "timing": "[monitoring label]", "significance": "[1-2 sentences: cause-and-effect mechanism]"}
+    {"event": "[specific event name with date]", "timing": "[date or timeframe]", "significance": "[1-2 sentences: If X → Y because Z]", "watchMetric": "[specific threshold, e.g. 'WTI crude above $72/bbl']"},
+    {"event": "[DIFFERENT theme from item 1]", "timing": "[date or timeframe]", "significance": "[1-2 sentences: mechanism]", "watchMetric": "[specific threshold]"},
+    {"event": "[DIFFERENT theme from items 1 and 2]", "timing": "[date or timeframe]", "significance": "[1-2 sentences: mechanism]", "watchMetric": "[specific threshold]"}
   ],
   "followUpItems": [
     {"originalEvent": "[yesterday's watch item that resolved]", "outcome": "[1 sentence: what happened — e.g. 'CPI came in at 2.6% vs 2.7% expected, reinforcing June rate cut expectations']"}
@@ -480,7 +514,7 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     const response = await client.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 1000,
-      temperature: 0.5,
+      temperature: 0.3,
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -561,22 +595,32 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     }
   }
 
-  // Safety net fillers — pad to exactly 3 items
+  // Safety net fillers — pad to exactly 3 items.
+  // Each filler covers a DISTINCT macro category so replacements always add diversity.
   const WATCH_FILLERS = [
     {
-      event: "Next Federal Reserve meeting",
-      timing: "Policy watch",
-      significance: "Rate decisions drive bond yields and rate-sensitive equity sectors.",
+      event: "U.S. tariff and trade policy developments",
+      timing: "Policy watch — ongoing",
+      significance: "Tariff announcements directly impact import costs, corporate margins, and sector rotation between domestic producers and importers.",
+      watchMetric: "USD/CNY; tariff-exposed sector ETFs; container shipping rates",
     },
     {
-      event: "Upcoming CPI and jobs data",
+      event: "Upcoming inflation data (CPI/PCE)",
       timing: "Upcoming economic data",
-      significance: "CPI, jobs, and GDP prints shape Fed rate expectations and equity risk premiums.",
+      significance: "Core inflation prints drive Fed rate expectations, moving Treasury yields, mortgage rates, and rate-sensitive equity sectors.",
+      watchMetric: "Core CPI MoM vs. 0.3% consensus; 10-Year breakeven inflation rate",
     },
     {
-      event: "Earnings season updates",
-      timing: "Earnings season updates",
-      significance: "Company guidance and margin trends reveal whether sector valuations can hold at current levels.",
+      event: "U.S. labor market data",
+      timing: "Upcoming economic data",
+      significance: "Non-farm payrolls, unemployment rate, and wage growth influence Fed rate timing and consumer spending trajectory.",
+      watchMetric: "NFP vs. consensus; unemployment rate; average hourly earnings MoM",
+    },
+    {
+      event: "Earnings season forward guidance",
+      timing: "Earnings season",
+      significance: "Management guidance and margin trends from mega-cap reports reveal whether current valuations can hold.",
+      watchMetric: "S&P 500 forward P/E ratio; earnings revision breadth",
     },
   ];
 
@@ -620,89 +664,108 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     }
   }
 
-  // ── Post-processing: enforce topic diversity ──
-  // Classify items by macro theme. If 2+ items share the same theme,
-  // keep the most detailed one and replace the duplicate with an alternative.
-  const THEME_PATTERNS: Array<[string, RegExp]> = [
-    ["fed_rates", /fomc|federal reserve|fed\s+meeting|rate\s+(decision|cut|hike)|fed\s+funds|monetary\s+policy/i],
-    ["inflation", /\bcpi\b|\bpce\b|\binflation\b|\bppi\b|\bprice\s+index/i],
-    ["employment", /\bnon-?farm\b|\bpayroll\b|\bjobs?\s+(report|data|growth)\b|\bunemployment\b|\bjobless\b/i],
-    ["oil_energy", /\boil\b|\bcrude\b|\bwti\b|\bbrent\b|\benergy\b|\bopec\b|\bgas\s+price/i],
-    ["trade_tariffs", /\btariff\b|\btrade\s+(war|policy|deal)\b|\bsanctions?\b|\bimport\s+dut/i],
-    ["gdp_growth", /\bgdp\b|\brecession\b|\bism\b|\bpmi\b/i],
-    ["earnings", /\bearnings\b|\brevenue\b|\bguidance\b|\bquarter\s+results/i],
-    ["treasury", /\btreasury\b|\byield\s+curve\b|\b10-?year\b|\bbond\s+auction/i],
+  // ── Post-processing: enforce topic diversity via entity-cluster overlap ──
+  // The old theme-based classifier only picked ONE category per item, so two items
+  // about Iran/oil could be classified as different themes ("inflation" vs "oil_energy")
+  // and slip through. This approach groups related entities into clusters and checks
+  // whether any two items share a cluster — catching editorial overlap reliably.
+  const ENTITY_CLUSTERS: Array<{ name: string; terms: string[] }> = [
+    { name: "fed_monetary", terms: ["fomc", "federal reserve", "fed meeting", "rate decision", "rate cut", "rate hike", "fed funds", "monetary policy", "powell"] },
+    { name: "oil_iran_energy", terms: ["oil", "crude", "wti", "brent", "opec", "iran", "energy sector", "strait of hormuz", "middle east oil", "petroleum", "refinery"] },
+    { name: "inflation_prices", terms: ["cpi", "pce", "inflation", "ppi", "consumer price", "price index"] },
+    { name: "trade_tariffs", terms: ["tariff", "trade war", "trade policy", "china trade", "import dut", "trade deal"] },
+    { name: "employment_labor", terms: ["non-farm", "nonfarm", "payroll", "unemployment", "jobless", "jobs report", "labor market"] },
+    { name: "gdp_growth", terms: ["gdp", "recession", "economic growth", "ism ", "pmi "] },
+    { name: "earnings", terms: ["earnings", "revenue", "guidance", "quarter results", "eps"] },
+    { name: "treasury_bonds", terms: ["treasury", "yield curve", "10-year", "bond auction", "2-year"] },
   ];
 
-  function classifyWatchTheme(item: { event: string; significance?: string }): string {
-    const text = `${item.event} ${item.significance ?? ""}`;
-    for (const [theme, pattern] of THEME_PATTERNS) {
-      if (pattern.test(text)) return theme;
+  function getItemClusters(item: { event: string; significance?: string; timing?: string }): Set<string> {
+    const text = `${item.event} ${item.significance ?? ""} ${item.timing ?? ""}`.toLowerCase();
+    const matched = new Set<string>();
+    for (const cluster of ENTITY_CLUSTERS) {
+      if (cluster.terms.some((term) => text.includes(term))) {
+        matched.add(cluster.name);
+      }
     }
-    return `unique_${whatToWatch.indexOf(item as typeof whatToWatch[0])}`;
+    return matched;
   }
 
-  const itemThemeMap = whatToWatch.map((item) => ({
-    item,
-    theme: classifyWatchTheme(item),
-  }));
-
-  // Find duplicate themes
-  const themeCounts = new Map<string, number>();
-  for (const { theme } of itemThemeMap) {
-    themeCounts.set(theme, (themeCounts.get(theme) ?? 0) + 1);
+  function itemsOverlap(
+    a: { event: string; significance?: string; timing?: string },
+    b: { event: string; significance?: string; timing?: string },
+  ): boolean {
+    const clustersA = getItemClusters(a);
+    const clustersB = getItemClusters(b);
+    for (const c of clustersA) {
+      if (clustersB.has(c)) return true;
+    }
+    return false;
   }
 
-  for (const [dupTheme, themeCount] of themeCounts.entries()) {
-    if (themeCount <= 1) continue;
+  // Pairwise overlap check — replace the weaker item in each overlapping pair
+  for (let i = 0; i < whatToWatch.length; i++) {
+    for (let j = i + 1; j < whatToWatch.length; j++) {
+      if (!itemsOverlap(whatToWatch[i], whatToWatch[j])) continue;
 
-    // Keep the item with the longest significance (most detailed)
-    const dupes = itemThemeMap
-      .filter((t) => t.theme === dupTheme)
-      .sort((a, b) => (b.item.significance?.length ?? 0) - (a.item.significance?.length ?? 0));
+      // Keep the item with longer significance (more detailed); replace the other
+      const weakerIdx = (whatToWatch[i].significance?.length ?? 0) >= (whatToWatch[j].significance?.length ?? 0) ? j : i;
 
-    // Replace weaker duplicate(s) with alternatives
-    for (let i = 1; i < dupes.length; i++) {
-      const idx = whatToWatch.indexOf(dupes[i].item);
-      if (idx === -1) continue;
+      // Collect clusters used by the items we're keeping
+      const keptClusters = new Set<string>();
+      for (let k = 0; k < whatToWatch.length; k++) {
+        if (k === weakerIdx) continue;
+        for (const c of getItemClusters(whatToWatch[k])) keptClusters.add(c);
+      }
 
-      const usedThemes = new Set(whatToWatch.map((w) => classifyWatchTheme(w)));
-
-      // Try geo themes first — ongoing geopolitical events are high quality alternatives
+      // Try story-derived replacement first — build a watch item from an actual
+      // published story that covers a different theme cluster.
       let replaced = false;
-      for (const geoDesc of activeGeoThemes) {
-        const geoTheme = classifyWatchTheme({ event: geoDesc, significance: geoDesc });
-        if (usedThemes.has(geoTheme)) continue;
+      for (const story of stories) {
+        const storyText = `${story.title} ${story.whyThisMatters ?? ""} ${story.category}`.toLowerCase();
+        const storyClusters = new Set<string>();
+        for (const cluster of ENTITY_CLUSTERS) {
+          if (cluster.terms.some((term) => storyText.includes(term))) {
+            storyClusters.add(cluster.name);
+          }
+        }
+        // Check that this story doesn't overlap with kept items
+        let overlapsKept = false;
+        for (const c of storyClusters) {
+          if (keptClusters.has(c)) { overlapsKept = true; break; }
+        }
+        if (overlapsKept || storyClusters.size === 0) continue;
 
-        // Parse geo description: "Label: description — monitor X"
-        const colonIdx = geoDesc.indexOf(":");
-        const eventLabel = colonIdx > 0 ? geoDesc.substring(0, colonIdx).trim() : geoDesc.substring(0, 60);
-        const descPart = colonIdx > 0 ? geoDesc.substring(colonIdx + 1).trim() : "";
-        const monitorMatch = descPart.match(/monitor\s+(.+)/i);
-
-        whatToWatch[idx] = {
-          event: eventLabel,
-          timing: "Ongoing — monitor key levels",
-          significance: descPart.replace(/\s*—\s*monitor\s+.+$/i, "").trim() || geoDesc.substring(0, 150),
-          watchMetric: monitorMatch?.[1] ?? undefined,
+        // Build a watch item from this story
+        const eventTitle = story.title.length > 80 ? story.title.substring(0, 77) + "..." : story.title;
+        whatToWatch[weakerIdx] = {
+          event: eventTitle,
+          timing: "Forward-looking signal",
+          significance: (story.whyThisMatters ?? extractLeadParagraph(story.story)).substring(0, 200),
+          watchMetric: story.marketImpact?.[0]
+            ? `${story.marketImpact[0].asset}: ${story.marketImpact[0].direction}`
+            : undefined,
         };
         replaced = true;
-        console.log(`[briefing] Replaced duplicate "${dupTheme}" watch item with geo theme: ${eventLabel}`);
+        console.log(`[briefing] Items ${i} and ${j} overlap — replaced item ${weakerIdx} with story: "${eventTitle}"`);
         break;
       }
 
-      // Fallback to WATCH_FILLERS
+      // Fallback to WATCH_FILLERS if no story available
       if (!replaced) {
-        const fillerThemes = WATCH_FILLERS.map((f) => ({
-          filler: f,
-          theme: classifyWatchTheme(f),
-        }));
-        const unusedFiller = fillerThemes.find((ft) => !usedThemes.has(ft.theme));
-        if (unusedFiller) {
-          whatToWatch[idx] = unusedFiller.filler;
-          console.log(`[briefing] Replaced duplicate "${dupTheme}" watch item with filler: ${unusedFiller.filler.event}`);
+        const filler = WATCH_FILLERS.find((f) => {
+          const fc = getItemClusters(f);
+          for (const c of fc) {
+            if (keptClusters.has(c)) return false;
+          }
+          return true;
+        });
+        if (filler) {
+          whatToWatch[weakerIdx] = filler;
+          console.log(`[briefing] Items ${i} and ${j} overlap — replaced item ${weakerIdx} with filler: "${filler.event}"`);
         }
       }
+      break; // Fix one overlap per pass; re-entering would need a fresh scan
     }
   }
 
