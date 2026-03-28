@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllArticles, getArticle } from "@/lib/articles";
+import { getAllArticleSlugs, getArticle } from "@/lib/articles";
 import { getRedisClient } from "@/lib/redis";
 import type { NewsCollection, NewsItem } from "@/lib/news-types";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
@@ -68,27 +68,28 @@ export async function GET(request: NextRequest) {
 
   const results: SearchResult[] = [];
 
-  // Search articles (filesystem)
+  // Search articles (filesystem) — single read per article via getArticle()
   if (type === "all" || type === "articles") {
-    const articles = getAllArticles();
-    for (const meta of articles) {
-      const article = getArticle(meta.slug);
-      const body = article?.content ?? "";
-      const relevance = scoreRelevance(query, meta.title, meta.excerpt, body, meta.ticker);
+    const slugs = getAllArticleSlugs();
+    for (const slug of slugs) {
+      const article = getArticle(slug);
+      if (!article) continue;
+      const body = article.content;
+      const relevance = scoreRelevance(query, article.title, article.excerpt, body, article.ticker);
 
       if (relevance > 0) {
-        if (category && !meta.tags?.some((t) => t.toLowerCase().includes(category.toLowerCase()))) {
+        if (category && !article.tags?.some((t) => t.toLowerCase().includes(category.toLowerCase()))) {
           continue;
         }
         results.push({
           type: "article",
-          id: meta.slug,
-          title: meta.title,
-          excerpt: meta.excerpt,
-          url: `/post/${meta.slug}`,
-          date: meta.date,
-          category: meta.tags?.[0],
-          ticker: meta.ticker,
+          id: slug,
+          title: article.title,
+          excerpt: article.excerpt,
+          url: `/post/${slug}`,
+          date: article.date,
+          category: article.tags?.[0],
+          ticker: article.ticker,
           relevance,
         });
       }

@@ -22,7 +22,9 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-async function getNewsItemWithCollection(id: string): Promise<{ item: NewsItem | null; allStories: NewsItem[] }> {
+// React.cache deduplicates this fetch within a single request lifecycle,
+// so generateMetadata and the page component share one KV round-trip.
+const getNewsItemWithCollection = React.cache(async function getNewsItemWithCollection(id: string): Promise<{ item: NewsItem | null; allStories: NewsItem[] }> {
   // Return 404 immediately for suppressed articles
   if (SUPPRESSED_ARTICLE_IDS.has(id)) return { item: null, allStories: [] };
 
@@ -39,7 +41,7 @@ async function getNewsItemWithCollection(id: string): Promise<{ item: NewsItem |
   } catch {
     return { item: null, allStories: [] };
   }
-}
+});
 
 async function getNewsItem(id: string): Promise<NewsItem | null> {
   const { item } = await getNewsItemWithCollection(id);
