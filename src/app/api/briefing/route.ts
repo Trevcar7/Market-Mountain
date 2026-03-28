@@ -591,45 +591,53 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
   }
 
   // Step 2: Build the replacement pool (ordered by quality)
-  // Calendar events with real dates → story-derived → static fallbacks
+  // Priority: calendar events (real dates) → macro alternatives (always relevant, forward-looking)
+  // NOTE: Story headlines are NOT used — they're backwards-looking news, not "What to Watch".
   const replacementPool: Array<{ event: string; timing: string; significance: string; watchMetric?: string }> = [];
 
+  // 2a. Real calendar events from FMP (best quality — specific dates and data)
   for (const evt of calendarWatchItems) {
     replacementPool.push(evt);
   }
-  for (const story of stories.slice(0, 6)) {
-    const title = story.title.length > 80 ? story.title.substring(0, 77) + "..." : story.title;
-    // Trim significance at sentence boundary, not mid-word
-    const rawSig = story.whyThisMatters ?? extractLeadParagraph(story.story);
-    const sigSentences = rawSig.match(/[^.!?]+[.!?]+/g) ?? [rawSig];
-    let significance = "";
-    for (const s of sigSentences) {
-      if ((significance + s).length > 200) break;
-      significance += s;
-    }
-    if (!significance) significance = rawSig.substring(0, 200);
 
-    replacementPool.push({
-      event: title,
-      timing: "Forward-looking signal",
-      significance: significance.trim(),
-      watchMetric: story.marketImpact?.[0]
-        ? `${story.marketImpact[0].asset}: ${story.marketImpact[0].direction}`
-        : undefined,
-    });
-  }
+  // 2b. Well-crafted macro alternatives — each covers a different theme, always relevant
+  // These are forward-looking with specific metrics, not story headlines.
   replacementPool.push(
+    {
+      event: "Oil prices and geopolitical supply risk",
+      timing: "Commodity watch — ongoing",
+      significance: "Crude above $75/bbl re-ignites inflation fears and compresses consumer discretionary margins; a break below $65 signals demand destruction.",
+      watchMetric: "WTI crude $65–$75/bbl range; Brent-WTI spread; XLE sector ETF",
+    },
     {
       event: "U.S. tariff and trade policy developments",
       timing: "Policy watch — ongoing",
-      significance: "Tariff announcements directly impact import costs, corporate margins, and sector rotation between domestic producers and importers.",
+      significance: "Tariff announcements shift import costs and corporate margins, driving sector rotation between domestic producers and import-dependent companies.",
       watchMetric: "USD/CNY; tariff-exposed sector ETFs; container shipping rates",
     },
     {
-      event: "Earnings season forward guidance",
+      event: "Upcoming inflation data (CPI/PCE)",
+      timing: "Upcoming economic data",
+      significance: "Core inflation prints drive Fed rate expectations, directly moving Treasury yields, mortgage rates, and rate-sensitive equity sectors.",
+      watchMetric: "Core CPI MoM vs. 0.3% consensus; 10-Year breakeven inflation rate",
+    },
+    {
+      event: "U.S. labor market conditions",
+      timing: "Upcoming economic data",
+      significance: "Non-farm payrolls, jobless claims, and wage growth directly influence Fed rate timing and the consumer spending trajectory.",
+      watchMetric: "NFP vs. consensus; unemployment rate; average hourly earnings MoM",
+    },
+    {
+      event: "Mega-cap earnings and forward guidance",
       timing: "Earnings season",
-      significance: "Management guidance and margin trends from mega-cap reports reveal whether current valuations can hold.",
+      significance: "Management guidance and margin trends from the largest companies reveal whether current equity valuations can hold at these levels.",
       watchMetric: "S&P 500 forward P/E ratio; earnings revision breadth",
+    },
+    {
+      event: "Treasury market and yield curve dynamics",
+      timing: "Fixed income watch",
+      significance: "The 2s-10s spread and long-end auction demand signal whether the bond market endorses the current growth and inflation outlook.",
+      watchMetric: "10-Year Treasury yield; 2s-10s spread; 30-Year auction bid-to-cover",
     },
   );
 
