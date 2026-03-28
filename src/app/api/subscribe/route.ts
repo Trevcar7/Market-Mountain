@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRedisClient } from "@/lib/redis";
+import { getResendClient, EMAIL_FROM, AUDIENCE_ID } from "@/lib/email";
+import WelcomeEmail from "@/emails/WelcomeEmail";
 
 export const runtime = "nodejs";
 
@@ -51,6 +53,31 @@ export async function POST(request: Request) {
     await kv.lpush(KV_LIST_KEY, JSON.stringify({ email, subscribedAt: now }));
 
     console.log(`[/api/subscribe] New subscriber: ${email}`);
+
+    // Send welcome email + add to Resend Audience (non-blocking)
+    const resend = getResendClient();
+    if (resend) {
+      // Add to Resend Audience for bulk sends
+      if (AUDIENCE_ID) {
+        resend.contacts.create({
+          audienceId: AUDIENCE_ID,
+          email,
+          unsubscribed: false,
+        }).catch((err) => {
+          console.warn("[/api/subscribe] Resend audience add failed:", err);
+        });
+      }
+
+      // Send welcome email
+      resend.emails.send({
+        from: EMAIL_FROM,
+        to: email,
+        subject: "Welcome to Market Mountain",
+        react: WelcomeEmail(),
+      }).catch((err) => {
+        console.warn("[/api/subscribe] Welcome email failed:", err);
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

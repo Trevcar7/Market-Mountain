@@ -175,6 +175,12 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
 
         <div className="flex items-center gap-2 text-text-light text-[11px] tracking-wide mt-3 pt-3 border-t border-border/60">
           <time dateTime={news.publishedAt}>{formatDate(news.publishedAt)}</time>
+          {news.wordCount && news.wordCount > 0 && (
+            <>
+              <span aria-hidden="true">&#183;</span>
+              <span>{Math.ceil(news.wordCount / 230)} min read</span>
+            </>
+          )}
         </div>
       </div>
     </Link>

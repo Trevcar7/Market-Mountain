@@ -66,41 +66,52 @@ export default async function ArticlePage({ params }: Props) {
   const tocHeadings = parseHeadings(article.content);
 
   const articleUrl = `${SITE_URL}/post/${slug}`;
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    headline: article.title,
-    description: article.excerpt,
-    url: articleUrl,
-    datePublished: article.date,
-    ...(article.updated ? { dateModified: article.updated } : { dateModified: article.date }),
-    author: {
-      "@type": "Person",
-      name: "Trevor Carnovsky",
-      url: `${SITE_URL}/about`,
-      jobTitle: "Equity Researcher & Investment Analyst",
-      sameAs: ["https://www.linkedin.com/in/trevor-carnovsky/"],
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: article.title,
+      description: article.excerpt,
+      url: articleUrl,
+      datePublished: article.date,
+      ...(article.updated ? { dateModified: article.updated } : { dateModified: article.date }),
+      author: {
+        "@type": "Person",
+        name: "Trevor Carnovsky",
+        url: `${SITE_URL}/about`,
+        jobTitle: "Equity Researcher & Investment Analyst",
+        sameAs: ["https://www.linkedin.com/in/trevor-carnovsky/"],
+      },
+      publisher: {
+        "@type": "Organization",
+        name: "Market Mountain",
+        url: SITE_URL,
+        logo: { "@type": "ImageObject", url: `${SITE_URL}/icon.svg` },
+      },
+      mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
+      ...(article.coverImage
+        ? {
+            image: {
+              "@type": "ImageObject",
+              url: article.coverImage.startsWith("http")
+                ? article.coverImage
+                : `${SITE_URL}${article.coverImage}`,
+              width: 1200,
+              height: 630,
+            },
+          }
+        : {}),
     },
-    publisher: {
-      "@type": "Organization",
-      name: "Market Mountain",
-      url: SITE_URL,
-      logo: { "@type": "ImageObject", url: `${SITE_URL}/icon.svg` },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "Articles", item: `${SITE_URL}/articles` },
+        { "@type": "ListItem", position: 3, name: article.title },
+      ],
     },
-    mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
-    ...(article.coverImage
-      ? {
-          image: {
-            "@type": "ImageObject",
-            url: article.coverImage.startsWith("http")
-              ? article.coverImage
-              : `${SITE_URL}${article.coverImage}`,
-            width: 1200,
-            height: 630,
-          },
-        }
-      : {}),
-  };
+  ];
 
   return (
     <>

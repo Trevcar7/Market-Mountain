@@ -162,3 +162,48 @@ body {
   outline-offset: 2px;
   border-radius: 2px;
 }
+
+/* Print-friendly styling — institutional investors print research notes */
+@media print {
+  header, footer, nav,
+  .reading-progress,
+  .share-bar,
+  .subscribe-cta,
+  .macro-board,
+  .market-strip,
+  .signal-tags,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  .prose {
+    max-width: 100% !important;
+  }
+
+  a {
+    color: black !important;
+    text-decoration: underline;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #666;
+  }
+
+  img {
+    max-width: 100%;
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+}

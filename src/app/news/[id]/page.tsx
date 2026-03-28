@@ -191,8 +191,39 @@ export default async function NewsStoryPage({ params }: Props) {
 
   const storyUrl = `${SITE_URL}/news/${item.id}`;
 
+  const newsJsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "NewsArticle",
+      headline: item.title,
+      url: storyUrl,
+      datePublished: item.publishedAt,
+      author: { "@type": "Organization", name: "Market Mountain", url: SITE_URL },
+      publisher: {
+        "@type": "Organization",
+        name: "Market Mountain",
+        url: SITE_URL,
+        logo: { "@type": "ImageObject", url: `${SITE_URL}/icon.svg` },
+      },
+      ...(item.imageUrl ? { image: { "@type": "ImageObject", url: item.imageUrl } } : {}),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "Market News", item: `${SITE_URL}/news` },
+        { "@type": "ListItem", position: 3, name: item.title },
+      ],
+    },
+  ];
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(newsJsonLd) }}
+      />
       <ReadingProgress />
       {/* Hero */}
       <div className="bg-navy-900 text-white">
