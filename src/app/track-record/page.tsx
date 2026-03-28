@@ -210,12 +210,18 @@ export default async function TrackRecordPage() {
                     <p className={`text-lg font-bold ${portfolioValue >= totalInvested ? "text-accent-600" : "text-red-500"}`}>
                       ${Math.round(portfolioValue).toLocaleString()}
                     </p>
+                    <p className={`text-[10px] font-semibold ${portfolioValue >= totalInvested ? "text-accent-600" : "text-red-500"}`}>
+                      {portfolioValue >= totalInvested ? "+" : ""}{(((portfolioValue - totalInvested) / totalInvested) * 100).toFixed(1)}%
+                    </p>
                     <p className="text-[10px] text-text-muted">Our Picks</p>
                   </div>
                   <div className="text-text-light text-xs">vs</div>
                   <div className="text-center">
                     <p className="text-lg font-bold text-text-muted">
                       ${Math.round(spyPortfolioValue).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] font-semibold text-text-muted">
+                      {spyPortfolioValue >= totalInvested ? "+" : ""}{(((spyPortfolioValue - totalInvested) / totalInvested) * 100).toFixed(1)}%
                     </p>
                     <p className="text-[10px] text-text-muted">S&amp;P 500</p>
                   </div>
