@@ -682,7 +682,7 @@ export async function fetchFmpQuote(
       if (typeof price === "number" && price > 0) return price;
     }
 
-    // Fallback to v3 quote endpoint
+    // Fallback to v3 quote-short endpoint
     const res2 = await fetch(
       fmpUrl(`/api/v3/quote-short/${symbol}`),
       { signal: withTimeout() }
@@ -692,6 +692,18 @@ export async function fetchFmpQuote(
       const quote2 = Array.isArray(data2) ? data2[0] : data2;
       const price2 = quote2?.price ?? quote2?.close ?? null;
       if (typeof price2 === "number" && price2 > 0) return price2;
+    }
+
+    // Last resort: company profile endpoint (works on FMP free tier)
+    const res3 = await fetch(
+      fmpUrl(`/api/v3/profile/${symbol}`),
+      { signal: withTimeout() }
+    );
+    if (res3.ok) {
+      const data3 = await res3.json();
+      const profile = Array.isArray(data3) ? data3[0] : data3;
+      const price3 = profile?.price ?? null;
+      if (typeof price3 === "number" && price3 > 0) return price3;
     }
 
     return null;
