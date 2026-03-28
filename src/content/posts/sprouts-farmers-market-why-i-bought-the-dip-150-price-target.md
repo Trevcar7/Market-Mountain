@@ -10,7 +10,7 @@ ticker: "SFM"
 priceTarget: 150
 priceAtPublish: 79
 rating: "buy"
-targetHit: true
+targetHit: false
 ---
 
 ## Background

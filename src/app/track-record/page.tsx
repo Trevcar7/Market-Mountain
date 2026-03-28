@@ -123,96 +123,111 @@ export default async function TrackRecordPage() {
           All Research Picks
         </h2>
 
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          {/* Table header */}
-          <div className="hidden sm:grid sm:grid-cols-7 gap-4 px-5 py-3 bg-surface-2 text-[10px] font-bold tracking-widest uppercase text-text-light border-b border-border">
-            <span className="col-span-2">Stock</span>
-            <span>Rating</span>
-            <span className="text-right">Entry</span>
-            <span className="text-right">Target</span>
-            <span className="text-right">Current</span>
-            <span className="text-right">Return</span>
-          </div>
-
-          {/* Rows */}
-          {enrichedPicks.map((pick) => (
-            <Link
-              key={`${pick.ticker}-${pick.date}`}
-              href={`/post/${pick.slug}`}
-              className="block sm:grid sm:grid-cols-7 gap-4 px-5 py-4 border-b border-border last:border-b-0 hover:bg-surface transition-colors"
-            >
-              {/* Stock info */}
-              <div className="col-span-2 mb-2 sm:mb-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold text-text">{pick.ticker}</span>
-                  <span
-                    className={`text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded ${
-                      ratingColors[pick.rating] ?? ratingColors.neutral
-                    }`}
-                  >
-                    {ratingLabels[pick.rating] ?? pick.rating}
-                  </span>
-                  {pick.hitTarget && (
-                    <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-accent-500 text-white flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      TARGET HIT
+        <div className="space-y-4">
+          {enrichedPicks.map((pick) => {
+            const targetUpside = ((pick.priceTarget - pick.priceAtPublish) / pick.priceAtPublish) * 100;
+            return (
+              <Link
+                key={`${pick.ticker}-${pick.date}`}
+                href={`/post/${pick.slug}`}
+                className="block bg-card rounded-xl border border-border shadow-sm hover:border-accent-300 hover:shadow-md transition-all overflow-hidden"
+              >
+                {/* Card header */}
+                <div className="px-5 pt-5 pb-3">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-lg font-bold text-text">{pick.ticker}</span>
+                    <span
+                      className={`text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded ${
+                        ratingColors[pick.rating] ?? ratingColors.neutral
+                      }`}
+                    >
+                      {ratingLabels[pick.rating] ?? pick.rating}
                     </span>
-                  )}
-                </div>
-                <p className="text-xs text-text-muted mt-0.5 line-clamp-1">{pick.title}</p>
-                <p className="text-[11px] text-text-light">{formatDate(pick.date)}</p>
-              </div>
-
-              {/* Rating (hidden on mobile, shown in stock info) */}
-              <div className="hidden sm:flex items-center">
-                <span
-                  className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded ${
-                    ratingColors[pick.rating] ?? ratingColors.neutral
-                  }`}
-                >
-                  {ratingLabels[pick.rating] ?? pick.rating}
-                </span>
-              </div>
-
-              {/* Prices */}
-              <div className="flex sm:block justify-between sm:text-right">
-                <span className="text-xs text-text-light sm:hidden">Entry:</span>
-                <span className="text-sm text-text">${pick.priceAtPublish}</span>
-              </div>
-              <div className="flex sm:block justify-between sm:text-right">
-                <span className="text-xs text-text-light sm:hidden">Target:</span>
-                <span className="text-sm font-medium text-accent-600">${pick.priceTarget}</span>
-              </div>
-              <div className="flex sm:block justify-between sm:text-right">
-                <span className="text-xs text-text-light sm:hidden">Current:</span>
-                <span className="text-sm text-text">
-                  {pick.currentPrice ? `$${pick.currentPrice.toFixed(2)}` : "—"}
-                </span>
-              </div>
-              <div className="flex sm:block justify-between sm:text-right">
-                <span className="text-xs text-text-light sm:hidden">Return:</span>
-                {pick.returnPct !== null ? (
-                  <span
-                    className={`text-sm font-bold ${
-                      pick.returnPct >= 0 ? "text-accent-600" : "text-red-500"
-                    }`}
-                  >
-                    {pick.returnPct >= 0 ? "+" : ""}
-                    {pick.returnPct.toFixed(1)}%
                     {pick.hitTarget && (
-                      <svg className="inline w-3.5 h-3.5 ml-1 text-accent-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
+                      <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-accent-500 text-white flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        TARGET HIT
+                      </span>
                     )}
-                  </span>
-                ) : (
-                  <span className="text-sm text-text-light">—</span>
-                )}
-              </div>
-            </Link>
-          ))}
+                    <span className="text-[11px] text-text-light ml-auto">{formatDate(pick.date)}</span>
+                  </div>
+                  <p className="text-sm text-text-muted line-clamp-1">{pick.title}</p>
+                </div>
+
+                {/* Price data grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-border">
+                  {/* Entry Price */}
+                  <div className="bg-card px-4 py-3">
+                    <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">Entry</p>
+                    <p className="text-base font-bold text-text">${pick.priceAtPublish}</p>
+                  </div>
+
+                  {/* Price Target */}
+                  <div className="bg-card px-4 py-3">
+                    <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">Target</p>
+                    <p className="text-base font-bold text-accent-600">${pick.priceTarget}</p>
+                    <p className="text-[11px] text-accent-600 font-medium">+{targetUpside.toFixed(0)}% upside</p>
+                  </div>
+
+                  {/* Current Price */}
+                  <div className="bg-card px-4 py-3">
+                    <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">Current</p>
+                    <p className="text-base font-bold text-text">
+                      {pick.currentPrice ? `$${pick.currentPrice.toFixed(2)}` : "—"}
+                    </p>
+                  </div>
+
+                  {/* Current Return (live) */}
+                  <div className="bg-card px-4 py-3">
+                    <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">Return</p>
+                    {pick.returnPct !== null ? (
+                      <>
+                        <p className={`text-base font-bold ${pick.returnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                          {pick.returnPct >= 0 ? "+" : ""}{pick.returnPct.toFixed(1)}%
+                        </p>
+                        <p className={`text-[11px] font-medium ${pick.returnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                          {pick.returnPct >= 0 ? "+" : ""}${pick.currentPrice ? (pick.currentPrice - pick.priceAtPublish).toFixed(2) : "—"}/share
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-base text-text-light">—</p>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div className="bg-card px-4 py-3 col-span-2 sm:col-span-1">
+                    <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">Status</p>
+                    {pick.hitTarget ? (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-accent-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-semibold text-accent-600">Target Reached</span>
+                      </div>
+                    ) : pick.returnPct !== null && pick.returnPct > 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                        <span className="text-sm font-medium text-accent-600">In Profit</span>
+                      </div>
+                    ) : pick.returnPct !== null ? (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-amber-600">Active</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-text-light">Tracking</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
 
         {/* Disclaimer */}
