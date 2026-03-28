@@ -44,6 +44,7 @@ export default function Footer() {
                 { href: "/briefing", label: "Briefing" },
                 { href: "/articles", label: "Articles" },
                 { href: "/about", label: "About" },
+                { href: "/preferences", label: "Email Preferences" },
               ].map((link) => (
                 <Link
                   key={link.href}

@@ -228,7 +228,7 @@ export default function HomePage() {
       </section>
 
       {/* About strip */}
-      <section className="bg-white border-t border-border">
+      <section className="bg-card border-t border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 flex flex-col md:flex-row items-center gap-8 md:gap-12">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold tracking-widest uppercase text-accent-600 mb-2">

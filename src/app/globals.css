@@ -43,6 +43,46 @@
   --color-text-light: #94A3B8;
 }
 
+/* ── Dark Mode Overrides ─────────────────────────────────────────────────── */
+/* Class-based toggle: <html class="dark"> swaps all semantic tokens.       */
+/* The navy hero/MacroBoard sections are already dark — no changes needed.  */
+html.dark {
+  --color-surface:   #0F172A;
+  --color-surface-2: #1E293B;
+  --color-card:      #1E293B;
+  --color-border:    #334155;
+  --color-border-2:  #475569;
+  --color-text:       #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --color-text-light: #64748B;
+  color-scheme: dark;
+}
+
+/* Dark prose overrides for article readability */
+html.dark .prose {
+  --tw-prose-body: #E2E8F0;
+  --tw-prose-headings: #F8FAFC;
+  --tw-prose-lead: #94A3B8;
+  --tw-prose-links: #4ADE80;
+  --tw-prose-bold: #F1F5F9;
+  --tw-prose-counters: #94A3B8;
+  --tw-prose-bullets: #22C55E;
+  --tw-prose-hr: #334155;
+  --tw-prose-quotes: #CBD5E1;
+  --tw-prose-quote-borders: #22C55E;
+  --tw-prose-captions: #64748B;
+  --tw-prose-code: #E2E8F0;
+  --tw-prose-pre-code: #E2E8F0;
+  --tw-prose-pre-bg: #0F172A;
+  --tw-prose-th-borders: #334155;
+  --tw-prose-td-borders: #334155;
+}
+
+/* Dark scrollbar */
+html.dark ::-webkit-scrollbar-track { background: #1E293B; }
+html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #64748B; }
+
 *,
 *::before,
 *::after {

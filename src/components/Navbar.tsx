@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
+import ThemeToggle from "./ThemeToggle";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -39,7 +40,7 @@ export default function Navbar() {
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${
         isHeroPage && !scrolled
           ? "bg-navy-900 border-b border-white/10"
-          : "bg-white/95 backdrop-blur-md border-b border-border shadow-sm"
+          : "bg-card/95 backdrop-blur-md border-b border-border shadow-sm"
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -83,6 +84,7 @@ export default function Navbar() {
                 </Link>
               );
             })}
+            <ThemeToggle />
           </nav>
 
           {/* Mobile hamburger */}
@@ -119,7 +121,7 @@ export default function Navbar() {
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ${
           menuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
-        } ${isHeroPage && !scrolled ? "bg-navy-800 border-t border-white/10" : "bg-white border-t border-border"}`}
+        } ${isHeroPage && !scrolled ? "bg-navy-800 border-t border-white/10" : "bg-card border-t border-border"}`}
       >
         <nav className="px-4 py-3 flex flex-col gap-1" aria-label="Mobile navigation">
           {navLinks.map((link) => {

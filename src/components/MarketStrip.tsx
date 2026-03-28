@@ -68,7 +68,7 @@ export default function MarketStrip() {
   const { snapshot, loading } = useMarketData();
 
   if (loading) return (
-    <div className="w-full bg-white sm:overflow-hidden" aria-hidden="true">
+    <div className="w-full bg-card sm:overflow-hidden" aria-hidden="true">
       <div className="h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-10 gap-6 animate-pulse">
@@ -97,7 +97,7 @@ export default function MarketStrip() {
 
   return (
     <div
-      className="w-full bg-white sm:overflow-hidden"
+      className="w-full bg-card sm:overflow-hidden"
       aria-label="Live market prices"
     >
       {/* Top accent line — fading green matching the site accent divider */}

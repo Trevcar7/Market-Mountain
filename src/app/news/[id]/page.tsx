@@ -323,7 +323,7 @@ export default async function NewsStoryPage({ params }: Props) {
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       {/* Story body */}
-      <div className="bg-white">
+      <div className="bg-card">
       <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
         <article>
           <div className="prose prose-slate max-w-none">
