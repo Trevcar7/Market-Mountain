@@ -2,17 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-
-interface SearchResult {
-  type: "article" | "news";
-  id: string;
-  title: string;
-  excerpt: string;
-  url: string;
-  date: string;
-  category?: string;
-  ticker?: string;
-}
+import type { SearchResult } from "@/lib/search-types";
 
 export default function SearchBar() {
   const [open, setOpen] = useState(false);

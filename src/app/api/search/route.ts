@@ -3,20 +3,9 @@ import { getAllArticleSlugs, getArticle } from "@/lib/articles";
 import { getRedisClient } from "@/lib/redis";
 import type { NewsCollection, NewsItem } from "@/lib/news-types";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
+import type { SearchResult } from "@/lib/search-types";
 
 export const runtime = "nodejs";
-
-interface SearchResult {
-  type: "article" | "news";
-  id: string;
-  title: string;
-  excerpt: string;
-  url: string;
-  date: string;
-  category?: string;
-  ticker?: string;
-  relevance: number;
-}
 
 /**
  * Simple text relevance scorer — counts keyword matches in title, excerpt, and body.
@@ -141,7 +130,7 @@ export async function GET(request: NextRequest) {
 
   // Sort by relevance (highest first), then by date (newest first)
   results.sort((a, b) => {
-    if (b.relevance !== a.relevance) return b.relevance - a.relevance;
+    if ((b.relevance ?? 0) !== (a.relevance ?? 0)) return (b.relevance ?? 0) - (a.relevance ?? 0);
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 

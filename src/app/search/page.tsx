@@ -3,18 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-
-interface SearchResult {
-  type: "article" | "news";
-  id: string;
-  title: string;
-  excerpt: string;
-  url: string;
-  date: string;
-  category?: string;
-  ticker?: string;
-  relevance: number;
-}
+import type { SearchResult } from "@/lib/search-types";
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {

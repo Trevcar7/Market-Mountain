@@ -692,16 +692,10 @@ export async function fetchFmpQuote(
       if (typeof price2 === "number" && price2 > 0) return price2;
     }
 
-    // Last resort: company profile endpoint (confirmed working on FMP free tier)
-    const res3 = await fetch(
-      fmpUrl(`/api/v3/profile/${symbol}`),
-      { signal: withTimeout() }
-    );
-    if (res3.ok) {
-      const data3 = await res3.json();
-      const profile = Array.isArray(data3) ? data3[0] : data3;
-      const price3 = profile?.price ?? null;
-      if (typeof price3 === "number" && price3 > 0) return price3;
+    // Last resort: reuse fetchFmpCompanyProfile (confirmed working on FMP free tier)
+    const profile = await fetchFmpCompanyProfile(symbol);
+    if (profile?.price && typeof profile.price === "number" && profile.price > 0) {
+      return profile.price;
     }
 
     return null;
