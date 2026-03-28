@@ -4,7 +4,7 @@ import { getRedisClient } from "@/lib/redis";
 import type { Redis } from "@upstash/redis";
 import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic-client";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
-import { fetchBriefingMacroPanel, fetchBriefingWhatToWatch } from "@/lib/market-data";
+import { fetchBriefingMacroPanel, fetchBriefingWhatToWatch, FOMC_2026_MEETINGS } from "@/lib/market-data";
 import { applyArticlePatches } from "@/lib/news-patches";
 
 export const maxDuration = 30;
@@ -400,9 +400,18 @@ Summary: ${extractLeadParagraph(s.story)}`
     )
     .join("\n\n");
 
-  // Build macro calendar block for the prompt
-  const macroCalendarBlock = upcomingMacroEvents.length > 0
-    ? `\n\nUPCOMING MACRO CALENDAR (this week):\n${upcomingMacroEvents.map((e) => `- ${e.event} (${e.date})`).join("\n")}\n\nIMPORTANT: Your first 1-2 "whatToWatch" items MUST reference these actual scheduled macro events. Only use story-derived themes for the 3rd item if all calendar slots are filled.`
+  // Build macro calendar block for the prompt — include FOMC date
+  const todayStr = new Date().toISOString().split("T")[0];
+  const nextFomc = FOMC_2026_MEETINGS.find((m) => m.end >= todayStr);
+  const fomcLine = nextFomc
+    ? `- FOMC Meeting: ${nextFomc.start} to ${nextFomc.end}${nextFomc.sep ? " (includes SEP + dot plot)" : ""} — ${Math.floor((new Date(nextFomc.start).getTime() - Date.now()) / 86400000)} days away`
+    : "";
+  const calendarLines = [
+    ...upcomingMacroEvents.map((e) => `- ${e.event} (${e.date})`),
+    ...(fomcLine ? [fomcLine] : []),
+  ];
+  const macroCalendarBlock = calendarLines.length > 0
+    ? `\n\nUPCOMING MACRO CALENDAR:\n${calendarLines.join("\n")}\n\nIMPORTANT: Reference specific upcoming macro events in "whatToWatch". Do NOT duplicate — if you mention FOMC, mention it ONCE with the specific date. Only use story-derived themes for remaining slots.`
     : "";
 
   // Build active geopolitical themes block — ongoing market-moving situations
@@ -526,11 +535,24 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     }
   }
 
+  // Dedup: remove duplicate FOMC items (Claude may generate one AND fallback may inject one)
+  const fomcItems = whatToWatch.filter((w) => /fomc|federal open market/i.test(w.event));
+  if (fomcItems.length > 1) {
+    // Keep the longest/most detailed FOMC item, remove the rest
+    const bestFomc = fomcItems.reduce((best, item) =>
+      item.significance.length > best.significance.length ? item : best
+    );
+    whatToWatch = whatToWatch.filter((w) => !(/fomc|federal open market/i.test(w.event)) || w === bestFomc);
+  }
+
   // Fill remaining slots if Claude returned fewer than 3
   if (whatToWatch.length < 3) {
     try {
       const fmpEvents = await fetchBriefingWhatToWatch();
-      const merged = [...whatToWatch, ...fmpEvents].slice(0, 3);
+      // Filter out FOMC from fmpEvents if we already have one
+      const hasFomc = whatToWatch.some((w) => /fomc|federal open market/i.test(w.event));
+      const filtered = hasFomc ? fmpEvents.filter((e) => !/fomc|federal open market/i.test(e.event)) : fmpEvents;
+      const merged = [...whatToWatch, ...filtered].slice(0, 3);
       whatToWatch = merged.length > 0 ? merged : whatToWatch;
     } catch {
       // Non-fatal
