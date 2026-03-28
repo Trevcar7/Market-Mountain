@@ -11,6 +11,12 @@ export interface ArticleMeta {
   tags?: string[];
   updated?: string;
   disclaimer?: boolean;
+  // Research metadata — for track record and ticker pages
+  ticker?: string;               // Primary ticker (e.g., "FSLR", "SFM")
+  priceTarget?: number;           // Price target in dollars
+  priceAtPublish?: number;        // Stock price when article was published
+  rating?: "buy" | "hold" | "sell" | "neutral" | "watchlist";
+  disclosure?: string;            // Conflict of interest disclosure
 }
 
 export interface Article extends ArticleMeta {

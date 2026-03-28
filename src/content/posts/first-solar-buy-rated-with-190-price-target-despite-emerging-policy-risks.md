@@ -6,6 +6,10 @@ excerpt: "Despite a 41% post-election selloff driven by IRA uncertainty, First S
 tags: ["Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/first-solar.png"
+ticker: "FSLR"
+priceTarget: 190
+priceAtPublish: 130
+rating: "buy"
 ---
 
 ## Company Background

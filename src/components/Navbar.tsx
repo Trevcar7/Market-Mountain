@@ -11,6 +11,7 @@ const navLinks = [
   { href: "/news", label: "News" },
   { href: "/briefing", label: "Briefing" },
   { href: "/articles", label: "Articles" },
+  { href: "/track-record", label: "Track Record" },
   { href: "/about", label: "About" },
 ];
 

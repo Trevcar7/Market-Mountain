@@ -6,6 +6,10 @@ excerpt: "NEXTracker holds 23% global market share in solar tracking technology,
 tags: ["Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/nextracker.png"
+ticker: "NXT"
+priceTarget: 70
+priceAtPublish: 50
+rating: "buy"
 ---
 
 ## Company Background and Competition

@@ -10,7 +10,8 @@ import { categoryLabels, categoryGradients, categoryAccentBorder, categoryAccent
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
 import { formatDate } from "@/lib/article-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
-import { BLOCKED_SOURCES } from "@/lib/news";
+import { BLOCKED_SOURCES, TIER_1_SOURCES } from "@/lib/news";
+import { findRelatedStories } from "@/lib/related-stories";
 import { NewsInlineChart, NewsKeyDataInline } from "@/components/NewsInlineChart";
 import ReadingProgress from "@/components/ReadingProgress";
 import ShareBar from "@/components/ShareBar";
@@ -21,23 +22,28 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-async function getNewsItem(id: string): Promise<NewsItem | null> {
+async function getNewsItemWithCollection(id: string): Promise<{ item: NewsItem | null; allStories: NewsItem[] }> {
   // Return 404 immediately for suppressed articles
-  if (SUPPRESSED_ARTICLE_IDS.has(id)) return null;
+  if (SUPPRESSED_ARTICLE_IDS.has(id)) return { item: null, allStories: [] };
 
   const kv = getRedisClient();
-  if (!kv) return null;
+  if (!kv) return { item: null, allStories: [] };
 
   try {
     const data = await kv.get<NewsCollection>("news");
-    const raw = data?.news.find((n) => n.id === id) ?? null;
-    // Block direct URL access to March 12 articles
-    if (raw && new Date(raw.publishedAt).getTime() < MARCH_13_CUTOFF_MS) return null;
-    const item = raw ? applyArticlePatches(raw) : null;
-    return item;
+    const allStories = (data?.news ?? [])
+      .filter((n) => !SUPPRESSED_ARTICLE_IDS.has(n.id) && new Date(n.publishedAt).getTime() >= MARCH_13_CUTOFF_MS)
+      .map(applyArticlePatches);
+    const item = allStories.find((n) => n.id === id) ?? null;
+    return { item, allStories };
   } catch {
-    return null;
+    return { item: null, allStories: [] };
   }
+}
+
+async function getNewsItem(id: string): Promise<NewsItem | null> {
+  const { item } = await getNewsItemWithCollection(id);
+  return item;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -112,11 +118,12 @@ function MarketImpactBox({ items }: { items: MarketImpactItem[] }) {
 
 export default async function NewsStoryPage({ params }: Props) {
   const { id } = await params;
-  const item = await getNewsItem(id);
+  const { item, allStories } = await getNewsItemWithCollection(id);
   if (!item) notFound();
 
   const gradient = categoryGradients[item.category] ?? categoryGradients.other;
   const categoryLabel = categoryLabels[item.category] ?? "Market News";
+  const relatedStories = findRelatedStories(item, allStories, 3);
 
   // Unique sources for attribution — exclude blocked/low-quality outlets
   const uniqueSources = item.sourcesUsed
@@ -438,26 +445,38 @@ export default async function NewsStoryPage({ params }: Props) {
               Data Sources
             </p>
             <div className="flex flex-wrap gap-2">
-              {uniqueSources.map((src) =>
-                src.url ? (
+              {uniqueSources.map((src) => {
+                const isTier1 = TIER_1_SOURCES.some((t) => src.source.toLowerCase().includes(t));
+                const badge = isTier1 ? (
+                  <svg className="w-3 h-3 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-label="Verified source">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : null;
+                return src.url ? (
                   <a
                     key={src.source}
                     href={src.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-xs font-medium text-accent-700 hover:bg-slate-200 hover:text-accent-800 transition-colors break-words min-w-0 max-w-full"
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors break-words min-w-0 max-w-full ${
+                      isTier1
+                        ? "bg-accent-50 text-accent-700 hover:bg-accent-100"
+                        : "bg-surface-2 text-accent-700 hover:bg-border"
+                    }`}
                   >
+                    {badge}
                     {src.source}
                   </a>
                 ) : (
                   <span
                     key={src.source}
-                    className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-xs font-medium text-slate-500 break-words min-w-0 max-w-full"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface-2 text-xs font-medium text-text-muted break-words min-w-0 max-w-full"
                   >
+                    {badge}
                     {src.source}
                   </span>
-                )
-              )}
+                );
+              })}
             </div>
           </div>
 
@@ -482,6 +501,36 @@ export default async function NewsStoryPage({ params }: Props) {
         </article>
       </div>
       </div>
+
+      {/* Related Coverage */}
+      {relatedStories.length > 0 && (
+        <section className="bg-surface border-t border-border">
+          <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10">
+            <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-6">
+              Related Coverage
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {relatedStories.map((story) => (
+                <Link
+                  key={story.id}
+                  href={`/news/${story.id}`}
+                  className="group block p-4 rounded-lg border border-border hover:border-accent-300 hover:shadow-sm bg-card transition-all duration-200"
+                >
+                  <span className="text-[10px] font-semibold tracking-wider uppercase text-accent-600 mb-1.5 block">
+                    {categoryLabels[story.category] ?? "Market News"}
+                  </span>
+                  <h3 className="text-sm font-semibold text-text leading-snug line-clamp-3 group-hover:text-accent-700 transition-colors">
+                    {story.title}
+                  </h3>
+                  <time className="text-[11px] text-text-light mt-2 block">
+                    {formatDate(story.publishedAt)}
+                  </time>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </>
   );
 }

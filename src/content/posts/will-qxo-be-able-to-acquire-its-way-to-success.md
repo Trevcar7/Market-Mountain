@@ -7,6 +7,8 @@ tags: ["Stock Analysis", "Macro"]
 disclaimer: true
 coverImage: "/images/qxo.png"
 coverImagePosition: "50% 30%"
+ticker: "QXO"
+rating: "watchlist"
 ---
 
 ## Introducing the Man Behind It All

@@ -6,6 +6,10 @@ excerpt: "Despite a 25% post-earnings drop driven by cautious Q4 guidance, Sprou
 tags: ["Stock Analysis"]
 disclaimer: true
 coverImage: "/images/sprouts.png"
+ticker: "SFM"
+priceTarget: 150
+priceAtPublish: 79
+rating: "buy"
 ---
 
 ## Background

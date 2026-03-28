@@ -6,6 +6,10 @@ excerpt: "The S&P 500 erases 2025 losses on U.S.–China trade pause. First Sola
 tags: ["Market Commentary", "Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/markets-march-higher.png"
+ticker: "FSLR"
+priceTarget: 262
+priceAtPublish: 191
+rating: "buy"
 ---
 
 ## Stocks Erase Early Losses, Now Flat for 2025
