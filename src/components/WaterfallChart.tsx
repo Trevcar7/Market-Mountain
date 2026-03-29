@@ -36,8 +36,8 @@ const CHARTS: Record<WaterfallVariant, WaterfallConfig> = {
   },
 };
 
-const CHART_HEIGHT = 220;
-const BAR_AREA = 180;
+const CHART_HEIGHT = 280;
+const BAR_AREA = 200;
 
 export default function WaterfallChart({
   variant,
@@ -110,7 +110,7 @@ export default function WaterfallChart({
       </div>
 
       {/* Chart */}
-      <div className="bg-card px-4 sm:px-6 pt-5 pb-3">
+      <div className="bg-card px-4 sm:px-6 pt-10 pb-3">
         <div
           className="relative flex items-end gap-1 sm:gap-2"
           style={{ height: `${CHART_HEIGHT}px` }}
@@ -138,7 +138,7 @@ export default function WaterfallChart({
               <div
                 key={i}
                 className="relative z-10 flex flex-col items-center flex-1"
-                style={{ height: `${CHART_HEIGHT - 20}px` }}
+                style={{ height: `${CHART_HEIGHT - 36}px` }}
               >
                 {/* Value label */}
                 <div
@@ -163,7 +163,7 @@ export default function WaterfallChart({
                 <div
                   style={{
                     position: "absolute",
-                    bottom: `${bar.bottom + 20}px`,
+                    bottom: `${bar.bottom + 36}px`,
                     height: `${Math.max(3, bar.height)}px`,
                     width: "100%",
                     maxWidth: "56px",
