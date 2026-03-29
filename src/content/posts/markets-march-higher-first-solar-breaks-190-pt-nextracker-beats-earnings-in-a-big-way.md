@@ -2,7 +2,7 @@
 title: "Markets March Higher, First Solar Breaks $190 PT, NEXTracker Beats on Earnings in a Big Way"
 date: "2025-05-14"
 readTime: "4 min read"
-excerpt: "The S&P 500 erases 2025 losses on U.S.–China trade pause. First Solar blows past my $190 target — new PT is $262. NEXTracker posts a major earnings beat: revenues up 25.5% YoY, EPS beats by 32%."
+excerpt: "The S&P 500 erases 2025 losses on U.S.–China trade pause. First Solar blows past my $190 target. New PT is $262. NEXTracker posts a major earnings beat: revenues up 25.5% YoY, EPS beats by 32%."
 tags: ["Market Commentary", "Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/markets-march-higher.png"
@@ -22,7 +22,7 @@ Markets stayed generally flat in response. However, the Trump Administration sub
 
 As Mother's Day weekend came to an end, the Trump Administration announced that the **U.S. and China agreed to a 90-day tariff pause**. This brought the previous tariff rate on U.S. imports from China of **145% down to 30%**. China followed suit and reduced its 125% tariff to **10% on U.S. goods**. Following this news, the equity markets marched higher, with the **S&P 500 up over 4% this week**.
 
-## First Solar Surges Beyond My $190 Target — What's Next?
+## First Solar Surges Beyond My $190 Target: What's Next?
 
 New policy developments confirm that the **IRA 45x solar tax credits will likely remain intact**. The Trump Administration's "Big, Beautiful Bill" has made its way out of the Ways and Means Committee and into the House of Representatives. Investors expected the bill would significantly revise or even slash Solar's 45x tax credits. However, it has only minor revisions, including a phase-out process beginning in 2029.
 
@@ -50,6 +50,6 @@ NEXTracker's EPS continues to grow at a remarkable rate, experiencing a **CAGR o
 
 ### Bentek Acquisition
 
-NEXTracker also announced the **acquisition of Bentek Corporation for $78 million**. With this acquisition, NEXTracker gains cutting-edge electrical technology and a broadened supply chain, further decreasing costs. Bentek specializes in **electric balance of system (EBOS)** technology — electrical infrastructure used to carry electricity across solar fields.
+NEXTracker also announced the **acquisition of Bentek Corporation for $78 million**. With this acquisition, NEXTracker gains cutting-edge electrical technology and a broadened supply chain, further decreasing costs. Bentek specializes in **electric balance of system (EBOS)** technology, electrical infrastructure used to carry electricity across solar fields.
 
 NEXTracker's earnings report blew analyst expectations out of the water. The company continues to expand global operations and grow important financial metrics at a rate that analysts struggle to keep up with. With significant revenue growth and profitability expansion, the future is bright for NEXTracker.

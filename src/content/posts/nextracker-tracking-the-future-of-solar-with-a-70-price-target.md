@@ -2,7 +2,7 @@
 title: "NEXTracker: Tracking the Future of Solar with a $70 Price Target"
 date: "2025-05-12"
 readTime: "5 min read"
-excerpt: "NEXTracker holds 23% global market share in solar tracking technology, boasts a CAGR of 30%, and carries a $4.5B backlog. My DCF analysis points to $67/share — I'm placing a $70 price target with 40% upside."
+excerpt: "NEXTracker holds 23% global market share in solar tracking technology, boasts a CAGR of 30%, and carries a $4.5B backlog. My DCF analysis points to $67/share. I'm placing a $70 price target with 40% upside."
 tags: ["Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/nextracker.png"
@@ -28,7 +28,7 @@ From 2013 through 2023, NEXTracker has maintained industry leadership with a **g
 
 ## Revisiting the Inflation Reduction Act
 
-Like First Solar, NEXTracker has benefited from the **Inflation Reduction Act (IRA)** and carries similar risks — sensitivity to changes in governmental policy and potential reduction in IRA tax credits. I have previously argued that any revision to the IRA is unlikely to cut tax benefits for the solar industry significantly, if at all.
+Like First Solar, NEXTracker has benefited from the **Inflation Reduction Act (IRA)** and carries similar risks: sensitivity to changes in governmental policy and potential reduction in IRA tax credits. I have previously argued that any revision to the IRA is unlikely to cut tax benefits for the solar industry significantly, if at all.
 
 ## Boom or Bottleneck? NEXTracker's $8B Backlog Challenge
 
@@ -54,8 +54,8 @@ These are just a few examples of NEXTracker's significant operations and partner
 
 NEXTracker has maintained market dominance through significant R&D spending and strategic acquisitions. In 2024, NEXTracker acquired two companies:
 
-- **Ojjo** — Developed specialized technology that makes installing steel pipe foundations more efficient, with less drilling required on hard, rocky terrain. Expects a cheaper, more efficient installation process.
-- **Solar Pile International** — Developed specialized piling technology, including special steel beams that allow solar farms to be solidly built on weakened soil or terrain.
+- **Ojjo**: Developed specialized technology that makes installing steel pipe foundations more efficient, with less drilling required on hard, rocky terrain. Expects a cheaper, more efficient installation process.
+- **Solar Pile International**: Developed specialized piling technology, including special steel beams that allow solar farms to be solidly built on weakened soil or terrain.
 
 These acquisitions were pursued to cut costs, gain access to specialized technologies, and decrease limitations when building on unreliable terrain.
 

@@ -1,8 +1,8 @@
 ---
-title: "Sprouts Farmers Market—Why I Bought the Dip: $150 Price Target"
+title: "Sprouts Farmers Market: Why I Bought the Dip, $150 Price Target"
 date: "2025-11-03"
 readTime: "3 min read"
-excerpt: "Despite a 25% post-earnings drop driven by cautious Q4 guidance, Sprouts Farmers Market's fundamentals remain strong. My DCF analysis implies a fair value of $153/share — a 94% premium to the October 31 price."
+excerpt: "Despite a 25% post-earnings drop driven by cautious Q4 guidance, Sprouts Farmers Market's fundamentals remain strong. My DCF analysis implies a fair value of $153/share, a 94% premium to the October 31 price."
 tags: ["Stock Analysis"]
 disclaimer: true
 coverImage: "/images/sprouts.png"
@@ -42,7 +42,7 @@ Although Sprouts has yet to obtain its optimal capital structure, management may
 
 ## Discounted Cash Flow Valuation
 
-When performing the discounted cash flow analysis (DCF), I utilized a **long-term growth rate (LTGR) of 2%** and a **WACC of 7.24%**. Based on these assumptions, my DCF analysis yields an implied fair value of **$153 per share** — a **94% premium** to the market price of $79 as of October 31.
+When performing the discounted cash flow analysis (DCF), I utilized a **long-term growth rate (LTGR) of 2%** and a **WACC of 7.24%**. Based on these assumptions, my DCF analysis yields an implied fair value of **$153 per share**, a **94% premium** to the market price of $79 as of October 31.
 
 If company management does begin to lever up as interest rates decline, the WACC would decrease to approximately 6.94%, giving an implied share price of **$163 per share**, or a 107% increase from the stock's current level.
 

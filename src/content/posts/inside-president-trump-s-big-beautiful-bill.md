@@ -11,7 +11,7 @@ coverImagePosition: "center 25%"
 
 ## Breaking Down the One Big Beautiful Bill Act
 
-On **July 4th, 2025**, President Donald Trump signed the **One Big Beautiful Bill Act (OBBB)**, commonly referred to as the "Big Beautiful Bill," into law. While the bill has sparked significant debate — particularly over its expansive spending, Medicaid impacts, and accelerated phase-out of renewable energy credits — its provisions reach across a wide array of policy areas. Below is a breakdown of the Act's most critical elements.
+On **July 4th, 2025**, President Donald Trump signed the **One Big Beautiful Bill Act (OBBB)**, commonly referred to as the "Big Beautiful Bill," into law. While the bill has sparked significant debate, particularly over its expansive spending, Medicaid impacts, and accelerated phase-out of renewable energy credits, its provisions reach across a wide array of policy areas. Below is a breakdown of the Act's most critical elements.
 
 ---
 

@@ -15,15 +15,15 @@ rating: "watchlist"
 
 Brad Jacobs is an outspoken CEO with an attractive track record of building great companies that deliver high returns on equity. Jacobs has seen significant success as CEO of multiple companies, including:
 
-- **United Waste (IPO 1992)** — consolidated and sold to Waste Management in 1997 for $1.9 billion, delivering **55% compounded annual returns** to investors.
-- **United Rentals (URI)** — a roll-up of heavy equipment rental companies, generated **~20,000% returns** during Jacobs' tenure as CEO from 1997 to 2007.
-- **XPO** — a freight company that Jacobs took public in 2012, delivering **5,000% returns** from 2012 to 2024.
-- **GXO** — a spin-off from XPO in 2021. Returns have been sluggish since the initial spin-off.
-- **RXO** — also a spin-off from XPO in 2021. Like GXO, has suffered from subpar performance since inception.
+- **United Waste (IPO 1992)**: consolidated and sold to Waste Management in 1997 for $1.9 billion, delivering **55% compounded annual returns** to investors.
+- **United Rentals (URI)**: a roll-up of heavy equipment rental companies, generated **~20,000% returns** during Jacobs' tenure as CEO from 1997 to 2007.
+- **XPO**: a freight company that Jacobs took public in 2012, delivering **5,000% returns** from 2012 to 2024.
+- **GXO**: a spin-off from XPO in 2021. Returns have been sluggish since the initial spin-off.
+- **RXO**: also a spin-off from XPO in 2021. Like GXO, has suffered from subpar performance since inception.
 
 Jacobs lives by his lifelong motto, "Create shareholder value," and often admits that without this, he questions his very purpose. He is not afraid to vocalize and instate grand expectations as he enters a business that operates within a fragmented industry. Jacobs has done just this for almost 40 years and has completed **over 500 acquisitions** during his tenure.
 
-His strategy is to identify a large, fragmented industry that has room for growth in the future, gather investors, purchase a business, and then utilize this business and the raised capital to continue acquiring and integrating other companies within the industry. Jacobs has also stated he will never overpay for an acquisition. This is a notable reason for his interest in a large, fragmented industry over a smaller one — a larger industry provides a multitude of acquisition targets.
+His strategy is to identify a large, fragmented industry that has room for growth in the future, gather investors, purchase a business, and then utilize this business and the raised capital to continue acquiring and integrating other companies within the industry. Jacobs has also stated he will never overpay for an acquisition. This is a notable reason for his interest in a large, fragmented industry over a smaller one. A larger industry provides a multitude of acquisition targets.
 
 ## In Comes QXO
 
@@ -35,11 +35,11 @@ Jacobs was able to raise **$5 billion in cash**, with $900 million from himself,
 - **Strong future growth**: Over 6–8% annually
 - **Operational inefficiencies** that Jacobs believes he can solve through AI and modernization
 
-Jacobs' goal with QXO is to roll up the industry, integrating each acquisition in sequence while deploying AI to build more efficient operations — eventually leading to increased margins. Publicly, Jacobs has stated QXO will achieve **$50 billion in recurring revenue within the next decade**, which implies a roughly 1,000% increase in revenues since it went public in January 2025.
+Jacobs' goal with QXO is to roll up the industry, integrating each acquisition in sequence while deploying AI to build more efficient operations, eventually leading to increased margins. Publicly, Jacobs has stated QXO will achieve **$50 billion in recurring revenue within the next decade**, which implies a roughly 1,000% increase in revenues since it went public in January 2025.
 
 ## The First Acquisition
 
-On **April 29, 2025**, QXO made its first acquisition. The company acquired **Beacon Roofing Supply** in an **$11 billion buyout** at $124 per share — a 10.8x multiple of Beacon's 2025 EBITDA and 10.1x its 2026 EBITDA, a slight premium to industry averages.
+On **April 29, 2025**, QXO made its first acquisition. The company acquired **Beacon Roofing Supply** in an **$11 billion buyout** at $124 per share, a 10.8x multiple of Beacon's 2025 EBITDA and 10.1x its 2026 EBITDA, a slight premium to industry averages.
 
 Investors quickly approved, and QXO's stock doubled within months of the deal. This strategic acquisition has quickly led QXO to become one of the largest distributors in the U.S. building products market. It has also granted QXO long-standing trust, as Beacon has been in business since 1928, with key distribution centers near major cities and areas undergoing significant redevelopment.
 

@@ -2,7 +2,7 @@
 title: "First Solar: Buy-Rated with $190 Price Target Despite Emerging Policy Risks"
 date: "2025-03-31"
 readTime: "5 min read"
-excerpt: "Despite a 41% post-election selloff driven by IRA uncertainty, First Solar's fundamentals remain compelling. My multi-model valuation — DCF, EV/EBITDA, PE, P/CF — all converge below fair value, supporting a $190 price target."
+excerpt: "Despite a 41% post-election selloff driven by IRA uncertainty, First Solar's fundamentals remain compelling. My multi-model valuation (DCF, EV/EBITDA, PE, P/CF) all converge below fair value, supporting a $190 price target."
 tags: ["Stock Analysis", "Energy"]
 disclaimer: true
 coverImage: "/images/first-solar.png"
@@ -59,13 +59,13 @@ The risks of cutting the act are significant:
 - A hit to GDP of around **$190 billion** in 2035
 - A sharp **$32 billion increase in energy costs** over the next 10 years
 
-Moving forward, it is possible to see some restructuring of the Act — particularly benefits geared toward the electric vehicle sector. However, it is **unlikely First Solar will see any significant changes** to current tax benefits, considering it is a U.S. company creating jobs in a growing energy sector during a period in which the U.S. seeks to increase domestic investment and expand energy capabilities.
+Moving forward, it is possible to see some restructuring of the Act, particularly benefits geared toward the electric vehicle sector. However, it is **unlikely First Solar will see any significant changes** to current tax benefits, considering it is a U.S. company creating jobs in a growing energy sector during a period in which the U.S. seeks to increase domestic investment and expand energy capabilities.
 
 ![IRA Climate Projects and Investments by State](/images/charts/fslr-ira-map.png)
 
 ## Tariff Protections
 
-Some other political concerns are the threat of tariffs on countries such as Canada, Mexico, and many others. Rest assured, **most of First Solar's raw materials are sourced from the U.S.** — including the glass and steel required for its panel production.
+Some other political concerns are the threat of tariffs on countries such as Canada, Mexico, and many others. Rest assured, **most of First Solar's raw materials are sourced from the U.S.**, including the glass and steel required for its panel production.
 
 Additionally, the company is also **protected from solar panel production coming out of China**, as the U.S. has imposed a **50% tariff on Chinese-produced panels**, making imports of these solar panels very unlikely to occur and decreasing domestic competition for the company.
 

@@ -21,7 +21,7 @@ Companies such as Delta Air Lines (DAL), United Airlines (UAL), Southwest Airlin
 
 ## High Fixed Costs and Slim Margins Leave Little Room for Error
 
-Due to the nature of the airline industry, carriers operate with substantial fixed costs. These include the ownership and leasing of aircraft, ground equipment, and salary expenses. Combined with weak pricing power — where ticket prices are often dictated by market competition rather than pricing strength — airlines tend to generate consistently low margins.
+Due to the nature of the airline industry, carriers operate with substantial fixed costs. These include the ownership and leasing of aircraft, ground equipment, and salary expenses. Combined with weak pricing power, where ticket prices are often dictated by market competition rather than pricing strength, airlines tend to generate consistently low margins.
 
 Based on my analysis of the big four domestic carriers (Delta, United, Southwest, and American), the **average operating margin hovers around 6%**, with **net profit margins just above 3.5%**. With margins this thin, these companies have limited flexibility to return capital to shareholders or absorb economic shocks comfortably.
 
