@@ -135,7 +135,7 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
   return (
     <Link
       href={href}
-      className="group flex flex-col rounded-lg bg-card border border-border hover:border-navy-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      className="group flex flex-col rounded-lg bg-card border border-border hover:border-navy-200 dark:hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
     >
       {/* Cover: photo if available, else gradient — 16:9 */}
       <div className={`relative w-full aspect-video overflow-hidden bg-gradient-to-br ${gradient}`}>

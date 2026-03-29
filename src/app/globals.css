@@ -78,6 +78,10 @@ html.dark .prose {
   --tw-prose-td-borders: #334155;
 }
 
+/* Chart SVG color tokens — dark mode overrides for inline news charts */
+:root { --chart-grid: #e2e8f0; --chart-axis: #94a3b8; --chart-text: #64748b; }
+html.dark { --chart-grid: #334155; --chart-axis: #94a3b8; --chart-text: #cbd5e1; }
+
 /* Dark mode bar chart value labels — override inline color with lighter variant */
 html.dark .bar-label { color: var(--lc-dk) !important; }
 

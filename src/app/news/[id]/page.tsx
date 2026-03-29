@@ -92,10 +92,10 @@ function MarketImpactBox({ items }: { items: MarketImpactItem[] }) {
             <span
               className={`flex items-center gap-0.5 text-xs tabular-nums ${
                 item.direction === "up"
-                  ? "text-emerald-600"
+                  ? "text-emerald-600 dark:text-emerald-400"
                   : item.direction === "down"
-                  ? "text-red-600"
-                  : "text-slate-400"
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-slate-400 dark:text-slate-300"
               }`}
             >
               {item.direction === "up" ? (

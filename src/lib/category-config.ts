@@ -33,14 +33,14 @@ export const categoryGradients: Record<string, string> = {
   other: "from-slate-800 via-slate-900 to-navy-900",
 };
 
-/** Light-mode badge colors for briefing and list views. */
+/** Badge colors for briefing and list views (light + dark). */
 export const categoryColors: Record<string, string> = {
-  macro: "bg-blue-100 text-blue-800",
-  earnings: "bg-purple-100 text-purple-800",
-  markets: "bg-amber-100 text-amber-800",
-  policy: "bg-teal-100 text-teal-800",
-  crypto: "bg-orange-100 text-orange-800",
-  other: "bg-slate-100 text-slate-700",
+  macro: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  earnings: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  markets: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  policy: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
+  crypto: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+  other: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
 /** Category-specific accent for pull quotes and section dividers. */
@@ -54,10 +54,10 @@ export const categoryAccentBorder: Record<string, string> = {
 };
 
 export const categoryAccentText: Record<string, string> = {
-  macro: "text-blue-600",
-  earnings: "text-purple-600",
-  markets: "text-amber-600",
-  policy: "text-teal-600",
-  crypto: "text-orange-600",
-  other: "text-accent-600",
+  macro: "text-blue-600 dark:text-blue-400",
+  earnings: "text-purple-600 dark:text-purple-400",
+  markets: "text-amber-600 dark:text-amber-400",
+  policy: "text-teal-600 dark:text-teal-400",
+  crypto: "text-orange-600 dark:text-orange-400",
+  other: "text-accent-600 dark:text-accent-400",
 };

@@ -138,6 +138,18 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bamazon\b|\bAMZN\b/i, imageUrl: "https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=1200&q=80", category: "markets", sentiment: "positive" },
   // Jio / Reliance IPO → India / emerging market
   { test: /\bjio\b|\breliance\b/i, imageUrl: "https://images.unsplash.com/photo-1468254095679-bbcba94a7066?w=1200&q=80" },
+  // Qualcomm / AMD → semiconductor chip close-up
+  { test: /\bqualcomm\b|\bQCOM\b|\bAMD\b/i, imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80", category: "markets" },
+  // Palantir → data analytics / AI interface
+  { test: /\bpalantir\b|\bPLTR\b/i, imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80", category: "markets" },
+  // Broadcom → networking / tech infrastructure
+  { test: /\bbroadcom\b|\bAVGO\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets" },
+  // Warren Buffett / Berkshire Hathaway → Omaha / value investing
+  { test: /\bbuffett\b|\bberkshire\b|\bBRK\b/i, imageUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80", category: "markets" },
+  // CPI / Consumer Price Index → inflation data
+  { test: /\bCPI\b|\bconsumer price/i, imageUrl: "https://images.unsplash.com/photo-1553729459-afe8f2e2b300?w=1200&q=80", category: "macro" },
+  // Japan / Nikkei / BOJ → Tokyo / Asian markets
+  { test: /\bjapan\b|\bnikkei\b|\bBOJ\b|\bbank of japan\b/i, imageUrl: "https://images.unsplash.com/photo-1536098561742-ca998e48cbcc?w=1200&q=80", category: "macro" },
 ];
 
 /**

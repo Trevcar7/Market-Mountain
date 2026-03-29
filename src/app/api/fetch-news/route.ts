@@ -903,15 +903,16 @@ async function handleNewsFetch() {
       );
     }
 
-    // 4d. Per-category cap
-    const categoryCount: Record<string, number> = {};
+    // 4d. Per-category cap — sort by importance first so lowest-importance groups are dropped
     const catCapBefore = afterEntityMatch.length;
-    const afterCategoryCap = afterEntityMatch.filter((g) => {
+    const sortedForCap = [...afterEntityMatch].sort((a, b) => b.importance - a.importance);
+    const categoryCount: Record<string, number> = {};
+    const afterCategoryCap = sortedForCap.filter((g) => {
       const cat = g.category;
       categoryCount[cat] = (categoryCount[cat] ?? 0) + 1;
       const cap = PER_CATEGORY_CAP[cat] ?? 2;
       if (categoryCount[cat] > cap) {
-        console.log(`[fetch-news] Category cap: dropping "${g.topic}" (${cat} already at ${cap})`);
+        console.log(`[fetch-news] Category cap: dropping "${g.topic}" (${cat} at ${cap}, importance ${g.importance.toFixed(1)})`);
         return false;
       }
       return true;

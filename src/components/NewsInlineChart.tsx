@@ -111,10 +111,10 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   };
 
   const ACCENT = "#22C55E";
-  const GRID = "#e2e8f0";
-  const AXIS = "#94a3b8";
-  const TEXT = "#64748b";
-  const REF_COLOR = "#94a3b8";
+  const GRID = "var(--chart-grid, #e2e8f0)";
+  const AXIS = "var(--chart-axis, #94a3b8)";
+  const TEXT = "var(--chart-text, #64748b)";
+  const REF_COLOR = "var(--chart-axis, #94a3b8)";
 
   const maxLabels = 7;
   const labelStep = chart.labels.length > maxLabels ? Math.ceil(chart.labels.length / maxLabels) : 1;
@@ -173,15 +173,15 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   };
 
   const renderChartHeader = () => (
-    <div className="bg-slate-50 border-b border-border px-5 py-3">
+    <div className="bg-surface-2 border-b border-border px-5 py-3">
       {chart.chartLabel && (
-        <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400 mb-1">
+        <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-text-light mb-1">
           {chart.chartLabel}
         </p>
       )}
-      <p className="text-sm font-semibold text-slate-800">{chart.title}</p>
+      <p className="text-sm font-semibold text-text">{chart.title}</p>
       {chart.timeRange && (
-        <p className="text-xs text-slate-500 mt-0.5">{chart.timeRange}</p>
+        <p className="text-xs text-text-muted mt-0.5">{chart.timeRange}</p>
       )}
     </div>
   );
@@ -189,12 +189,12 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   const renderChartFooter = () => {
     if (!chart.source && !chart.caption) return null;
     return (
-      <div className="bg-slate-50 border-t border-border px-5 py-2.5 space-y-0.5">
+      <div className="bg-surface-2 border-t border-border px-5 py-2.5 space-y-0.5">
         {chart.caption && (
-          <p className="text-xs text-slate-600 italic leading-relaxed">{chart.caption}</p>
+          <p className="text-xs text-text-muted italic leading-relaxed">{chart.caption}</p>
         )}
         {chart.source && (
-          <p className="text-[10px] text-slate-400">Source: {chart.source}</p>
+          <p className="text-[10px] text-text-light">Source: {chart.source}</p>
         )}
       </div>
     );

@@ -1001,6 +1001,25 @@ Rules:
 - ENERGY is preferred over COMMODITIES for oil/gas stories
 - Do not invent new tags outside this list
 
+TONE VARIATION BY CATEGORY (Step 19)
+Vary your analytical voice based on the story's primary category to prevent all articles sounding alike:
+- MACRO stories: Emphasize rate sensitivity, economic transmission mechanisms, and duration risk. Use fixed-income language where appropriate.
+- EARNINGS stories: Emphasize quality of the beat (revenue vs. cost cuts), forward guidance signal strength, and whether the market reaction is justified by the underlying numbers.
+- POLICY stories: Emphasize redistributive impact, sector-level winners and losers, and implementation timeline risk.
+- MARKETS stories: Emphasize positioning, flow data, and technical levels alongside fundamentals.
+- ENERGY/COMMODITIES stories: Emphasize supply-demand dynamics, inventory data, and geopolitical supply risk.
+
+BRAND COLOR GUIDANCE (Step 20)
+When a story prominently features a specific company, note its brand identity in the chartData metadata if a chart is included. This helps the rendering layer apply company-appropriate visual theming. Common mappings:
+- NVIDIA: green (#76B900)
+- Meta/Facebook: blue (#0668E1)
+- Apple: gray (#A2AAAD)
+- Tesla: red (#CC0000)
+- Amazon: orange (#FF9900)
+- Google/Alphabet: blue (#4285F4)
+- Microsoft: blue (#00A4EF)
+If the company is not listed, omit brand color guidance and the default accent green will be used.
+
 CLAIM PRECISION VALIDATION (Step 19a)
 Never state unsourced quantitative rules or sensitivity ratios as if they are universal financial laws.
 - BAD: "Every 25 basis point increase in the risk-free rate reduces the present value of healthcare cash flows by 2 to 3 percent."
