@@ -12,6 +12,7 @@ priceAtPublish: 50
 rating: "buy"
 targetHit: true
 coverageStatus: "active"
+targetHitDate: "2025-08-19"
 ---
 
 ## Company Background and Competition

@@ -324,7 +324,7 @@ export default async function TrackRecordPage() {
                       <span>{formatDateShort(pick.date)}</span>
                       <span className="text-border">|</span>
                       <span>
-                        {pick.coverageStatus === "closed" && pick.targetHitDate
+                        {pick.targetHitDate && (pick.targetHitConfirmed || pick.coverageStatus === "closed")
                           ? `${formatHoldingPeriod(Math.floor((new Date(pick.targetHitDate).getTime() - new Date(pick.date).getTime()) / 86400000))} to target`
                           : `${formatHoldingPeriod(pick.holdingDays)} held`}
                       </span>
