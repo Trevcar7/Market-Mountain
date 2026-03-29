@@ -36,8 +36,7 @@ const CHARTS: Record<WaterfallVariant, WaterfallConfig> = {
   },
 };
 
-const CHART_HEIGHT = 280;
-const BAR_AREA = 200;
+const BAR_AREA_H = 200;
 
 export default function WaterfallChart({
   variant,
@@ -50,9 +49,9 @@ export default function WaterfallChart({
   // Compute running totals and bar positions
   const bars: {
     label: string;
-    value: number;
-    bottom: number;
-    height: number;
+    displayVal: string;
+    bottomPx: number;
+    heightPx: number;
     type: WaterfallStep["type"];
   }[] = [];
   let running = 0;
@@ -62,41 +61,40 @@ export default function WaterfallChart({
       running = step.value;
       bars.push({
         label: step.label,
-        value: step.value,
-        bottom: 0,
-        height: (step.value / maxVal) * BAR_AREA,
+        displayVal: cfg.valFormat(step.value),
+        bottomPx: 0,
+        heightPx: (step.value / maxVal) * BAR_AREA_H,
         type: step.type,
       });
     } else if (step.type === "subtract") {
       const absVal = Math.abs(step.value);
-      const barH = (absVal / maxVal) * BAR_AREA;
+      const barH = (absVal / maxVal) * BAR_AREA_H;
       running += step.value;
-      const bottomPx = (running / maxVal) * BAR_AREA;
+      const bottomPx = (running / maxVal) * BAR_AREA_H;
       bars.push({
         label: step.label,
-        value: step.value,
-        bottom: bottomPx,
-        height: barH,
+        displayVal: `-${cfg.valFormat(step.value)}`,
+        bottomPx,
+        heightPx: barH,
         type: step.type,
       });
     } else if (step.type === "add") {
-      const barH = (step.value / maxVal) * BAR_AREA;
-      const bottomPx = (running / maxVal) * BAR_AREA;
+      const barH = (step.value / maxVal) * BAR_AREA_H;
+      const bottomPx = (running / maxVal) * BAR_AREA_H;
       running += step.value;
       bars.push({
         label: step.label,
-        value: step.value,
-        bottom: bottomPx,
-        height: barH,
+        displayVal: cfg.valFormat(step.value),
+        bottomPx,
+        heightPx: barH,
         type: step.type,
       });
     } else {
-      // total — show as grounded bar at running total
       bars.push({
         label: step.label,
-        value: running,
-        bottom: 0,
-        height: (running / maxVal) * BAR_AREA,
+        displayVal: cfg.valFormat(running),
+        bottomPx: 0,
+        heightPx: (running / maxVal) * BAR_AREA_H,
         type: step.type,
       });
     }
@@ -109,89 +107,80 @@ export default function WaterfallChart({
         <p className="text-sm font-semibold text-text">{cfg.title}</p>
       </div>
 
-      {/* Chart */}
-      <div className="bg-card px-4 sm:px-6 pt-10 pb-3">
-        <div
-          className="relative flex items-end gap-1 sm:gap-2"
-          style={{ height: `${CHART_HEIGHT}px` }}
-        >
+      {/* Chart area */}
+      <div className="bg-card px-4 sm:px-6 pt-4 pb-4">
+        {/* Bar area with fixed height */}
+        <div className="relative" style={{ height: `${BAR_AREA_H + 16}px` }}>
           {/* Grid lines */}
           {[0.25, 0.5, 0.75, 1.0].map((f) => (
             <div
               key={f}
               className="absolute left-0 right-0 border-t border-border/60"
-              style={{ bottom: `${f * BAR_AREA}px` }}
+              style={{ bottom: `${f * BAR_AREA_H}px` }}
             />
           ))}
 
-          {/* Waterfall bars */}
-          {bars.map((bar, i) => {
-            const isNeg = bar.type === "subtract";
-            const isTotal = bar.type === "total";
-            const barColor = isNeg
-              ? "#94A3B8"
-              : isTotal
-                ? cfg.color
-                : cfg.color;
+          {/* Bars + value labels */}
+          <div className="absolute inset-0 flex items-end gap-1 sm:gap-2">
+            {bars.map((bar, i) => {
+              const isNeg = bar.type === "subtract";
+              const isTotal = bar.type === "total" || bar.type === "start";
+              const barColor = isNeg ? "#94A3B8" : cfg.color;
 
-            return (
-              <div
-                key={i}
-                className="relative z-10 flex flex-col items-center flex-1"
-                style={{ height: `${CHART_HEIGHT - 36}px` }}
-              >
-                {/* Value label */}
-                <div
-                  className="flex flex-col items-center justify-end flex-1"
-                  style={{ paddingBottom: `${bar.bottom + bar.height}px` }}
-                >
+              return (
+                <div key={i} className="relative flex-1 flex justify-center">
+                  {/* Value label - positioned above bar top */}
                   <span
-                    className="bar-label text-[9px] sm:text-[10px] font-semibold leading-none mb-1"
-                    style={
-                      {
-                        color: isNeg ? "#94A3B8" : cfg.color,
-                        "--lc-dk": isNeg ? "#CBD5E1" : cfg.darkColor,
-                      } as React.CSSProperties
-                    }
-                  >
-                    {isNeg ? "-" : ""}
-                    {cfg.valFormat(bar.value)}
-                  </span>
-                </div>
-
-                {/* Bar */}
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: `${bar.bottom + 36}px`,
-                    height: `${Math.max(3, bar.height)}px`,
-                    width: "100%",
-                    maxWidth: "56px",
-                    backgroundColor: barColor,
-                    borderRadius: "3px 3px 0 0",
-                    opacity: isNeg ? 0.45 : isTotal ? 1 : 1,
-                  }}
-                />
-
-                {/* Connector line to next bar */}
-                {i < bars.length - 1 && !isTotal && (
-                  <div
-                    className="absolute border-t border-dashed border-text-light/40"
+                    className="bar-label absolute text-[9px] sm:text-[10px] font-semibold leading-none text-center"
                     style={{
-                      bottom: `${(isNeg ? bar.bottom : bar.bottom + bar.height) + 20}px`,
-                      right: "-50%",
+                      bottom: `${bar.bottomPx + bar.heightPx + 4}px`,
+                      color: isNeg ? "#94A3B8" : cfg.color,
+                      "--lc-dk": isNeg ? "#CBD5E1" : cfg.darkColor,
+                    } as React.CSSProperties}
+                  >
+                    {bar.displayVal}
+                  </span>
+
+                  {/* Bar */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: `${bar.bottomPx}px`,
+                      height: `${Math.max(3, bar.heightPx)}px`,
                       width: "100%",
+                      maxWidth: "56px",
+                      backgroundColor: barColor,
+                      borderRadius: "3px 3px 0 0",
+                      opacity: isNeg ? 0.45 : 1,
                     }}
                   />
-                )}
 
-                {/* Category label */}
-                <span className="text-[9px] sm:text-[10px] font-medium text-text-muted text-center whitespace-pre-line leading-tight absolute bottom-0">
-                  {bar.label}
-                </span>
-              </div>
-            );
-          })}
+                  {/* Connector line to next bar */}
+                  {i < bars.length - 1 && bar.type !== "total" && (
+                    <div
+                      className="absolute border-t border-dashed border-text-light/40"
+                      style={{
+                        bottom: `${isNeg ? bar.bottomPx : bar.bottomPx + bar.heightPx}px`,
+                        right: "-50%",
+                        width: "100%",
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Category labels - separate row below chart */}
+        <div className="flex gap-1 sm:gap-2 mt-2">
+          {bars.map((bar, i) => (
+            <div key={i} className="flex-1 text-center">
+              <span className="text-[9px] sm:text-[10px] font-medium text-text-muted whitespace-pre-line leading-tight">
+                {bar.label}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
