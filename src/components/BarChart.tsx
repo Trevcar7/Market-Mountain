@@ -5,7 +5,9 @@ type BarChartVariant =
   | "sprouts-debtequity"
   | "siri-revenue-ebitda"
   | "siri-fcf"
-  | "siri-debt-coverage";
+  | "siri-debt-coverage"
+  | "fslr-revenue"
+  | "fslr-tax-credits";
 
 interface SeriesConfig {
   name: string;
@@ -112,6 +114,28 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
     yFormat: (v) => `$${v.toFixed(2)}B`,
     caption: "Net Debt/EBITDA of 3.6x. At current FCF, debt could be fully retired in 7.6 years. Source: SiriusXM 10-K filings.",
   },
+  "fslr-revenue": {
+    title: "First Solar Revenue Growth ($B)",
+    data: [
+      { label: "FY2023", values: [3.3] },
+      { label: "FY2024", values: [4.2] },
+      { label: "FY2025E", values: [5.5] },
+    ],
+    series: [{ name: "Revenue", color: "#EE2821" }],
+    yFormat: (v) => `$${v.toFixed(1)}B`,
+    caption: "FY2025E based on midpoint of $5.3-5.8B management guidance. Source: First Solar 10-K filings.",
+  },
+  "fslr-tax-credits": {
+    title: "First Solar 45X Tax Credit Revenue ($B)",
+    data: [
+      { label: "FY2023", values: [0.66] },
+      { label: "FY2024", values: [0.82] },
+      { label: "FY2025E", values: [1.68] },
+    ],
+    series: [{ name: "Tax Credits", color: "#EE2821" }],
+    yFormat: (v) => `$${v.toFixed(2)}B`,
+    caption: "IRA 45X manufacturing tax credits sold at ~$0.95 on the dollar. FY2025E based on midpoint of $1.65-1.7B guidance.",
+  },
 };
 
 const CHART_HEIGHT = 200;
@@ -173,6 +197,7 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
                         style={{
                           height: `${barH}px`,
                           width: "100%",
+                          maxWidth: "56px",
                           backgroundColor: cfg.series[si].color,
                           borderRadius: "3px 3px 0 0",
                           opacity: si > 0 ? 0.8 : 1,
