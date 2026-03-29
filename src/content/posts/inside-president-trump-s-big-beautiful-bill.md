@@ -1,7 +1,7 @@
 ---
 title: "Inside President Trump's \"Big Beautiful Bill\""
 date: "2025-07-13"
-readTime: "6 min read"
+readTime: "7 min read"
 excerpt: "On July 4th, 2025, President Trump signed the One Big Beautiful Bill Act into law. Here's a breakdown of the key provisions: Medicaid work requirements, SNAP changes, new tax deductions, SALT expansion, and more."
 tags: ["Policy & Economics", "Macro"]
 disclaimer: false
@@ -19,10 +19,10 @@ On **July 4th, 2025**, President Donald Trump signed the **One Big Beautiful Bil
 
 ### Medicaid
 
-One of the most controversial provisions involves changes to Medicaid eligibility and enrollment. An estimated **10–15 million Americans** may lose Medicaid coverage, largely due to recently implemented work requirements and verification procedures. These changes are projected to result in approximately **$1 trillion in federal spending reductions** over the next decade.
+One of the most controversial provisions involves changes to Medicaid eligibility and enrollment. An estimated **10-15 million Americans** may lose Medicaid coverage, largely due to recently implemented work requirements and verification procedures. These changes are projected to result in approximately **$1 trillion in federal spending reductions** over the next decade.
 
 **Key provisions:**
-- Adults aged 19–64 must complete at least **80 hours/month** (20 hours/week) of work, volunteering, schooling, or community service to maintain eligibility.
+- Adults aged 19-64 must complete at least **80 hours/month** (20 hours/week) of work, volunteering, schooling, or community service to maintain eligibility.
 - More frequent eligibility checks (**twice a year**, instead of annually).
 - Requirements begin in **December 2026**, with states required to follow guidelines by April 1, 2027.
 
@@ -43,7 +43,7 @@ The SNAP program is likely to experience an approximate **$200 billion spending 
 **Key provisions:**
 - Requires states to provide funding for the food assistance program; funding recalculated every 3 years instead of 5.
 - Parents of children aged **14 or older** must meet work requirements of 80 hours/month.
-- New work requirement age range of **18–64** (phased in from 2025 to 2027).
+- New work requirement age range of **18-64** (phased in from 2025 to 2027).
 
 ---
 
@@ -75,6 +75,14 @@ Americans may deduct up to **$10,000 annually** in auto loan interest if the veh
 
 ---
 
+## Renewable Energy Credit Phase-Out
+
+The Act accelerates the phase-out of several clean energy tax credits originally established under the Inflation Reduction Act. The **45X advanced manufacturing production tax credit**, which has been a significant revenue source for domestic solar manufacturers like First Solar, begins its phase-out in **2029** rather than the originally scheduled timeline. Other clean energy incentives, including the investment tax credit for solar and wind projects, face similar accelerated sunsets.
+
+For investors in the renewable energy sector, this creates a defined timeline. Companies benefiting from these credits, including First Solar and NEXTracker, will need to demonstrate that their business models can sustain margins without the subsidy tailwind. In the near term, the phase-out may actually accelerate project development as developers rush to qualify before credits expire, potentially creating a demand surge in 2027-2028 followed by a slowdown.
+
+---
+
 ## Family and Child Revisions
 
 ### Increased Child Tax Credit
@@ -100,12 +108,27 @@ Defense spending increases by **$153 billion**, including:
 - $29 billion for new **Navy ships**
 - $15 billion for **nuclear deterrence**
 
+The defense allocation signals continued prioritization of military modernization and may serve as a tailwind for major defense contractors. The remaining balance is distributed across readiness, personnel, and infrastructure programs.
+
+---
+
+## What This Means for Markets
+
+The Act's provisions carry implications across several sectors:
+
+- **Healthcare**: Medicaid and SNAP spending cuts totaling over $1.2 trillion over the next decade could pressure hospital operators and managed care companies that serve Medicaid populations. Investors should monitor enrollment trends and state-level implementation timelines.
+- **Defense**: The $153 billion increase is a direct tailwind for defense contractors and related supply chains. Companies with exposure to missile defense, naval construction, and nuclear modernization stand to benefit.
+- **Energy**: The accelerated phase-out of renewable energy credits creates a defined runway for solar and wind companies. Near-term demand may accelerate as developers rush to qualify, but post-2029 margins face uncertainty without the subsidy floor.
+- **Consumer**: Expanded standard deductions, SALT relief, and new deductions for tips and overtime could boost disposable income for middle-income households, potentially supporting consumer spending in the near term.
+
 ---
 
 ## Final Thoughts
 
-The "Big Beautiful Bill" addresses major aspects of American tax policy, healthcare, defense, and family financial planning. Supporters commend the act's focus on tax relief, national security, and long-term investment in American families. Critics scrutinize its costs, impact on healthcare access, and the accelerated phase-out of certain renewable energy incentives.
-
-Whether the Act is viewed as a bold restructuring or a costly overhaul, it is clear the "Big Beautiful Bill" will have an imprint on the U.S. economy and the daily lives of Americans in the coming years.
+The "Big Beautiful Bill" addresses major aspects of American tax policy, healthcare, defense, and family financial planning. Its provisions will have a measurable impact on corporate earnings, consumer spending, and sector dynamics across the economy. For investors, the key takeaway is that policy creates both winners and losers: defense and consumer discretionary sectors stand to benefit, while healthcare providers serving Medicaid populations and renewable energy companies reliant on expiring credits face headwinds that will need to be managed.
 
 > *Note: This article does not reflect political bias and is intended solely to provide factual summaries of the Act's key provisions.*
+
+---
+
+*References available upon request.*
