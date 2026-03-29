@@ -111,29 +111,29 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
   const max = Math.max(...flat);
 
   return (
-    <div className="my-8 overflow-x-auto rounded-xl border border-slate-200 shadow-sm not-prose">
+    <div className="my-8 overflow-x-auto rounded-xl border border-border shadow-sm not-prose">
       <table className="w-full border-collapse text-sm">
         <thead>
           {/* WACC title row */}
           <tr>
-            <th colSpan={2} className="bg-slate-50 border-b border-r border-slate-200 p-2" />
+            <th colSpan={2} className="bg-surface-2 border-b border-r border-border p-2" />
             <th
               colSpan={cfg.waccValues.length}
-              className="bg-slate-50 border-b border-slate-200 py-2.5 text-center text-[11px] font-bold tracking-widest uppercase text-slate-500"
+              className="bg-surface-2 border-b border-border py-2.5 text-center text-[11px] font-bold tracking-widest uppercase text-text-muted"
             >
               WACC
             </th>
           </tr>
           {/* Column header row */}
           <tr>
-            <th className="bg-slate-50 border-b border-r border-slate-200 w-7 p-0" />
-            <th className="bg-slate-50 border-b border-r border-slate-200 px-3 py-2 text-right text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+            <th className="bg-surface-2 border-b border-r border-border w-7 p-0" />
+            <th className="bg-surface-2 border-b border-r border-border px-3 py-2 text-right text-[11px] font-semibold text-text-light whitespace-nowrap">
               ${cfg.baseCaseValue}
             </th>
             {cfg.waccValues.map((w) => (
               <th
                 key={w}
-                className="bg-slate-50 border-b border-r border-slate-200 px-2 sm:px-4 py-2 sm:py-2.5 text-center text-[11px] sm:text-xs font-semibold text-slate-700"
+                className="bg-surface-2 border-b border-r border-border px-2 sm:px-4 py-2 sm:py-2.5 text-center text-[11px] sm:text-xs font-semibold text-text"
               >
                 {w}
               </th>
@@ -147,14 +147,14 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
               {ri === 0 && (
                 <td
                   rowSpan={cfg.data.length}
-                  className="bg-slate-50 border-r border-slate-200 text-center text-[11px] font-bold tracking-widest uppercase text-slate-500 w-7"
+                  className="bg-surface-2 border-r border-border text-center text-[11px] font-bold tracking-widest uppercase text-text-muted w-7"
                   style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                 >
                   LTGR
                 </td>
               )}
               {/* LTGR percentage */}
-              <td className="bg-slate-50 border-b border-r border-slate-200 px-2 sm:px-3 py-2.5 sm:py-3.5 text-right text-[11px] sm:text-xs font-semibold text-slate-700 whitespace-nowrap">
+              <td className="bg-surface-2 border-b border-r border-border px-2 sm:px-3 py-2.5 sm:py-3.5 text-right text-[11px] sm:text-xs font-semibold text-text whitespace-nowrap">
                 {cfg.ltgrValues[ri]}
               </td>
               {/* Heat map data cells */}
@@ -164,7 +164,7 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
                 return (
                   <td
                     key={ci}
-                    className="border-b border-r border-slate-200 py-2.5 sm:py-3.5 px-2 sm:px-4 text-center text-xs sm:text-sm font-bold"
+                    className="border-b border-r border-border py-2.5 sm:py-3.5 px-2 sm:px-4 text-center text-xs sm:text-sm font-bold"
                     style={{
                       backgroundColor: heatColor(t),
                       color: "rgba(10,22,40,0.82)",
@@ -182,7 +182,7 @@ export default function DCFHeatmap({ variant }: { variant: DCFVariant }) {
         </tbody>
       </table>
       {/* Caption bar */}
-      <div className="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+      <div className="bg-surface-2 border-t border-border px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-text-light">
         <span>
           Base case:{" "}
           <span className="font-semibold text-text-muted">

@@ -50,8 +50,8 @@ export default function TableOfContents({ headings, readTime }: TableOfContentsP
               href={`#${id}`}
               className={`block text-xs leading-snug py-1 pl-3 border-l-2 transition-colors duration-150 ${
                 activeId === id
-                  ? "border-accent-500 text-navy-900 font-semibold"
-                  : "border-border text-text-muted hover:text-navy-700 hover:border-navy-300"
+                  ? "border-accent-500 text-text font-semibold"
+                  : "border-border text-text-muted hover:text-text hover:border-accent-500/50"
               }`}
             >
               {text}
@@ -61,7 +61,7 @@ export default function TableOfContents({ headings, readTime }: TableOfContentsP
       </ul>
       <button
         type="button"
-        className="block text-[10px] text-text-light hover:text-navy-700 mt-4 pl-3 transition-colors text-left"
+        className="block text-[10px] text-text-light hover:text-text mt-4 pl-3 transition-colors text-left"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       >
         Back to top

@@ -24,9 +24,9 @@ function cellCls(type: CellType, isHeader: boolean): string {
     return "bg-navy-900 text-white";
   }
   switch (type) {
-    case "hi":     return "bg-emerald-50 text-emerald-700 font-semibold";
-    case "pos":    return "text-emerald-600 font-semibold";
-    case "neg":    return "text-red-500";
+    case "hi":     return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold";
+    case "pos":    return "text-emerald-600 dark:text-emerald-400 font-semibold";
+    case "neg":    return "text-red-500 dark:text-red-400";
     case "muted":  return "text-text-light";
     default:       return "";
   }
@@ -218,7 +218,7 @@ function MarketShareTable() {
           <div key={i} className="flex items-center gap-3 px-5 py-2.5">
             <span
               className={`text-xs font-medium w-28 flex-shrink-0 ${
-                item.highlight ? "text-emerald-700 font-semibold" : "text-text-muted"
+                item.highlight ? "text-emerald-700 dark:text-emerald-400 font-semibold" : "text-text-muted"
               }`}
             >
               {item.name}
@@ -234,7 +234,7 @@ function MarketShareTable() {
             </div>
             <span
               className={`text-xs font-semibold tabular-nums w-8 text-right flex-shrink-0 ${
-                item.highlight ? "text-emerald-700" : "text-text-muted"
+                item.highlight ? "text-emerald-700 dark:text-emerald-400" : "text-text-muted"
               }`}
             >
               {item.pct}%

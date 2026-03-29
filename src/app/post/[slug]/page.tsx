@@ -233,9 +233,9 @@ export default async function ArticlePage({ params }: Props) {
 
         {/* Conflict of Interest Disclosure */}
         {article.disclosure && (
-          <div className="mt-10 p-4 sm:p-5 rounded-xl border-l-4 border-l-amber-500 border border-amber-200/50 bg-amber-50/50 text-sm leading-relaxed">
-            <strong className="text-amber-800 font-semibold">Disclosure: </strong>
-            <span className="text-amber-900/80">{article.disclosure}</span>
+          <div className="mt-10 p-4 sm:p-5 rounded-xl border-l-4 border-l-amber-500 border border-amber-200/50 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-900/20 text-sm leading-relaxed">
+            <strong className="text-amber-800 dark:text-amber-200 font-semibold">Disclosure: </strong>
+            <span className="text-amber-900/80 dark:text-amber-100/80">{article.disclosure}</span>
           </div>
         )}
 
@@ -243,7 +243,7 @@ export default async function ArticlePage({ params }: Props) {
         {article.disclaimer !== false && (
           <div className={`mt-10 p-4 sm:p-5 rounded-xl text-text-muted text-sm leading-relaxed ${
             article.tags?.some(t => /equity research|price target/i.test(t))
-              ? "border-l-4 border-l-amber-400 border border-amber-200/50 bg-amber-50/50"
+              ? "border-l-4 border-l-amber-400 border border-amber-200/50 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-900/20"
               : "border border-border bg-surface-2"
           }`}>
             <strong className="text-text font-semibold">Disclaimer: </strong>
@@ -280,7 +280,7 @@ export default async function ArticlePage({ params }: Props) {
                 href="https://www.linkedin.com/in/trevor-carnovsky/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-[#0077B5] hover:text-[#005f93] font-medium transition-colors"
+                className="inline-flex items-center gap-2 text-sm text-[#0077B5] hover:text-[#005f93] dark:text-[#60A5FA] dark:hover:text-[#93C5FD] font-medium transition-colors"
                 aria-label="Connect with Trevor Carnovsky on LinkedIn"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

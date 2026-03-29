@@ -12,6 +12,7 @@ type BarChartVariant =
 interface SeriesConfig {
   name: string;
   color: string;
+  darkColor: string;
 }
 
 interface GroupData {
@@ -37,7 +38,7 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "2028", values: [11.3] },
       { label: "2029", values: [12.3] },
     ],
-    series: [{ name: "Revenue", color: "#2a783a" }],
+    series: [{ name: "Revenue", color: "#2a783a", darkColor: "#4ADE80" }],
     yFormat: (v) => `$${v}B`,
     caption: "Revenue in billions USD. Forecast based on 10 to 13% annual growth rate.",
   },
@@ -49,8 +50,8 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "Albertsons", values: [1.9, 1.2] },
     ],
     series: [
-      { name: "Operating Margin", color: "#2a783a" },
-      { name: "Net Profit Margin", color: "#6bbd45" },
+      { name: "Operating Margin", color: "#2a783a", darkColor: "#4ADE80" },
+      { name: "Net Profit Margin", color: "#6bbd45", darkColor: "#86EFAC" },
     ],
     yFormat: (v) => `${v}%`,
   },
@@ -62,9 +63,9 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "Albertsons", values: [0.9, 0.22, 0.03] },
     ],
     series: [
-      { name: "Current Ratio", color: "#2a783a" },
-      { name: "Quick Ratio", color: "#6bbd45" },
-      { name: "Cash Ratio", color: "#94A3B8" },
+      { name: "Current Ratio", color: "#2a783a", darkColor: "#4ADE80" },
+      { name: "Quick Ratio", color: "#6bbd45", darkColor: "#86EFAC" },
+      { name: "Cash Ratio", color: "#94A3B8", darkColor: "#CBD5E1" },
     ],
     yFormat: (v) => v.toFixed(2),
   },
@@ -75,7 +76,7 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "Kroger", values: [3.03] },
       { label: "Albertsons", values: [4.17] },
     ],
-    series: [{ name: "D/E Ratio", color: "#2a783a" }],
+    series: [{ name: "D/E Ratio", color: "#2a783a", darkColor: "#4ADE80" }],
     yFormat: (v) => v.toFixed(2),
   },
   "siri-revenue-ebitda": {
@@ -86,8 +87,8 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "FY2025", values: [8.56, 2.67] },
     ],
     series: [
-      { name: "Revenue", color: "#0000EB" },
-      { name: "Adj. EBITDA", color: "#94A3B8" },
+      { name: "Revenue", color: "#0000EB", darkColor: "#818CF8" },
+      { name: "Adj. EBITDA", color: "#94A3B8", darkColor: "#CBD5E1" },
     ],
     yFormat: (v) => `$${v.toFixed(1)}B`,
     caption: "Revenue declining 0.6% to 2.9% annually while EBITDA margins remain stable at 31%. Source: SiriusXM 10-K filings.",
@@ -99,7 +100,7 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "FY2024", values: [1.02] },
       { label: "FY2025", values: [1.26] },
     ],
-    series: [{ name: "Free Cash Flow", color: "#0000EB" }],
+    series: [{ name: "Free Cash Flow", color: "#0000EB", darkColor: "#818CF8" }],
     yFormat: (v) => `$${v.toFixed(2)}B`,
     caption: "FCF rebounded to $1.26B in FY2025, representing a 15% FCF margin. Source: SiriusXM 10-K filings.",
   },
@@ -110,7 +111,7 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "Adj. EBITDA", values: [2.67] },
       { label: "Annual FCF", values: [1.26] },
     ],
-    series: [{ name: "Amount ($B)", color: "#0000EB" }],
+    series: [{ name: "Amount ($B)", color: "#0000EB", darkColor: "#818CF8" }],
     yFormat: (v) => `$${v.toFixed(2)}B`,
     caption: "Net Debt/EBITDA of 3.6x. At current FCF, debt could be fully retired in 7.6 years. Source: SiriusXM 10-K filings.",
   },
@@ -121,7 +122,7 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "FY2024", values: [4.2] },
       { label: "FY2025E", values: [5.5] },
     ],
-    series: [{ name: "Revenue", color: "#EE2821" }],
+    series: [{ name: "Revenue", color: "#EE2821", darkColor: "#FCA5A5" }],
     yFormat: (v) => `$${v.toFixed(1)}B`,
     caption: "FY2025E based on midpoint of $5.3-5.8B management guidance. Source: First Solar 10-K filings.",
   },
@@ -132,7 +133,7 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
       { label: "FY2024", values: [0.82] },
       { label: "FY2025E", values: [1.68] },
     ],
-    series: [{ name: "Tax Credits", color: "#EE2821" }],
+    series: [{ name: "Tax Credits", color: "#EE2821", darkColor: "#FCA5A5" }],
     yFormat: (v) => `$${v.toFixed(2)}B`,
     caption: "IRA 45X manufacturing tax credits sold at ~$0.95 on the dollar. FY2025E based on midpoint of $1.65-1.7B guidance.",
   },
@@ -188,8 +189,8 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
                       style={{ height: `${CHART_HEIGHT - 20}px`, justifyContent: "flex-end" }}
                     >
                       <span
-                        className="text-[10px] font-semibold leading-none mb-1"
-                        style={{ color: cfg.series[si].color }}
+                        className="bar-label text-[10px] font-semibold leading-none mb-1"
+                        style={{ color: cfg.series[si].color, "--lc-dk": cfg.series[si].darkColor } as React.CSSProperties}
                       >
                         {cfg.yFormat(val)}
                       </span>
