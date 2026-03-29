@@ -3,7 +3,7 @@ import Link from "next/link";
 import { extractPicks } from "@/lib/track-record";
 import { fetchFmpQuote, fetchFmpStockHistory } from "@/lib/market-data";
 
-export const revalidate = 300; // ISR: 5 min
+export const revalidate = 86400; // ISR: once per day (closing prices)
 
 export const metadata: Metadata = {
   title: "Track Record",
@@ -410,7 +410,7 @@ export default async function TrackRecordPage() {
           </h3>
           <p className="text-xs text-text-muted leading-relaxed">
             Entry prices are the closing price on publication date. <strong className="text-text">Price Target</strong> is the
-            published valuation target. <strong className="text-text">Current Price</strong> updates every 5 minutes from live market data.
+            published valuation target. <strong className="text-text">Current Price</strong> updates daily using closing prices.
             Closed picks lock in the return at the price target. The S&amp;P 500 benchmark uses actual SPY prices
             over each pick&apos;s holding period. Past performance does not guarantee future results.
           </p>
