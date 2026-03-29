@@ -40,13 +40,17 @@ This strategic pivot matters for two reasons. First, it addresses the demographi
 
 ## Financial Strength: Cash Flow Machine
 
-Revenue has declined modestly over the past three years, falling 0.6% in FY2023, 2.9% in FY2024, and 1.6% in FY2025. The primary driver is self-pay subscriber erosion as streaming alternatives like Spotify and Apple Music capture a growing share of in-car listening, particularly among younger drivers. The rapid adoption of CarPlay and Android Auto has made it easier than ever to bypass satellite radio entirely. That said, the rate of decline appears to be moderating, and SiriusXM's financial profile remains remarkably stable. Adjusted EBITDA margins have held steady at approximately **31%** across all three fiscal years, demonstrating the operating leverage inherent in the satellite model.
+Revenue has declined modestly over the past three years. After holding essentially flat in FY2023, it fell 2.9% in FY2024 and 1.6% in FY2025. The primary driver is self-pay subscriber erosion as streaming alternatives like Spotify and Apple Music capture a growing share of in-car listening, particularly among younger drivers. The rapid adoption of CarPlay and Android Auto has made it easier than ever to bypass satellite radio entirely. That said, the rate of decline appears to be moderating, and SiriusXM's financial profile remains remarkably stable. Adjusted EBITDA margins have held steady at approximately **31%** across all three fiscal years, demonstrating the operating leverage inherent in the satellite model.
 
 <BarChart variant="siri-revenue-ebitda" />
 
 More importantly, free cash flow has proven resilient and is trending in the right direction. FCF rebounded to **$1.26 billion** in FY2025, a **15% FCF margin**, after a softer FY2024. This level of cash generation from a business with a $7.4 billion market cap is extraordinary and represents a **17% free cash flow yield** at today's price.
 
 <BarChart variant="siri-fcf" />
+
+The following waterfall illustrates how SiriusXM's $8.56 billion in revenue translates to $1.26 billion in free cash flow, highlighting where dollars are consumed along the way.
+
+<WaterfallChart variant="siri-revenue-to-fcf" />
 
 ## Addressing the Elephant in the Room: Debt
 

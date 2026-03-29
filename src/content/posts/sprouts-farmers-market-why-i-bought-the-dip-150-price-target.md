@@ -24,7 +24,7 @@ Sprouts also benefits from a smaller-format store model, averaging roughly 28,00
 
 ## Earnings Overreaction
 
-Despite robust fundamentals, including **13% revenue growth** and **34% EPS growth** year over year, Sprouts stock fell 25% following cautious same-store sales guidance for Q4 2025. Management guided for same-store sales growth in the low single digits, a deceleration from the mid-single-digit pace earlier in the year. The market punished the stock as if growth were evaporating entirely. In reality, same-store sales were still positive, and revenue growth remained in the double digits. This appears to be a classic overreaction to a short-term slowdown in an otherwise strong growth story, with continued double-digit annual revenue growth expected around 10 to 13%.
+Despite robust fundamentals, including **13% revenue growth** and **34% EPS growth** year over year, Sprouts stock fell 25% following cautious same-store sales guidance for Q4 2025. Management guided for same-store sales growth in the low single digits, a deceleration from the mid-single-digit pace earlier in the year. The market punished the stock as if growth were evaporating entirely. In reality, same-store sales were still positive, and revenue growth remained in the double digits. This appears to be a classic overreaction to a short-term slowdown in an otherwise strong growth story, with continued double-digit annual revenue growth expected around 10 to 11%.
 
 <BarChart variant="sprouts-revenue" />
 

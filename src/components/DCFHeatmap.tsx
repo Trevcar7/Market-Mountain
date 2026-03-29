@@ -35,14 +35,14 @@ const CONFIGS: Record<DCFVariant, DCFConfig> = {
     baseCaseCol: 2,
   },
   firstsolar: {
-    baseCaseValue: 192,
+    baseCaseValue: 190,
     currentPrice: 126,
     waccValues: ["9.53%", "10.53%", "11.53%", "12.53%", "13.53%"],
     ltgrValues: ["2.00%", "3.00%", "4.00%", "5.00%", "6.00%"],
     data: [
       [206, 177, 155, 137, 122],
       [235, 199, 171, 150, 132],
-      [274, 227, 192, 165, 144],
+      [274, 227, 190, 165, 144],
       [331, 264, 219, 185, 160],
       [419, 319, 255, 211, 179],
     ],

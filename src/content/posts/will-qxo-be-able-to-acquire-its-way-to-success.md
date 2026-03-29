@@ -16,8 +16,8 @@ rating: "watchlist"
 Brad Jacobs is an outspoken CEO with an attractive track record of building great companies that deliver high returns on equity. Jacobs has seen significant success as CEO of multiple companies, including:
 
 - **United Waste (IPO 1992)**: consolidated and sold to Waste Management in 1997 for $1.9 billion, delivering **55% compounded annual returns** to investors.
-- **United Rentals (URI)**: a roll-up of heavy equipment rental companies, generated **~20,000% returns** during Jacobs' tenure as CEO from 1997 to 2007.
-- **XPO**: a freight company that Jacobs took public in 2012, delivering **5,000% returns** from 2012 to 2024.
+- **United Rentals (URI)**: a roll-up of heavy equipment rental companies that became the world's largest equipment rental provider, **outperforming the S&P 500 by 2.2x** during Jacobs' tenure from 1997 to 2007.
+- **XPO**: a freight company that Jacobs grew from $175 million in revenue to $15 billion, delivering **over 3,000% total shareholder returns** and ranking as the 7th best-performing Fortune 500 stock of the decade.
 - **GXO**: a spin-off from XPO in 2021. Returns have been sluggish since the initial spin-off.
 - **RXO**: also a spin-off from XPO in 2021. Like GXO, has suffered from subpar performance since inception.
 

@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import DCFHeatmap from "@/components/DCFHeatmap";
 import BarChart from "@/components/BarChart";
 import DataTable from "@/components/DataTable";
+import WaterfallChart from "@/components/WaterfallChart";
 import ReadingProgress from "@/components/ReadingProgress";
 import ArticleCard from "@/components/ArticleCard";
 import TableOfContents from "@/components/TableOfContents";
@@ -226,7 +227,7 @@ export default async function ArticlePage({ params }: Props) {
         <div className="prose prose-lg prose-slate max-w-none prose-drop-cap">
           <MDXRemote
             source={article.content}
-            components={{ DCFHeatmap, BarChart, DataTable }}
+            components={{ DCFHeatmap, BarChart, DataTable, WaterfallChart }}
             options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }}
           />
         </div>
