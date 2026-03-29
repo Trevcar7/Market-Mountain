@@ -1,4 +1,4 @@
-type DCFVariant = "nextracker" | "firstsolar" | "sprouts";
+type DCFVariant = "nextracker" | "firstsolar" | "sprouts" | "siriusxm";
 
 interface DCFConfig {
   baseCaseValue: number;
@@ -15,6 +15,7 @@ const PUBLISH_DATES: Record<DCFVariant, string> = {
   nextracker: "May 2025",
   firstsolar: "Mar 2025",
   sprouts: "Nov 2025",
+  siriusxm: "Mar 2026",
 };
 
 const CONFIGS: Record<DCFVariant, DCFConfig> = {
@@ -59,6 +60,21 @@ const CONFIGS: Record<DCFVariant, DCFConfig> = {
       [247, 189, 153, 129, 111],
       [358, 247, 189, 153, 129],
       [461, 293, 214, 169, 140],
+    ],
+    baseCaseRow: 2,
+    baseCaseCol: 2,
+  },
+  siriusxm: {
+    baseCaseValue: 39,
+    currentPrice: 22,
+    waccValues: ["5.0%", "6.0%", "7.0%", "8.0%", "9.0%"],
+    ltgrValues: ["-1.0%", "-0.5%", "0.0%", "0.5%", "1.0%"],
+    data: [
+      [54, 42, 33, 26, 21],
+      [59, 46, 36, 28, 23],
+      [66, 50, 39, 31, 24],
+      [74, 56, 43, 34, 26],
+      [85, 62, 47, 37, 29],
     ],
     baseCaseRow: 2,
     baseCaseCol: 2,

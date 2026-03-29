@@ -2,7 +2,10 @@ type BarChartVariant =
   | "sprouts-revenue"
   | "sprouts-profitability"
   | "sprouts-liquidity"
-  | "sprouts-debtequity";
+  | "sprouts-debtequity"
+  | "siri-revenue-ebitda"
+  | "siri-fcf"
+  | "siri-debt-coverage";
 
 interface SeriesConfig {
   name: string;
@@ -72,6 +75,42 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
     ],
     series: [{ name: "D/E Ratio", color: "#22C55E" }],
     yFormat: (v) => v.toFixed(2),
+  },
+  "siri-revenue-ebitda": {
+    title: "SiriusXM Revenue & Adjusted EBITDA ($B)",
+    data: [
+      { label: "FY2023", values: [8.96, 2.79] },
+      { label: "FY2024", values: [8.70, 2.73] },
+      { label: "FY2025", values: [8.56, 2.67] },
+    ],
+    series: [
+      { name: "Revenue", color: "#0000EB" },
+      { name: "Adj. EBITDA", color: "#94A3B8" },
+    ],
+    yFormat: (v) => `$${v.toFixed(1)}B`,
+    caption: "Revenue declining 0.6% to 2.9% annually while EBITDA margins remain stable at 31%. Source: SiriusXM 10-K filings.",
+  },
+  "siri-fcf": {
+    title: "SiriusXM Free Cash Flow ($B)",
+    data: [
+      { label: "FY2023", values: [1.18] },
+      { label: "FY2024", values: [1.02] },
+      { label: "FY2025", values: [1.26] },
+    ],
+    series: [{ name: "Free Cash Flow", color: "#0000EB" }],
+    yFormat: (v) => `$${v.toFixed(2)}B`,
+    caption: "FCF rebounded to $1.26B in FY2025, representing a 15% FCF margin. Source: SiriusXM 10-K filings.",
+  },
+  "siri-debt-coverage": {
+    title: "SiriusXM Debt & EBITDA Coverage",
+    data: [
+      { label: "Total Debt", values: [9.60] },
+      { label: "Adj. EBITDA", values: [2.67] },
+      { label: "Annual FCF", values: [1.26] },
+    ],
+    series: [{ name: "Amount ($B)", color: "#0000EB" }],
+    yFormat: (v) => `$${v.toFixed(2)}B`,
+    caption: "Net Debt/EBITDA of 3.6x. At current FCF, debt could be fully retired in 7.6 years. Source: SiriusXM 10-K filings.",
   },
 };
 

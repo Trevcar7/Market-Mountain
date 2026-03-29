@@ -6,7 +6,9 @@ export type DataTableVariant =
   | "fslr-valuation"
   | "nxt-earnings-beat"
   | "salt-rates"
-  | "nxt-market-share";
+  | "nxt-market-share"
+  | "siri-valuation-summary"
+  | "siri-reverse-dcf";
 
 // Cell type — string = plain, object = styled
 type CellType = "default" | "accent" | "pos" | "neg" | "hi" | "muted";
@@ -109,6 +111,32 @@ const TABLES: Record<Exclude<DataTableVariant, "nxt-market-share">, TableConfig>
       ["New York", "8.82%"],
     ],
     caption: "SALT deduction cap increases from $10,000 to $40,000 starting 2025, reverting to $10,000 in 2030.",
+  },
+  "siri-valuation-summary": {
+    title: "SiriusXM — DCF Valuation Summary",
+    headers: ["Metric", "Value"],
+    rows: [
+      ["Current Share Price", "$22"],
+      ["Implied Share Price (DCF)", { text: "$39", type: "pos" }],
+      ["Upside to Fair Value", { text: "77%", type: "pos" }],
+      ["WACC", "7.0%"],
+      ["Terminal Growth Rate", "0.0%"],
+      ["Revenue Growth Assumption", "Declining (−1.5% → 0%)"],
+      ["EBIT Margin", "21.5%"],
+    ],
+    caption: "Base case assumes revenue declines of 1.5% tapering to 0% over a 5-year forecast period — a deliberately conservative assumption.",
+  },
+  "siri-reverse-dcf": {
+    title: "SiriusXM — Reverse DCF: What the Market Is Pricing In",
+    headers: ["Metric", "Market-Implied Value"],
+    rows: [
+      ["Current Share Price", "$22"],
+      ["Implied Terminal Growth Rate (at 7.0% WACC)", { text: "−4.6%", type: "neg" }],
+      ["Market Assumption", { text: "Perpetual cash flow decline", type: "neg" }],
+      ["My Base Case TGR", { text: "0.0%", type: "pos" }],
+      ["Difference", { text: "4.6 percentage points", type: "hi" }],
+    ],
+    caption: "The reverse DCF reveals the market is pricing in a permanent cash flow contraction of nearly 5% per year — far more pessimistic than even the most bearish fundamental outlook.",
   },
 };
 
