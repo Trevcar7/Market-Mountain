@@ -69,9 +69,8 @@ All four valuation methods consistently demonstrate that First Solar is trading 
 ## Risks
 
 - **IRA policy reversal**: First Solar's earnings are meaningfully tied to 45X manufacturing tax credits. Any revision, phase-out, or repeal of IRA incentives would directly impact profitability and reduce the company's competitive advantage over imported panels.
-- **Trade policy shifts**: The 50% tariff on Chinese solar panels could be reduced or restructured in future trade negotiations, reintroducing low-cost competition into the domestic market.
+- **Trade policy and Chinese competition**: The 50% tariff on Chinese solar panels could be reduced or restructured in future trade negotiations. Chinese silicon manufacturers continue to scale aggressively and reduce costs, so any weakening of tariff protections would reintroduce low-cost competition and erode First Solar's domestic pricing advantage.
 - **CdTe raw material concentration**: Cadmium telluride is a niche material with limited global supply sources. Supply disruptions or price spikes in tellurium could pressure manufacturing costs and margins.
-- **Competition from Chinese silicon manufacturers**: Chinese solar manufacturers continue to scale aggressively and reduce costs. If tariff protections weaken, First Solar's pricing advantage in the U.S. market could erode.
 - **Factory expansion execution risk**: First Solar is investing heavily in new U.S. and international manufacturing capacity. Construction delays, cost overruns, or demand shortfalls could lead to underutilized capacity and lower returns on invested capital.
 
 ## Conclusion
