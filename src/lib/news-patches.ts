@@ -71,8 +71,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bmusk\b.*\b(?:liable|fraud|verdict)\b/i, imageUrl: "https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=1200&q=80", category: "markets" },
   // Musk / Terafab / Tesla semiconductor → AI chip image; category → markets; strip irrelevant dollar chart
   { test: /\bterafab\b|\bmusk\b.*\b(?:chip|twitter|tesla)\b/i, imageUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1200&q=80", category: "markets", clearChartLabels: /dollar|dxy|dtwex/i },
-  // SMCI / Super Micro — clear wrong NVDA chart + irrelevant Fed data; fix SMCI drop to actual -33%; category → markets; fix sentiment (indictment is negative, not positive)
-  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets", sentiment: "negative", clearChart: true, clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
+  // SMCI / Super Micro — fix SMCI drop to actual -33%; category → markets; fix sentiment (indictment is negative, not positive)
+  { test: /\bsuper micro\b|\bSMCI\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets", sentiment: "negative", clearKeyData: true, marketImpactOverrides: [{ asset: "SMCI", change: "-33%", direction: "down" }] },
   // Nexstar / Tegna acquisition → TV news broadcast studio; fix tickers (was SPY/XLF/TLT, should be NXST/TGNA)
   { test: /\bnexstar\b|\btegna\b/i, imageUrl: "https://images.unsplash.com/photo-1495020689067-958852a7765e?w=1200&q=80", category: "markets", setTickers: ["NXST", "TGNA"] },
   // NVIDIA → official NVIDIA logo (green eye + wordmark); fix category to markets; strip bad AMD inline image
@@ -89,8 +89,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bmlb\b|\bbaseball\b|\bsports betting\b/i, imageUrl: "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80", title: "MLB Partners With Polymarket Under CFTC Framework, Opening Door for Sports Prediction Markets", category: "markets", clearKeyData: true, clearInlineImage: true },
   // Meta content moderation / AI → Facebook + Messenger 3D icons (strip irrelevant macro data + wall street inline image)
   { test: /\bmeta\b.*\bcontent\b|\bmeta\b.*\bmoderation\b|\bmeta\b.*\bfacebook\b/i, imageUrl: "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=1200&q=80", category: "markets", clearKeyData: true, clearInlineImage: true },
-  // OpenAI / AI acquisition → AI visualization (strip irrelevant GOOGL chart + treasury data); fix sentiment (M&A is neutral, not negative)
-  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", sentiment: "neutral", clearChart: true, clearKeyData: true },
+  // OpenAI / AI acquisition → AI visualization; fix sentiment (M&A is neutral, not negative)
+  { test: /\bopenai\b/i, imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80", category: "markets", sentiment: "neutral" },
   // Iran peace / oil retreat / equities rally (Mar 26) — comprehensive fact-check patch
   // Fixes: fabricated Iran Hormuz consent, wrong Fed date, overstated SPY, wrong sentiment/tickers, false-positive hallucination
   { test: /\boil retreat\b.*\biran\b|\biran peace signals\b/i,
