@@ -25,7 +25,7 @@ const CHARTS: Record<WaterfallVariant, WaterfallConfig> = {
       { label: "Sales &\nMarketing", value: -1.12, type: "subtract" },
       { label: "G&A +\nOther Opex", value: -1.03, type: "subtract" },
       { label: "Adj.\nEBITDA", value: 2.67, type: "total" },
-      { label: "D&A /\nCapex / Tax", value: -1.41, type: "subtract" },
+      { label: "Capex /\nInt. / Tax", value: -1.41, type: "subtract" },
       { label: "Free Cash\nFlow", value: 1.26, type: "total" },
     ],
     valFormat: (v) => `$${Math.abs(v).toFixed(2)}B`,
