@@ -208,10 +208,17 @@ export default async function TrackRecordPage() {
               <p className="text-xs text-text-muted mt-1">Avg Target Upside</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
-              <p className={`text-2xl font-bold ${avgReturn >= 0 ? "text-accent-600" : "text-red-500"}`}>
-                {hasLiveData ? `${avgReturn >= 0 ? "+" : ""}${avgReturn.toFixed(1)}%` : "—"}
-              </p>
-              <p className="text-xs text-text-muted mt-1">Avg Return</p>
+              {(() => {
+                const portfolioReturnPct = totalInvested > 0 ? ((portfolioValue - totalInvested) / totalInvested) * 100 : 0;
+                return (
+                  <>
+                    <p className={`text-2xl font-bold ${portfolioReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                      {hasLiveData ? `${portfolioReturnPct >= 0 ? "+" : ""}${portfolioReturnPct.toFixed(1)}%` : "—"}
+                    </p>
+                    <p className="text-xs text-text-muted mt-1">Portfolio Return</p>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
