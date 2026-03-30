@@ -93,33 +93,26 @@ export default async function TrackRecordPage() {
       ? withReturns.reduce((sum, p) => sum + (p.returnPct ?? 0), 0) / withReturns.length
       : 0;
 
-  // Portfolio value: maturity-weighted
-  // Each pick earns weight through EITHER time held OR magnitude of move:
-  //   weight = min(1, max(holdingDays / 60, abs(returnPct) / 15))
-  // - New picks with small moves barely count (e.g., day 1, 0% = weight 0.02)
-  // - Picks that mature over 60 days reach full weight gradually
-  // - Big movers count fully regardless of age (e.g., +400% on day 1 = full weight)
-  // - Closed picks always get full weight (thesis completed)
-  const MATURITY_DAYS = 60;
-  const RETURN_THRESHOLD = 15;
+  // Portfolio value: $1K per pick, equal-weight
+  // Picks held < 30 days are excluded from the portfolio return so new holdings
+  // don't drag down the average. Once a pick passes 30 days (or hits ±15% move),
+  // it's included at full weight.
+  const MIN_DAYS = 30;
+  const MOVE_THRESHOLD = 15;
   const investmentPerPick = 1000;
 
-  const pickWeights = enrichedPicks.map((p) => {
-    if (p.coverageStatus === "closed") return 1;
-    const timeWeight = Math.min(1, p.holdingDays / MATURITY_DAYS);
-    const moveWeight = Math.min(1, Math.abs(p.returnPct ?? 0) / RETURN_THRESHOLD);
-    return Math.max(timeWeight, moveWeight);
-  });
-  const totalWeight = pickWeights.reduce((sum, w) => sum + w, 0);
-  const totalInvested = totalWeight * investmentPerPick;
-
-  const portfolioValue = enrichedPicks.reduce((sum, p, i) => {
-    const invested = pickWeights[i] * investmentPerPick;
+  const qualifiedPicks = enrichedPicks.filter((p) =>
+    p.coverageStatus === "closed" ||
+    p.holdingDays >= MIN_DAYS ||
+    Math.abs(p.returnPct ?? 0) >= MOVE_THRESHOLD
+  );
+  const totalInvested = qualifiedPicks.length * investmentPerPick;
+  const portfolioValue = qualifiedPicks.reduce((sum, p) => {
     if (p.coverageStatus === "closed") {
-      return sum + invested * (p.priceTarget / p.priceAtPublish);
+      return sum + investmentPerPick * (p.priceTarget / p.priceAtPublish);
     }
     const growth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
-    return sum + invested * growth;
+    return sum + investmentPerPick * growth;
   }, 0);
 
   // S&P 500 benchmark: simple SPY return from first pick date (Mar 25, 2025) to today
@@ -231,16 +224,15 @@ export default async function TrackRecordPage() {
                     Portfolio vs. S&P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ${(enrichedPicks.length * 1000).toLocaleString()} invested ($1K per pick)
+                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""})
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
                   {(() => {
-                    const displayBase = enrichedPicks.length * 1000;
                     const portfolioReturnPct = totalInvested > 0 ? (portfolioValue - totalInvested) / totalInvested : 0;
-                    const portfolioDisplay = displayBase * (1 + portfolioReturnPct);
+                    const portfolioDisplay = totalInvested * (1 + portfolioReturnPct);
                     const spyReturnPct = totalInvested > 0 ? (spyPortfolioValue - totalInvested) / totalInvested : 0;
-                    const spyDisplay = displayBase * (1 + spyReturnPct);
+                    const spyDisplay = totalInvested * (1 + spyReturnPct);
                     return (
                       <>
                         <div className="text-center">
