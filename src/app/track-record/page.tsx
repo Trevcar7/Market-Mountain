@@ -348,9 +348,10 @@ export default async function TrackRecordPage() {
                       {(isTargetHit || isClosed) && <span className="text-accent-600 font-semibold ml-1">achieved</span>}
                     </p>
                   </div>
+                  {!isClosed && (
                   <div>
                     <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">
-                      {isClosed ? "Return at Close" : "Current Price"}
+                      Current Price
                     </p>
                     {pick.returnPct !== null ? (
                       <>
@@ -358,7 +359,7 @@ export default async function TrackRecordPage() {
                           {pick.returnPct >= 0 ? "+" : ""}{pick.returnPct.toFixed(1)}%
                         </p>
                         <p className="text-xs text-text-muted">
-                          ${pick.priceAtPublish} → ${isClosed ? `$${pick.priceTarget} target` : `$${pick.currentPrice?.toFixed(2)} now`}
+                          ${pick.priceAtPublish} → ${pick.currentPrice?.toFixed(2)} now
                         </p>
                       </>
                     ) : (
@@ -368,6 +369,7 @@ export default async function TrackRecordPage() {
                       </>
                     )}
                   </div>
+                  )}
                 </div>
 
                 {/* Progress bar */}
