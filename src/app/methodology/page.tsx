@@ -106,13 +106,12 @@ export default function MethodologyPage() {
               "18-Test QA Gate",
               "KV Publish",
               "Briefing Generation",
-              "Email Delivery",
             ].map((step, i) => (
               <span key={i} className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-lg bg-navy-900 text-white">
                   {step}
                 </span>
-                {i < 9 && (
+                {i < 8 && (
                   <svg className="w-4 h-4 text-accent-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
