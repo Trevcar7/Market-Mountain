@@ -12,7 +12,7 @@ priceAtPublish: 126
 rating: "buy"
 targetHit: true
 coverageStatus: "closed"
-coverageNote: "Price target of $262 reached October 2025. Coverage ended."
+coverageNote: "Price target of $262 reached October 2025. Coverage closed following repeated earnings misses and a sharp downward revision to FY2026 guidance, with management guiding revenue of $4.8–5.2B, a 30% cut from prior estimates."
 targetHitDate: "2025-10-31"
 ---
 
