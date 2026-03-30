@@ -2,13 +2,13 @@
 title: "SiriusXM: Buy-Rated with $39 Price Target"
 date: "2026-03-29"
 readTime: "7 min read"
-excerpt: "SiriusXM generates over $1.2B in annual free cash flow behind a satellite infrastructure moat and 180M+ trial-equipped vehicles on the road. My DCF implies $39/share, a 77% premium to the current price of $22."
+excerpt: "SiriusXM generates over $1.2B in annual free cash flow behind a satellite infrastructure moat and 180M+ trial-equipped vehicles on the road. My DCF implies $39/share, a 70% premium to the current price of $23."
 tags: ["Stock Analysis"]
 disclaimer: true
 coverImage: "/images/siriusxm.png"
 ticker: "SIRI"
 priceTarget: 39
-priceAtPublish: 22
+priceAtPublish: 23
 rating: "buy"
 targetHit: false
 coverageStatus: "active"
@@ -64,7 +64,7 @@ However, context matters. Net Debt / EBITDA stands at approximately **3.6x**, el
 
 My discounted cash flow model uses deliberately conservative assumptions. Revenue is projected to **decline** at rates of −1.5%, −1.0%, −1.0%, −0.5%, and 0% over the five-year forecast period. No growth is assumed at any point. EBIT margins are held at **21.5%**, and the model uses a **7.0% WACC** with a **0% terminal growth rate**, implying the business neither grows nor shrinks in perpetuity beyond the forecast period.
 
-Even under these bearish assumptions, the DCF yields an implied enterprise value of $22.8 billion. After subtracting net debt, the implied equity value is $13.2 billion, or approximately **$39 per share**, a **77% premium** to the current market price. Notably, management's own FY2026 guidance calls for revenue of $8.5 billion (essentially flat) and free cash flow of $1.35 billion, suggesting the company itself expects FCF growth and revenue stabilization ahead.
+Even under these bearish assumptions, the DCF yields an implied enterprise value of $22.8 billion. After subtracting net debt, the implied equity value is $13.2 billion, or approximately **$39 per share**, a **70% premium** to the current market price. Notably, management's own FY2026 guidance calls for revenue of $8.5 billion (essentially flat) and free cash flow of $1.35 billion, suggesting the company itself expects FCF growth and revenue stabilization ahead.
 
 <DataTable variant="siri-valuation-summary" />
 
@@ -74,7 +74,7 @@ The sensitivity analysis below shows implied share prices across a range of WACC
 
 ## The Market Is Too Pessimistic: Reverse DCF
 
-A reverse DCF takes the current share price of $22 as given and solves backward to determine what assumptions the market is embedding. At a 7.0% WACC, the market-implied terminal growth rate is approximately **−4.6%**. In other words, the market is pricing in a **permanent, accelerating decline** in cash flows of nearly 5% per year, effectively treating SiriusXM as a melting ice cube.
+A reverse DCF takes the current share price of $23 as given and solves backward to determine what assumptions the market is embedding. At a 7.0% WACC, the market-implied terminal growth rate is approximately **−4.6%**. In other words, the market is pricing in a **permanent, accelerating decline** in cash flows of nearly 5% per year, effectively treating SiriusXM as a melting ice cube.
 
 <DataTable variant="siri-reverse-dcf" />
 
@@ -91,7 +91,7 @@ While the subscriber landscape is undeniably challenging, a near-5% perpetual ca
 
 ## Conclusion
 
-SiriusXM is a cash-flow-rich business with a genuine infrastructure moat, trading at a steep discount to intrinsic value. The market is pricing in an implausibly dire scenario of permanent 5% annual cash flow decline, while the company continues to generate over $1.2 billion in annual free cash flow, benefit from unmatched auto OEM distribution, and invest in content diversification through podcasts. Even assuming revenue declines and zero terminal growth, the stock is worth significantly more than $22. I rate SiriusXM a **Buy with a $39 price target** and will monitor subscriber trends, debt reduction progress, and podcast content traction.
+SiriusXM is a cash-flow-rich business with a genuine infrastructure moat, trading at a steep discount to intrinsic value. The market is pricing in an implausibly dire scenario of permanent 5% annual cash flow decline, while the company continues to generate over $1.2 billion in annual free cash flow, benefit from unmatched auto OEM distribution, and invest in content diversification through podcasts. Even assuming revenue declines and zero terminal growth, the stock is worth significantly more than $23. I rate SiriusXM a **Buy with a $39 price target** and will monitor subscriber trends, debt reduction progress, and podcast content traction.
 
 ---
 

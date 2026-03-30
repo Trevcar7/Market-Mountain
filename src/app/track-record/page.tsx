@@ -350,7 +350,7 @@ export default async function TrackRecordPage() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">
-                      Current Price
+                      {isClosed ? "Return at Close" : "Current Price"}
                     </p>
                     {pick.returnPct !== null ? (
                       <>
@@ -358,7 +358,7 @@ export default async function TrackRecordPage() {
                           {pick.returnPct >= 0 ? "+" : ""}{pick.returnPct.toFixed(1)}%
                         </p>
                         <p className="text-xs text-text-muted">
-                          ${pick.priceAtPublish} → ${pick.currentPrice?.toFixed(2)} now
+                          ${pick.priceAtPublish} → ${isClosed ? `$${pick.priceTarget} target` : `$${pick.currentPrice?.toFixed(2)} now`}
                         </p>
                       </>
                     ) : (

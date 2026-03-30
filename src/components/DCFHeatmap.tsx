@@ -66,7 +66,7 @@ const CONFIGS: Record<DCFVariant, DCFConfig> = {
   },
   siriusxm: {
     baseCaseValue: 39,
-    currentPrice: 22,
+    currentPrice: 23,
     waccValues: ["5.0%", "6.0%", "7.0%", "8.0%", "9.0%"],
     ltgrValues: ["-1.0%", "-0.5%", "0.0%", "0.5%", "1.0%"],
     data: [
