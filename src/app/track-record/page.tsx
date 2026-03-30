@@ -106,26 +106,28 @@ export default async function TrackRecordPage() {
     return sum + investmentPerPick * growth;
   }, 0);
 
-  // S&P 500 benchmark: actual SPY return over each pick's holding period
-  // Fetch SPY historical prices to find the price on each pick's entry date
+  // S&P 500 benchmark: time-weighted SPY return over each pick's holding period
+  // Picks held < 30 days are excluded so new positions don't drag down the benchmark.
+  // Remaining picks are weighted by holding days so longer holdings contribute more.
+  const MIN_BENCHMARK_DAYS = 30;
   let spyPortfolioValue = 0;
   let spyDataAvailable = false;
-  const avgHoldingDays = enrichedPicks.length > 0
-    ? enrichedPicks.reduce((sum, p) => sum + p.holdingDays, 0) / enrichedPicks.length
-    : 0;
+  const benchmarkEligible = enrichedPicks.filter((p) => p.holdingDays >= MIN_BENCHMARK_DAYS);
+  const avgHoldingDays = benchmarkEligible.length > 0
+    ? benchmarkEligible.reduce((sum, p) => sum + p.holdingDays, 0) / benchmarkEligible.length
+    : enrichedPicks.length > 0
+      ? enrichedPicks.reduce((sum, p) => sum + p.holdingDays, 0) / enrichedPicks.length
+      : 0;
 
   if (spyPrice && hasLiveData) {
-    // Use pre-fetched SPY history (fetched in parallel with quotes above)
     const spyHistory = spyHistoryResult;
 
     if (spyHistory && spyHistory.labels.length > 0) {
-      // Build date→price map from SPY history
       const spyPriceMap = new Map<string, number>();
       for (let i = 0; i < spyHistory.labels.length; i++) {
         spyPriceMap.set(spyHistory.labels[i], spyHistory.values[i]);
       }
 
-      // Helper: find SPY price on/near a date
       function findSpyPrice(targetDate: string): number | null {
         for (let offset = 0; offset <= 5; offset++) {
           const fwd = new Date(new Date(targetDate).getTime() + offset * 86400000).toISOString().split("T")[0];
@@ -136,34 +138,33 @@ export default async function TrackRecordPage() {
         return null;
       }
 
-      // For each pick, calculate what $1K in SPY would have returned over the SAME period
-      // Closed picks: entry date → target hit date (not today)
-      // Active picks: entry date → today
-      spyPortfolioValue = enrichedPicks.reduce((sum, pick) => {
-        const spyEntryPrice = findSpyPrice(pick.date);
-        if (!spyEntryPrice) return sum + investmentPerPick;
+      // Time-weighted: each pick's SPY contribution is proportional to holding days
+      const totalHoldingDays = benchmarkEligible.reduce((sum, p) => sum + p.holdingDays, 0);
+      if (totalHoldingDays > 0 && benchmarkEligible.length > 0) {
+        let weightedSpyReturn = 0;
+        for (const pick of benchmarkEligible) {
+          const weight = pick.holdingDays / totalHoldingDays;
+          const spyEntryPrice = findSpyPrice(pick.date);
+          if (!spyEntryPrice) { weightedSpyReturn += weight; continue; }
 
-        let spyExitPrice: number | null;
-        if (pick.coverageStatus === "closed" && pick.targetHitDate) {
-          // Closed: SPY return over entry → target hit date
-          spyExitPrice = findSpyPrice(pick.targetHitDate);
-        } else {
-          // Active/target-hit: SPY return over entry → today
-          spyExitPrice = spyPrice;
-        }
+          let spyExitPrice: number | null;
+          if (pick.coverageStatus === "closed" && pick.targetHitDate) {
+            spyExitPrice = findSpyPrice(pick.targetHitDate);
+          } else {
+            spyExitPrice = spyPrice;
+          }
 
-        if (spyExitPrice) {
-          return sum + investmentPerPick * (spyExitPrice / spyEntryPrice);
+          weightedSpyReturn += weight * (spyExitPrice ? spyExitPrice / spyEntryPrice : 1);
         }
-        return sum + investmentPerPick;
-      }, 0);
-      spyDataAvailable = true;
+        spyPortfolioValue = totalInvested * weightedSpyReturn;
+        spyDataAvailable = true;
+      }
     }
   }
 
   // Fallback: estimate if historical data unavailable
   if (!spyDataAvailable) {
-    const spyAnnualReturn = 0.10;
+    const spyAnnualReturn = 0.12;
     const spyEstReturn = ((1 + spyAnnualReturn) ** (avgHoldingDays / 365) - 1) * 100;
     spyPortfolioValue = totalInvested * (1 + spyEstReturn / 100);
   }
