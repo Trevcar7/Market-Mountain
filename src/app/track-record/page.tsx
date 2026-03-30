@@ -93,7 +93,30 @@ export default async function TrackRecordPage() {
       ? withReturns.reduce((sum, p) => sum + (p.returnPct ?? 0), 0) / withReturns.length
       : 0;
 
-  // S&P 500 benchmark: SPY return from first pick date to today (simple, no portfolio sim)
+  // Portfolio value: $1K per pick, equal-weight
+  // Picks held < 30 days are excluded from the portfolio return so new holdings
+  // don't drag down the average. Once a pick passes 30 days (or hits ±15% move),
+  // it's included at full weight.
+  const MIN_DAYS = 30;
+  const MOVE_THRESHOLD = 15;
+  const investmentPerPick = 1000;
+
+  const qualifiedPicks = enrichedPicks.filter((p) =>
+    p.coverageStatus === "closed" ||
+    p.holdingDays >= MIN_DAYS ||
+    Math.abs(p.returnPct ?? 0) >= MOVE_THRESHOLD
+  );
+  const totalInvested = qualifiedPicks.length * investmentPerPick;
+  const portfolioValue = qualifiedPicks.reduce((sum, p) => {
+    if (p.coverageStatus === "closed") {
+      return sum + investmentPerPick * (p.priceTarget / p.priceAtPublish);
+    }
+    const growth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
+    return sum + investmentPerPick * growth;
+  }, 0);
+
+  // S&P 500 benchmark: simple SPY return from first pick date to today
+  let spyPortfolioValue = 0;
   let spyReturnPct = 0;
   let spyDataAvailable = false;
 
@@ -121,7 +144,9 @@ export default async function TrackRecordPage() {
       const spyStartPrice = findSpyPrice(oldestDate);
 
       if (spyStartPrice && spyPrice) {
-        spyReturnPct = ((spyPrice - spyStartPrice) / spyStartPrice) * 100;
+        const spyReturn = (spyPrice - spyStartPrice) / spyStartPrice;
+        spyReturnPct = spyReturn * 100;
+        spyPortfolioValue = totalInvested * (1 + spyReturn);
         spyDataAvailable = true;
       }
     }
@@ -130,7 +155,9 @@ export default async function TrackRecordPage() {
   if (!spyDataAvailable) {
     const oldestPick = picks.reduce((oldest, p) =>
       p.holdingDays > oldest.holdingDays ? p : oldest, picks[0]);
-    spyReturnPct = ((1 + 0.10) ** (oldestPick.holdingDays / 365) - 1) * 100;
+    const spyEstReturn = ((1 + 0.10) ** (oldestPick.holdingDays / 365) - 1) * 100;
+    spyReturnPct = spyEstReturn;
+    spyPortfolioValue = totalInvested * (1 + spyEstReturn / 100);
   }
 
   const activePicks = enrichedPicks.filter((p) => p.coverageStatus !== "closed").length;
@@ -174,10 +201,17 @@ export default async function TrackRecordPage() {
               <p className="text-xs text-text-muted mt-1">Avg Target Upside</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
-              <p className={`text-2xl font-bold ${avgReturn >= 0 ? "text-accent-600" : "text-red-500"}`}>
-                {hasLiveData ? `${avgReturn >= 0 ? "+" : ""}${avgReturn.toFixed(1)}%` : "—"}
-              </p>
-              <p className="text-xs text-text-muted mt-1">Avg Pick Return</p>
+              {(() => {
+                const portfolioReturnPct = totalInvested > 0 ? ((portfolioValue - totalInvested) / totalInvested) * 100 : 0;
+                return (
+                  <>
+                    <p className={`text-2xl font-bold ${portfolioReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                      {hasLiveData ? `${portfolioReturnPct >= 0 ? "+" : ""}${portfolioReturnPct.toFixed(1)}%` : "—"}
+                    </p>
+                    <p className="text-xs text-text-muted mt-1">Portfolio Return</p>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -187,26 +221,42 @@ export default async function TrackRecordPage() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="text-center sm:text-left">
                   <p className="text-[10px] font-bold tracking-widest uppercase text-text-light">
-                    Avg Pick Return vs. S&amp;P 500{spyDataAvailable ? "" : " (Est.)"}
+                    Portfolio vs. S&amp;P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    S&amp;P 500 return since first pick ({picks.reduce((o, p) => p.date < o ? p.date : o, picks[0].date).split("-").slice(0,2).map((s,i) => i === 1 ? ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(s)-1] : s).reverse().join(" ")})
+                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""})
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <p className={`text-2xl font-bold ${avgReturn >= 0 ? "text-accent-600" : "text-red-500"}`}>
-                      {avgReturn >= 0 ? "+" : ""}{avgReturn.toFixed(1)}%
-                    </p>
-                    <p className="text-[10px] text-text-muted">My Picks</p>
-                  </div>
-                  <div className="text-text-light text-xs">vs</div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-text-muted">
-                      {spyReturnPct >= 0 ? "+" : ""}{spyReturnPct.toFixed(1)}%
-                    </p>
-                    <p className="text-[10px] text-text-muted">S&amp;P 500</p>
-                  </div>
+                  {(() => {
+                    const portfolioReturnPct = totalInvested > 0 ? (portfolioValue - totalInvested) / totalInvested : 0;
+                    const portfolioDisplay = totalInvested * (1 + portfolioReturnPct);
+                    const spyReturnFrac = totalInvested > 0 ? (spyPortfolioValue - totalInvested) / totalInvested : 0;
+                    const spyDisplay = totalInvested * (1 + spyReturnFrac);
+                    return (
+                      <>
+                        <div className="text-center">
+                          <p className={`text-lg font-bold ${portfolioReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                            ${Math.round(portfolioDisplay).toLocaleString()}
+                          </p>
+                          <p className={`text-[10px] font-semibold ${portfolioReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                            {portfolioReturnPct >= 0 ? "+" : ""}{(portfolioReturnPct * 100).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-text-muted">My Picks</p>
+                        </div>
+                        <div className="text-text-light text-xs">vs</div>
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-text-muted">
+                            ${Math.round(spyDisplay).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] font-semibold text-text-muted">
+                            {spyReturnFrac >= 0 ? "+" : ""}{(spyReturnFrac * 100).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-text-muted">S&amp;P 500</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
