@@ -106,12 +106,13 @@ export default function MethodologyPage() {
               "18-Test QA Gate",
               "KV Publish",
               "Briefing Generation",
+              "Email Delivery",
             ].map((step, i) => (
               <span key={i} className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-lg bg-navy-900 text-white">
                   {step}
                 </span>
-                {i < 8 && (
+                {i < 9 && (
                   <svg className="w-4 h-4 text-accent-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -125,10 +126,7 @@ export default function MethodologyPage() {
         <p className="text-xs text-text-light mt-8 leading-relaxed">
           This methodology is continuously refined. The pipeline code is open for inspection
           and all thresholds, scoring weights, and editorial decisions are documented in the
-          codebase. Questions about our methodology can be directed to{" "}
-          <a href="mailto:trevor@marketmountainfinance.com" className="text-accent-600 hover:underline">
-            trevor@marketmountainfinance.com
-          </a>.
+          codebase.
         </p>
       </section>
     </div>
