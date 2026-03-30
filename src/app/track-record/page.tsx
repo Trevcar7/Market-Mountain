@@ -231,29 +231,40 @@ export default async function TrackRecordPage() {
                     Portfolio vs. S&P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ${totalInvested.toLocaleString()} invested ($1K per pick)
+                    ${(enrichedPicks.length * 1000).toLocaleString()} invested ($1K per pick)
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <p className={`text-lg font-bold ${portfolioValue >= totalInvested ? "text-accent-600" : "text-red-500"}`}>
-                      ${Math.round(portfolioValue).toLocaleString()}
-                    </p>
-                    <p className={`text-[10px] font-semibold ${portfolioValue >= totalInvested ? "text-accent-600" : "text-red-500"}`}>
-                      {portfolioValue >= totalInvested ? "+" : ""}{(((portfolioValue - totalInvested) / totalInvested) * 100).toFixed(1)}%
-                    </p>
-                    <p className="text-[10px] text-text-muted">My Picks</p>
-                  </div>
-                  <div className="text-text-light text-xs">vs</div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-text-muted">
-                      ${Math.round(spyPortfolioValue).toLocaleString()}
-                    </p>
-                    <p className="text-[10px] font-semibold text-text-muted">
-                      {spyPortfolioValue >= totalInvested ? "+" : ""}{(((spyPortfolioValue - totalInvested) / totalInvested) * 100).toFixed(1)}%
-                    </p>
-                    <p className="text-[10px] text-text-muted">S&amp;P 500</p>
-                  </div>
+                  {(() => {
+                    const displayBase = enrichedPicks.length * 1000;
+                    const portfolioReturnPct = totalInvested > 0 ? (portfolioValue - totalInvested) / totalInvested : 0;
+                    const portfolioDisplay = displayBase * (1 + portfolioReturnPct);
+                    const spyReturnPct = totalInvested > 0 ? (spyPortfolioValue - totalInvested) / totalInvested : 0;
+                    const spyDisplay = displayBase * (1 + spyReturnPct);
+                    return (
+                      <>
+                        <div className="text-center">
+                          <p className={`text-lg font-bold ${portfolioReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                            ${Math.round(portfolioDisplay).toLocaleString()}
+                          </p>
+                          <p className={`text-[10px] font-semibold ${portfolioReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                            {portfolioReturnPct >= 0 ? "+" : ""}{(portfolioReturnPct * 100).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-text-muted">My Picks</p>
+                        </div>
+                        <div className="text-text-light text-xs">vs</div>
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-text-muted">
+                            ${Math.round(spyDisplay).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] font-semibold text-text-muted">
+                            {spyReturnPct >= 0 ? "+" : ""}{(spyReturnPct * 100).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-text-muted">S&amp;P 500</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
