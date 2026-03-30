@@ -93,15 +93,33 @@ export default async function TrackRecordPage() {
       ? withReturns.reduce((sum, p) => sum + (p.returnPct ?? 0), 0) / withReturns.length
       : 0;
 
-  // Portfolio value: $1K per pick, simple equal-weight
+  // Portfolio value: maturity-weighted
+  // Each pick earns weight through EITHER time held OR magnitude of move:
+  //   weight = min(1, max(holdingDays / 60, abs(returnPct) / 15))
+  // - New picks with small moves barely count (e.g., day 1, 0% = weight 0.02)
+  // - Picks that mature over 60 days reach full weight gradually
+  // - Big movers count fully regardless of age (e.g., +400% on day 1 = full weight)
+  // - Closed picks always get full weight (thesis completed)
+  const MATURITY_DAYS = 60;
+  const RETURN_THRESHOLD = 15;
   const investmentPerPick = 1000;
-  const totalInvested = enrichedPicks.length * investmentPerPick;
-  const portfolioValue = enrichedPicks.reduce((sum, p) => {
+
+  const pickWeights = enrichedPicks.map((p) => {
+    if (p.coverageStatus === "closed") return 1;
+    const timeWeight = Math.min(1, p.holdingDays / MATURITY_DAYS);
+    const moveWeight = Math.min(1, Math.abs(p.returnPct ?? 0) / RETURN_THRESHOLD);
+    return Math.max(timeWeight, moveWeight);
+  });
+  const totalWeight = pickWeights.reduce((sum, w) => sum + w, 0);
+  const totalInvested = totalWeight * investmentPerPick;
+
+  const portfolioValue = enrichedPicks.reduce((sum, p, i) => {
+    const invested = pickWeights[i] * investmentPerPick;
     if (p.coverageStatus === "closed") {
-      return sum + investmentPerPick * (p.priceTarget / p.priceAtPublish);
+      return sum + invested * (p.priceTarget / p.priceAtPublish);
     }
     const growth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
-    return sum + investmentPerPick * growth;
+    return sum + invested * growth;
   }, 0);
 
   // S&P 500 benchmark: simple SPY return from first pick date (Mar 25, 2025) to today
