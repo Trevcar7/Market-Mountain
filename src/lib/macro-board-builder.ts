@@ -157,6 +157,7 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
     ),
     fetchFmpTreasuryRates(),                       // [7] FMP treasury
     fetchYahooYield("^TNX"),                       // [8] Yahoo 10Y
+    fetchYahooYield("CL=F"),                       // [9] Yahoo WTI crude futures
   ]);
 
   const fedData      = allResults[0].status === "fulfilled" ? allResults[0].value : [];
@@ -168,6 +169,7 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
   const blsRaw       = allResults[6].status === "fulfilled" ? allResults[6].value : {};
   const treasuryRows = allResults[7].status === "fulfilled" ? allResults[7].value : [];
   const yahoo10Y     = allResults[8].status === "fulfilled" ? allResults[8].value : null;
+  const yahooWti     = allResults[9].status === "fulfilled" ? allResults[9].value : null;
 
   const payrollsArr = blsRaw[BLS_SERIES.NONFARM_PAYROLLS] ?? [];
   const unemployArr = blsRaw[BLS_SERIES.UNEMPLOYMENT]     ?? [];
@@ -361,8 +363,22 @@ export async function buildMacroBoardIndicators(): Promise<MacroIndicator[]> {
     }
   }
 
-  // 7. WTI Crude Oil
-  if (wtiData) {
+  // 7. WTI Crude Oil — Yahoo CL=F (same-day futures) → EIA fallback
+  if (yahooWti) {
+    const price = yahooWti.current;
+    const prev  = yahooWti.previous;
+    const changePct = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+    indicators.push({
+      label: "WTI Crude",
+      value: `$${price.toFixed(2)}`,
+      change: Math.abs(changePct) > 0.05
+        ? `${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%`
+        : undefined,
+      direction: price > prev + 0.01 ? "up" : price < prev - 0.01 ? "down" : "flat",
+      source: "Yahoo",
+      updatedAt: new Date().toISOString().split("T")[0],
+    });
+  } else if (wtiData) {
     indicators.push({
       label: "WTI Crude",
       value: `$${wtiData.value.toFixed(2)}`,

@@ -2151,7 +2151,7 @@ export async function fetchBriefingWhatToWatch(): Promise<Array<{
   try {
     if (process.env.FMP_API_KEY) {
       const from = new Date().toISOString().split("T")[0];
-      const to = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const to = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const res = await fetch(
         fmpUrl("/api/v3/economic_calendar", { from, to, country: "US" }),
         { signal: withTimeout() }

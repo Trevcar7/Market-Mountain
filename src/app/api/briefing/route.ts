@@ -483,6 +483,15 @@ WHAT TO WATCH RULES:
 - Do NOT use: "markets reacted", "investors are watching", "remains to be seen", "this highlights", "in today's environment"
 - Do NOT generate vague themes — every item must reference a specific event, date, or data release
 
+EXAMPLES:
+BAD: "Oil prices and geopolitical supply risk"
+GOOD: "EIA weekly petroleum status report (April 3) — U.S. crude inventories rose 3.3M bbl last week; a second consecutive build above 2M bbl would confirm demand weakness and push WTI toward $65 support"
+BAD: "Upcoming inflation data"
+GOOD: "March CPI release (April 10) — consensus expects 2.6% YoY vs. 2.8% prior; a print above 2.7% would push the 10-Year above 4.50% and delay June rate-cut pricing"
+
+CURRENT MARKET LEVELS (use these for specific thresholds in watchMetric — do NOT invent prices):
+${macroData.length > 0 ? macroData.map((d) => `- ${d.label}: ${d.value}${d.change ? ` (${d.change})` : ""}`).join("\n") : "Market data unavailable — use general thresholds."}
+
 Today's published stories:
 
 ${storyContext}${macroCalendarBlock}${storyThemesBlock}${yesterdayBlock}
@@ -600,14 +609,23 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     replacementPool.push(evt);
   }
 
-  // 2b. Well-crafted macro alternatives — each covers a different theme, always relevant
-  // These are forward-looking with specific metrics, not story headlines.
+  // 2b. Data-driven macro alternatives — dynamically reference current market levels
+  // These are forward-looking with specific metrics, not generic themes.
+  const findMacro = (substr: string) => macroData.find((d) => d.label.toLowerCase().includes(substr.toLowerCase()));
+  const wtiLevel = findMacro("WTI") ?? findMacro("Oil");
+  const tenYLevel = findMacro("10-Year") ?? findMacro("10Y");
+  const cpiLevel = findMacro("CPI");
+  const ffLevel = findMacro("Fed Funds");
+
+  const wtiPrice = wtiLevel ? parseFloat(wtiLevel.value.replace(/[$,/bbl]/g, "")) : 70;
+  const tenY = tenYLevel ? parseFloat(tenYLevel.value.replace(/%/g, "")) : 4.3;
+
   replacementPool.push(
     {
-      event: "Oil prices and geopolitical supply risk",
+      event: `Oil prices testing key technical levels near $${Math.round(wtiPrice)}/bbl`,
       timing: "Commodity watch — ongoing",
-      significance: "Crude above $75/bbl re-ignites inflation fears and compresses consumer discretionary margins; a break below $65 signals demand destruction.",
-      watchMetric: "WTI crude $65–$75/bbl range; Brent-WTI spread; XLE sector ETF",
+      significance: `WTI crude at $${Math.round(wtiPrice)}/bbl. A sustained move above $${Math.round(wtiPrice + 5)} re-ignites inflation expectations; below $${Math.round(wtiPrice - 5)} signals demand destruction and eases Fed pressure.`,
+      watchMetric: `WTI crude $${Math.round(wtiPrice - 5)}–$${Math.round(wtiPrice + 5)}/bbl range`,
     },
     {
       event: "U.S. tariff and trade policy developments",
@@ -618,8 +636,8 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
     {
       event: "Upcoming inflation data (CPI/PCE)",
       timing: "Upcoming economic data",
-      significance: "Core inflation prints drive Fed rate expectations, directly moving Treasury yields, mortgage rates, and rate-sensitive equity sectors.",
-      watchMetric: "Core CPI MoM vs. 0.3% consensus; 10-Year breakeven inflation rate",
+      significance: `Core inflation prints drive Fed rate expectations. ${cpiLevel ? `CPI currently at ${cpiLevel.value} YoY — ` : ""}a surprise above consensus would push the 10-Year toward ${(tenY + 0.2).toFixed(1)}% and delay rate cuts.`,
+      watchMetric: `Core CPI MoM vs. 0.3% consensus; 10-Year ${tenY > 4.5 ? "above" : "at"} ${tenY.toFixed(1)}%`,
     },
     {
       event: "U.S. labor market conditions",
@@ -634,10 +652,10 @@ CRITICAL: "topDevelopmentsSummaries" MUST have exactly 3 items. "whatToWatch" MU
       watchMetric: "S&P 500 forward P/E ratio; earnings revision breadth",
     },
     {
-      event: "Treasury market and yield curve dynamics",
+      event: `Treasury market dynamics — 10-Year at ${tenY.toFixed(2)}%`,
       timing: "Fixed income watch",
-      significance: "The 2s-10s spread and long-end auction demand signal whether the bond market endorses the current growth and inflation outlook.",
-      watchMetric: "10-Year Treasury yield; 2s-10s spread; 30-Year auction bid-to-cover",
+      significance: `The 10-Year yield at ${tenY.toFixed(2)}% ${tenY > 4.5 ? "is pressuring rate-sensitive sectors" : "remains in a critical range"}. ${ffLevel ? `Fed Funds at ${ffLevel.value} — ` : ""}the 2s-10s spread and long-end auction demand signal whether the bond market endorses the growth outlook.`,
+      watchMetric: `10-Year yield ${(tenY - 0.15).toFixed(2)}%–${(tenY + 0.15).toFixed(2)}% range; 2s-10s spread`,
     },
   );
 

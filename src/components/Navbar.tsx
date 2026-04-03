@@ -19,12 +19,22 @@ const navLinks = [
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 12);
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
+  }, []);
+
+  // Detect dark mode so the navbar uses light-on-dark styling on all pages
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
   }, []);
 
   // Close menu on route change — derived during render (React-recommended pattern
@@ -36,11 +46,13 @@ export default function Navbar() {
   }
 
   const isHeroPage = pathname === "/";
+  // Use dark-navy styling when: (a) hero page before scroll, OR (b) dark mode on any page
+  const useDarkNav = (isHeroPage && !scrolled) || isDark;
 
   return (
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${
-        isHeroPage && !scrolled
+        useDarkNav
           ? "bg-navy-900 border-b border-white/10"
           : "bg-card/95 backdrop-blur-md border-b border-border shadow-sm"
       }`}
@@ -49,7 +61,7 @@ export default function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Logo
-            variant={isHeroPage && !scrolled ? "light" : "dark"}
+            variant={useDarkNav ? "light" : "dark"}
             size="sm"
           />
 
@@ -65,7 +77,7 @@ export default function Navbar() {
                   key={link.href}
                   href={link.href}
                   className={`relative px-4 py-2 text-sm font-medium tracking-wide transition-colors duration-150 ${
-                    isHeroPage && !scrolled
+                    useDarkNav
                       ? active
                         ? "text-white"
                         : "text-white/60 hover:text-white"
@@ -78,7 +90,7 @@ export default function Navbar() {
                   {active && (
                     <span
                       className={`absolute bottom-0 left-4 right-4 h-[2px] rounded-full ${
-                        isHeroPage && !scrolled ? "bg-accent-400" : "bg-accent-500"
+                        useDarkNav ? "bg-accent-400" : "bg-accent-500"
                       }`}
                       aria-hidden="true"
                     />
@@ -86,17 +98,17 @@ export default function Navbar() {
                 </Link>
               );
             })}
-            <SearchBar variant={isHeroPage && !scrolled ? "dark" : "light"} display="desktop" />
-            <ThemeToggle variant={isHeroPage && !scrolled ? "dark" : "light"} />
+            <SearchBar variant={useDarkNav ? "dark" : "light"} display="desktop" />
+            <ThemeToggle variant={useDarkNav ? "dark" : "light"} />
           </nav>
 
           {/* Mobile: search + theme + hamburger */}
           <div className="md:hidden flex items-center gap-1">
-            <SearchBar variant={isHeroPage && !scrolled ? "dark" : "light"} display="mobile" />
-            <ThemeToggle variant={isHeroPage && !scrolled ? "dark" : "light"} />
+            <SearchBar variant={useDarkNav ? "dark" : "light"} display="mobile" />
+            <ThemeToggle variant={useDarkNav ? "dark" : "light"} />
             <button
               className={`flex flex-col justify-center items-center w-10 h-10 rounded-md gap-1.5 transition-colors ${
-                isHeroPage && !scrolled
+                useDarkNav
                   ? "hover:bg-white/10"
                   : "hover:bg-surface-2"
               }`}
@@ -106,17 +118,17 @@ export default function Navbar() {
           >
             <span
               className={`block w-5 h-0.5 transition-all duration-200 ${
-                isHeroPage && !scrolled ? "bg-white" : "bg-text"
+                useDarkNav ? "bg-white" : "bg-text"
               } ${menuOpen ? "translate-y-2 rotate-45" : ""}`}
             />
             <span
               className={`block w-5 h-0.5 transition-all duration-200 ${
-                isHeroPage && !scrolled ? "bg-white" : "bg-text"
+                useDarkNav ? "bg-white" : "bg-text"
               } ${menuOpen ? "opacity-0 scale-x-0" : ""}`}
             />
             <span
               className={`block w-5 h-0.5 transition-all duration-200 ${
-                isHeroPage && !scrolled ? "bg-white" : "bg-text"
+                useDarkNav ? "bg-white" : "bg-text"
               } ${menuOpen ? "-translate-y-2 -rotate-45" : ""}`}
             />
           </button>
@@ -128,7 +140,7 @@ export default function Navbar() {
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ${
           menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-        } ${isHeroPage && !scrolled ? "bg-navy-800 border-t border-white/10" : "bg-card border-t border-border"}`}
+        } ${useDarkNav ? "bg-navy-800 border-t border-white/10" : "bg-card border-t border-border"}`}
       >
         <nav className="px-4 py-3 flex flex-col gap-1" aria-label="Mobile navigation">
           {navLinks.map((link) => {
@@ -141,7 +153,7 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 className={`px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                  isHeroPage && !scrolled
+                  useDarkNav
                     ? active
                       ? "bg-white/15 text-accent-400"
                       : "text-white/80 hover:bg-white/10 hover:text-white"

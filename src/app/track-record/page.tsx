@@ -3,7 +3,7 @@ import Link from "next/link";
 import { extractPicks } from "@/lib/track-record";
 import { fetchFmpQuote, fetchFmpStockHistory } from "@/lib/market-data";
 
-export const revalidate = 86400; // ISR: once per day (closing prices)
+export const revalidate = 14400; // ISR: every 4 hours (~2-3 updates during market hours)
 
 export const metadata: Metadata = {
   title: "Track Record",
@@ -94,9 +94,10 @@ export default async function TrackRecordPage() {
       : 0;
 
   // Portfolio value: $1K per pick, equal-weight
-  // Picks held < 30 days are excluded from the portfolio return so new holdings
-  // don't drag down the average. Once a pick passes 30 days (or hits ±15% move),
-  // it's included at full weight.
+  // Picks held < 30 days are excluded so new holdings don't drag down the average.
+  // Once a pick passes 30 days (or hits ±15% move), it's included at full weight.
+  // When a closed pick hits its target, proceeds are reinvested equally into
+  // active picks still below their price targets.
   const MIN_DAYS = 30;
   const MOVE_THRESHOLD = 15;
   const investmentPerPick = 1000;
@@ -107,12 +108,27 @@ export default async function TrackRecordPage() {
     Math.abs(p.returnPct ?? 0) >= MOVE_THRESHOLD
   );
   const totalInvested = qualifiedPicks.length * investmentPerPick;
+
+  // Reinvestment: closed-pick proceeds are redistributed into active picks below target
+  const closedPickProceeds = qualifiedPicks
+    .filter((p) => p.coverageStatus === "closed")
+    .reduce((sum, p) => sum + investmentPerPick * (p.priceTarget / p.priceAtPublish), 0);
+  const reinvestTargets = qualifiedPicks.filter(
+    (p) => p.coverageStatus !== "closed" && !p.hitTarget
+  );
+  const reinvestPerPick = reinvestTargets.length > 0
+    ? closedPickProceeds / reinvestTargets.length
+    : 0;
+
   const portfolioValue = qualifiedPicks.reduce((sum, p) => {
     if (p.coverageStatus === "closed") {
-      return sum + investmentPerPick * (p.priceTarget / p.priceAtPublish);
+      // Proceeds reinvested — this pick contributes $0 directly
+      return sum;
     }
+    const isReinvestTarget = !p.hitTarget;
+    const allocation = investmentPerPick + (isReinvestTarget ? reinvestPerPick : 0);
     const growth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
-    return sum + investmentPerPick * growth;
+    return sum + allocation * growth;
   }, 0);
 
   // S&P 500 benchmark: simple SPY return from first pick date to today
@@ -224,7 +240,7 @@ export default async function TrackRecordPage() {
                     Portfolio vs. S&amp;P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""})
+                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""}{closedPickProceeds > 0 && reinvestTargets.length > 0 ? ` · closed proceeds reinvested` : ""})
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
@@ -421,9 +437,10 @@ export default async function TrackRecordPage() {
           </h3>
           <p className="text-xs text-text-muted leading-relaxed">
             Entry prices are the closing price on publication date. <strong className="text-text">Price Target</strong> is the
-            published valuation target. <strong className="text-text">Current Price</strong> updates daily using closing prices.
-            Closed picks lock in the return at the price target. The S&amp;P 500 benchmark uses actual SPY prices
-            over each pick&apos;s holding period. Past performance does not guarantee future results.
+            published valuation target. <strong className="text-text">Current Price</strong> updates every ~4 hours during market hours.
+            When a pick hits its price target and coverage is closed, the hypothetical proceeds are reinvested
+            equally into remaining active picks still below their targets. The S&amp;P 500 benchmark uses actual SPY prices
+            over the full holding period. Past performance does not guarantee future results.
           </p>
         </div>
       </section>

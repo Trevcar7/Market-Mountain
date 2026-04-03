@@ -116,9 +116,9 @@ const TABLES: Record<Exclude<DataTableVariant, "nxt-market-share">, TableConfig>
     title: "SiriusXM — DCF Valuation Summary",
     headers: ["Metric", "Value"],
     rows: [
-      ["Current Share Price", "$22"],
+      ["Current Share Price", "$23"],
       ["Implied Share Price (DCF)", { text: "$39", type: "pos" }],
-      ["Upside to Fair Value", { text: "77%", type: "pos" }],
+      ["Upside to Fair Value", { text: "70%", type: "pos" }],
       ["WACC", "7.0%"],
       ["Terminal Growth Rate", "0.0%"],
       ["Revenue Growth Assumption", "Declining (−1.5% → 0%)"],
@@ -130,7 +130,7 @@ const TABLES: Record<Exclude<DataTableVariant, "nxt-market-share">, TableConfig>
     title: "SiriusXM — Reverse DCF: What the Market Is Pricing In",
     headers: ["Metric", "Market-Implied Value"],
     rows: [
-      ["Current Share Price", "$22"],
+      ["Current Share Price", "$23"],
       ["Implied Terminal Growth Rate (at 7.0% WACC)", { text: "−4.6%", type: "neg" }],
       ["Market Assumption", { text: "Perpetual cash flow decline", type: "neg" }],
       ["My Base Case TGR", { text: "0.0%", type: "pos" }],

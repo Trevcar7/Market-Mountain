@@ -142,8 +142,8 @@ export const ARTICLE_PATCHES: ArticlePatch[] = [
   { test: /\bqualcomm\b|\bQCOM\b|\bAMD\b/i, imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80", category: "markets" },
   // Palantir → data analytics / AI interface
   { test: /\bpalantir\b|\bPLTR\b/i, imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80", category: "markets" },
-  // Broadcom → networking / tech infrastructure
-  { test: /\bbroadcom\b|\bAVGO\b/i, imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1200&q=80", category: "markets" },
+  // Broadcom → networking / semiconductor infrastructure
+  { test: /\bbroadcom\b|\bAVGO\b/i, imageUrl: "https://images.unsplash.com/photo-1625571150159-f0d73d0b4108?w=1200&q=80", category: "markets" },
   // Warren Buffett / Berkshire Hathaway → Omaha / value investing
   { test: /\bbuffett\b|\bberkshire\b|\bBRK\b/i, imageUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80", category: "markets" },
   // CPI / Consumer Price Index → inflation data
@@ -206,7 +206,7 @@ export const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
   earnings: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",
   markets:  "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",
   crypto:   "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80",
-  policy:   "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1200&q=80",
+  policy:   "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1200&q=80",
 };
 
 /** Apply all article patches to a single NewsItem (mutates nothing). */

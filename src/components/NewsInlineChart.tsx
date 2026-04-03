@@ -72,6 +72,10 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
     allValues = chart.values;
   }
 
+  // Guard against empty or NaN-poisoned data
+  allValues = allValues.filter((v) => typeof v === "number" && !isNaN(v));
+  if (allValues.length === 0) return null;
+
   const dataMin = Math.min(...allValues);
   const dataMax = Math.max(...allValues);
   const dataRange = dataMax - dataMin || 1;
