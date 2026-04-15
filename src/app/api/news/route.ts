@@ -3,7 +3,7 @@ import { getRedisClient } from "@/lib/redis";
 import { NewsCollection } from "@/lib/news-types";
 import { SUPPRESSED_ARTICLE_IDS } from "@/lib/suppressed-articles";
 import { MARCH_13_CUTOFF_MS } from "@/lib/constants";
-import { applyArticlePatches, TOPIC_FALLBACK_IMAGES, CATEGORY_FALLBACK_IMAGES } from "@/lib/news-patches";
+import { applyArticlePatches } from "@/lib/news-patches";
 
 /**
  * GET /api/news
@@ -78,28 +78,6 @@ export async function GET() {
         ) as unknown as typeof item;
       });
 
-    // Post-patch image dedup: if two articles share the same cover image,
-    // the second one falls back to its topic or category image instead
-    const usedImages = new Set<string>();
-    for (const item of filteredNews) {
-      if (item.imageUrl) {
-        const baseUrl = item.imageUrl.split("?")[0];
-        if (usedImages.has(baseUrl)) {
-          // Duplicate — try topic fallback, then category fallback
-          const topicFallback = TOPIC_FALLBACK_IMAGES[item.topicKey ?? ""];
-          const categoryFallback = CATEGORY_FALLBACK_IMAGES[item.category];
-          const fallback = topicFallback ?? categoryFallback ?? undefined;
-          // Only use fallback if it's not also already used
-          if (fallback && !usedImages.has(fallback.split("?")[0])) {
-            (item as unknown as Record<string, unknown>).imageUrl = fallback;
-            usedImages.add(fallback.split("?")[0]);
-          }
-          // If fallback is also used, leave the duplicate (better than no image)
-        } else {
-          usedImages.add(baseUrl);
-        }
-      }
-    }
     const filtered = { ...newsData, news: filteredNews, meta: { ...newsData.meta, totalCount: filteredNews.length } };
 
     return NextResponse.json(filtered, {
