@@ -108,4 +108,12 @@ export const SUPPRESSED_ARTICLE_IDS = new Set<string>([
   // against primary sources during post-publish audit. Suppressed for quality.
   "news-1774813739677-1279",  // "French Factory Closures Surge 30% as Tariffs and Asian Competition Reshape Manufacturing"
 
+  // ── April 2, 2026 — Duplicate Fed/Warsh regime change article ──────────
+  // Same narrative (Warsh Fed nomination + inflation-vs-rate-cut collision)
+  // synthesized twice 3 days apart. Both articles share the "-1582" ID suffix
+  // (same author thread). The Apr 5 article has more specific market data
+  // (Fed Funds Rate 3.64%, 10Y 4.31%) and a fresher framing with sterling
+  // FX reaction. Keep news-1775404948494-1582 (Apr 5); suppress the older.
+  "news-1775140900681-1582",  // "Fed Rate Cut Hopes Collide With Inflation and Oil as Warsh Signals Regime Change"
+
 ]);
