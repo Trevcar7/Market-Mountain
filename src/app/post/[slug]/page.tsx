@@ -217,7 +217,7 @@ export default async function ArticlePage({ params }: Props) {
 
       {/* Article body — with optional ToC sidebar on lg+ screens */}
       <div className="bg-card">
-      <div className="mx-auto max-w-[900px] px-4 sm:px-6 py-10 sm:py-14 lg:flex lg:gap-14">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-6 py-7 sm:py-14 lg:flex lg:gap-14">
         {tocHeadings.length >= 3 && (
           <aside className="hidden lg:block w-44 shrink-0">
             <TableOfContents headings={tocHeadings} readTime={article.readTime} />
@@ -310,7 +310,7 @@ export default async function ArticlePage({ params }: Props) {
 
       {/* Related Articles */}
       {related.length > 0 && (
-        <section className="border-t border-border bg-surface-2 py-12 sm:py-16">
+        <section className="border-t border-border bg-surface-2 py-8 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2
               className="text-xl font-bold text-text mb-6 font-playfair"

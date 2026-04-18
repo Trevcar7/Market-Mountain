@@ -45,7 +45,7 @@ export default function SubscribeCTA() {
 
   return (
     <section className="bg-navy-900 border-t-2 border-accent-500/30">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-20">
         <div className="mx-auto max-w-2xl text-center">
           {/* Label */}
           <p className="text-xs font-semibold tracking-widest uppercase text-accent-500 mb-3">

@@ -53,7 +53,7 @@ export default function MethodologyPage() {
   return (
     <div className="min-h-screen bg-surface">
       {/* Hero */}
-      <section className="bg-navy-900 text-white py-16 sm:py-20">
+      <section className="bg-navy-900 text-white py-10 sm:py-20">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <p className="text-accent-400 text-xs font-semibold tracking-[0.2em] uppercase mb-3">
             EDITORIAL STANDARDS
@@ -69,7 +69,7 @@ export default function MethodologyPage() {
       </section>
 
       {/* Content */}
-      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-14">
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-7 sm:py-14">
         <div className="space-y-10">
           {sections.map((section, i) => (
             <div key={i}>

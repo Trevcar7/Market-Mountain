@@ -18,10 +18,10 @@ export default function NewsPage() {
   return (
     <main className="min-h-screen bg-surface">
       {/* Hero section */}
-      <section className="bg-navy-900 text-white py-16 sm:py-20">
+      <section className="bg-navy-900 text-white py-10 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
           <div className="max-w-2xl">
-            <h1 className="font-playfair text-4xl sm:text-5xl font-bold mb-4">
+            <h1 className="font-playfair text-3xl sm:text-5xl font-bold mb-3 sm:mb-4">
               Market News
             </h1>
             <p className="text-base sm:text-lg text-white/70 mb-2">
@@ -39,7 +39,7 @@ export default function NewsPage() {
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       {/* News grid */}
-      <section className="container mx-auto px-4 sm:px-6 max-w-6xl py-12 sm:py-16">
+      <section className="container mx-auto px-4 sm:px-6 max-w-6xl py-8 sm:py-16">
         <NewsSection
           limit={50}
           showCategories={true}

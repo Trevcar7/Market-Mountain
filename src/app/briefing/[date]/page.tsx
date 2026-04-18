@@ -69,7 +69,7 @@ export default async function BriefingDatePage({ params }: Props) {
   return (
     <main className="min-h-screen bg-surface">
       {/* Hero */}
-      <section className="bg-navy-900 text-white py-14 sm:py-20">
+      <section className="bg-navy-900 text-white py-9 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
           <nav className="flex items-center gap-1.5 text-[11px] text-white/35 mb-4" aria-label="Breadcrumb">
             <Link href="/" className="hover:text-white/60 transition-colors">Home</Link>
@@ -82,7 +82,7 @@ export default async function BriefingDatePage({ params }: Props) {
             Daily Markets Briefing
           </p>
           <h1
-            className="font-bold text-4xl sm:text-5xl leading-tight mb-4 font-playfair"
+            className="font-bold text-3xl sm:text-5xl leading-tight mb-3 sm:mb-4 font-playfair"
           >
             {formatLongDate(briefing.date)}
           </h1>
@@ -100,7 +100,7 @@ export default async function BriefingDatePage({ params }: Props) {
       {/* Accent divider */}
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
-      <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-12 sm:py-16 space-y-12">
+      <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-8 sm:py-16 space-y-8 sm:space-y-12">
         {/* Lead Story */}
         <section>
           <div className="flex items-center gap-3 mb-5">

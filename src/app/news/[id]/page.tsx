@@ -240,7 +240,7 @@ export default async function NewsStoryPage({ params }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-navy-900 via-navy-900/60 to-navy-900/20" />
         </div>
 
-        <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
+        <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-7 sm:py-14">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-[11px] text-white/35 mb-5" aria-label="Breadcrumb">
             <Link href="/" className="hover:text-white/60 transition-colors">Home</Link>

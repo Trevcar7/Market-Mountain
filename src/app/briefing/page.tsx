@@ -81,13 +81,13 @@ export default async function BriefingPage() {
   return (
     <main className="min-h-screen bg-surface">
       {/* Hero */}
-      <section className="bg-navy-900 text-white py-14 sm:py-20">
+      <section className="bg-navy-900 text-white py-9 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
           <p className="text-xs font-semibold tracking-widest uppercase text-accent-400 mb-3">
             Daily Markets Briefing
           </p>
           <h1
-            className="font-bold text-4xl sm:text-5xl leading-tight mb-4 font-playfair"
+            className="font-bold text-3xl sm:text-5xl leading-tight mb-3 sm:mb-4 font-playfair"
           >
             {briefing ? formatLongDate(briefing.date) : "Today's Briefing"}
           </h1>
@@ -105,7 +105,7 @@ export default async function BriefingPage() {
       {!briefing ? (
         <NoBriefingState />
       ) : (
-        <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-12 sm:py-16 space-y-12">
+        <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-8 sm:py-16 space-y-8 sm:space-y-12">
           {/* Lead Story */}
           <section>
             <div className="flex items-center gap-3 mb-5">

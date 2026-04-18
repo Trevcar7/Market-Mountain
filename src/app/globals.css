@@ -106,6 +106,8 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* iOS Safari: prevent automatic text size adjustment on rotation */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -114,6 +116,10 @@ body {
   font-family: var(--font-sans);
   line-height: 1.65;
   min-height: 100vh;
+  /* Prevent horizontal scroll / pinch-zoom-out from wide content.
+     `overflow-x: clip` (not hidden) avoids creating a scroll container
+     while still clipping horizontal overflow — keeps vertical scroll normal. */
+  overflow-x: clip;
 }
 
 ::-webkit-scrollbar { width: 6px; }

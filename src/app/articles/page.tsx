@@ -12,7 +12,7 @@ export default function ArticlesPage() {
   const articles = getAllArticles();
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-16">
       {/* Page header */}
       <div className="mb-10 sm:mb-14 border-b border-border pb-8">
         <p className="text-xs font-semibold tracking-widest uppercase text-accent-600 mb-2">

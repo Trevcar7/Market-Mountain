@@ -65,8 +65,8 @@ export default function HomePage() {
       />
       {/* Hero */}
       <section className="bg-navy-900 text-white border-b border-white/10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-6 sm:gap-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-7 sm:py-14">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-12">
             <div className="flex-1">
               <p className="text-[10px] font-bold tracking-widest uppercase text-accent-400 mb-2">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
@@ -129,8 +129,8 @@ export default function HomePage() {
       </section>
 
       {/* Market News */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
-        <div className="flex items-center justify-between mb-8 sm:mb-10">
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-20">
+        <div className="flex items-center justify-between mb-6 sm:mb-10">
           <div className="flex items-center gap-3">
             <span className="block w-[3px] h-5 rounded-full bg-accent-500 shrink-0" aria-hidden="true" />
             <h2 className="text-xl sm:text-2xl font-bold text-text font-playfair tracking-tight">
@@ -170,9 +170,9 @@ export default function HomePage() {
       </section>
 
       {/* Latest Analysis — Trevor's original research posts */}
-      <section className="bg-navy-50 border-t border-border">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
-        <div className="flex items-center justify-between mb-8 sm:mb-10">
+      <section className="bg-navy-50 dark:bg-navy-900 border-t border-border">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-20">
+        <div className="flex items-center justify-between mb-6 sm:mb-10">
           <div className="flex items-center gap-3">
             <span className="block w-[3px] h-5 rounded-full bg-accent-500 shrink-0" aria-hidden="true" />
             <h2 className="text-xl sm:text-2xl font-bold text-text font-playfair tracking-tight">
@@ -229,7 +229,7 @@ export default function HomePage() {
 
       {/* About strip */}
       <section className="bg-card border-t border-border">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-9 sm:py-16 flex flex-col md:flex-row items-center gap-6 md:gap-12">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold tracking-widest uppercase text-accent-600 mb-2">
               About the Author

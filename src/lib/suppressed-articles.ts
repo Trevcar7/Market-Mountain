@@ -87,4 +87,25 @@ export const SUPPRESSED_ARTICLE_IDS = new Set<string>([
   // suppress the older.
   "news-1774288973822-1245",  // "Fink Warns AI Wealth Gap Risks Widening as BlackRock Pushes Retail Investment Access"
 
+  // ── April 10, 2026 — Duplicate Meta Muse Spark article ─────────────────
+  // Same product launch (Meta's Muse Spark AI model) synthesized twice ~48h apart.
+  // The Apr 8 article is a straight announcement; the Apr 10 article adds critical
+  // analysis about coding performance and AI spending justification — which is
+  // the stronger editorial angle. Keep news-1775831765477-728 (Apr 10); suppress
+  // the older announcement piece.
+  "news-1775683841932-728",   // "Meta Debuts Muse Spark as First Test of Zuckerberg's AI Reorganization"
+
+  // ── April 5, 2026 — Duplicate OpenAI leadership reshuffle article ──────
+  // Same executive change (Fidji Simo medical leave, leadership reshuffle)
+  // synthesized twice ~20h apart. The Apr 5 article focuses on the specific
+  // product-role transition to Brockman — more concrete and focused.
+  // Keep news-1775368532048-941 (Apr 5); suppress the older broad-framing piece.
+  "news-1775318399680-941",   // "OpenAI Leadership Reshuffle Signals IPO Readiness Amid Executive Health Changes"
+
+  // ── March 29, 2026 — Weak fact-check French factory article ────────────
+  // Fact-check score of 40/100 — substantially below the 55 pass threshold.
+  // The "French factory closures surge 30%" statistic could not be verified
+  // against primary sources during post-publish audit. Suppressed for quality.
+  "news-1774813739677-1279",  // "French Factory Closures Surge 30% as Tariffs and Asian Competition Reshape Manufacturing"
+
 ]);

@@ -182,7 +182,7 @@ export default async function TrackRecordPage() {
   return (
     <div className="min-h-screen bg-surface">
       {/* Hero */}
-      <section className="bg-navy-900 text-white py-16 sm:py-20">
+      <section className="bg-navy-900 text-white py-10 sm:py-20">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
           <p className="text-accent-400 text-xs font-semibold tracking-[0.2em] uppercase mb-3">
             PERFORMANCE TRANSPARENCY
@@ -316,7 +316,7 @@ export default async function TrackRecordPage() {
       })()}
 
       {/* All Research Picks */}
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-10 sm:py-14">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-7 sm:py-14">
         <h2 className="text-lg font-serif font-bold text-text mb-6">
           All Research Picks
         </h2>
