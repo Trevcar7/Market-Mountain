@@ -63,7 +63,7 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
     return (
       <Link
         href={href}
-        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300 min-h-[260px] sm:aspect-[16/9] sm:min-h-[280px]"
+        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300 sm:aspect-[16/9] sm:min-h-[280px]"
       >
         {/* Background: category gradient */}
         <div
@@ -72,14 +72,15 @@ export default function NewsCard({ news, variant = "default" }: NewsCardProps) {
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
 
-        {/* Content at bottom */}
-        <div className="absolute inset-0 flex flex-col justify-end p-7 sm:p-10">
-          <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-300 bg-white/10 px-2 py-0.5 rounded mb-4 w-fit">
+        {/* Content — flows naturally on mobile (content drives card height);
+            absolute-pinned to bottom on desktop for hero overlay look */}
+        <div className="relative sm:absolute sm:inset-0 flex flex-col justify-end p-5 pt-20 sm:p-10">
+          <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-300 bg-white/10 px-2 py-0.5 rounded mb-3 sm:mb-4 w-fit">
             {categoryLabel}
           </span>
 
           <h2
-            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-2 group-hover:text-accent-300 transition-colors duration-200 font-playfair"
+            className="text-white text-xl sm:text-[1.75rem] font-bold leading-tight mb-2 group-hover:text-accent-300 transition-colors duration-200 font-playfair"
           >
             {news.title}
           </h2>

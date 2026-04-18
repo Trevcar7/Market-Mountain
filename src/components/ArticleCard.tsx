@@ -15,7 +15,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
     return (
       <Link
         href={href}
-        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300 min-h-[260px] sm:aspect-[16/9] sm:min-h-[280px]"
+        className="group block relative overflow-hidden rounded-xl bg-navy-900 shadow-lg hover:shadow-2xl transition-all duration-300 sm:aspect-[16/9] sm:min-h-[280px]"
       >
         {article.coverImage ? (
           <Image
@@ -33,15 +33,16 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
 
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
 
-        <div className="absolute inset-0 flex flex-col justify-end p-7 sm:p-10">
+        {/* Content — flows naturally on mobile; absolute-pinned to bottom on desktop */}
+        <div className="relative sm:absolute sm:inset-0 flex flex-col justify-end p-5 pt-20 sm:p-10">
           {tag && (
-            <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-300 bg-white/10 px-2 py-0.5 rounded mb-4 w-fit">
+            <span className="inline-block text-xs font-semibold tracking-wider uppercase text-accent-300 bg-white/10 px-2 py-0.5 rounded mb-3 sm:mb-4 w-fit">
               {tag}
             </span>
           )}
 
           <h2
-            className="text-white text-2xl sm:text-[1.75rem] font-bold leading-tight mb-3 group-hover:text-accent-300 transition-colors duration-200 font-playfair"
+            className="text-white text-xl sm:text-[1.75rem] font-bold leading-tight mb-3 group-hover:text-accent-300 transition-colors duration-200 font-playfair"
           >
             {article.title}
           </h2>
