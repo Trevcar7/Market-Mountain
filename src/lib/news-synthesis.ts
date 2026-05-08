@@ -571,6 +571,27 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
   result.secondOrderImplication = stripHashtags(result.secondOrderImplication);
   result.keyTakeaways = result.keyTakeaways.map(stripHashtags);
 
+  // ── Em-dash / en-dash sanitization ─────────────────────────────────────
+  // Editorial style: never use em-dashes (—) or en-dashes (–) as punctuation.
+  // Rewrites them as commas/periods based on context. Hyphens (-) in compound
+  // words like "year-over-year" or "10-Year" are preserved.
+  const stripDashes = (s: string) => {
+    if (!s) return s;
+    // Replace em-dash or en-dash (with optional surrounding spaces) with ", "
+    // Then collapse cases like ", ," → "," and trailing ", ." → "."
+    return s
+      .replace(/\s*[—–]\s*/g, ", ")
+      .replace(/,\s*,/g, ",")
+      .replace(/,\s*\./g, ".")
+      .replace(/\s+,/g, ",");
+  };
+  result.story = stripDashes(result.story);
+  result.title = stripDashes(result.title);
+  result.whyThisMatters = stripDashes(result.whyThisMatters);
+  result.whatToWatchNext = stripDashes(result.whatToWatchNext);
+  result.secondOrderImplication = stripDashes(result.secondOrderImplication);
+  result.keyTakeaways = result.keyTakeaways.map(stripDashes);
+
   // ── Fallback title extraction ──────────────────────────────────────────
   // If no HEADLINE: section was found (title === fallbackTitle), try to
   // extract a reasonable title from the first substantive line of the output.
@@ -690,9 +711,12 @@ function createSystemPrompt(toneProfile: ToneProfile): string {
 
 ${formatToneForPrompt(toneProfile)}
 
-Write in the style of The Wall Street Journal or Financial Times — clear, authoritative, analytical, and precise.
+Write in the style of The Wall Street Journal or Financial Times: clear, authoritative, analytical, and precise.
 
-WORKFLOW: THESIS → EVIDENCE → NARRATIVE
+PUNCTUATION RULE (ABSOLUTE)
+Never use em-dashes (—) or en-dashes (–). Anywhere. In any field. Use commas, periods, semicolons, parentheses, or the word "to" for ranges (e.g., "500 to 800 words"). This applies to HEADLINE, KEY_TAKEAWAYS, WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, the story body, and section headings. Hyphens inside compound words like "year-over-year" or "10-Year Treasury" are fine.
+
+WORKFLOW: THESIS to EVIDENCE to NARRATIVE
 Before writing, identify:
   1. THESIS: The single most important claim the sources support (one sentence)
   2. EVIDENCE: The specific numbers and facts that verify the thesis
@@ -720,24 +744,24 @@ Each article must offer a genuinely differentiated analytical perspective:
 - Provide a concrete forward-looking signal: Not "watch for volatility" but "the March FOMC dot plot and April CPI print will determine whether the 10-year holds above 4.5%."
 
 STRUCTURE
-Output your response in this exact format — no deviations:
+Output your response in this exact format. No deviations.
 
-HEADLINE: [sharp, specific news headline, 8–12 words, no dashes]
+HEADLINE: [sharp, specific news headline, 8 to 12 words, no dashes]
 KEY_TAKEAWAYS:
 • [Most important fact or number from the story]
 • [Key market implication or sector impact]
 • [Most important forward-looking signal to monitor]
-WHY_MATTERS: [one sentence explaining why this story matters to investors]
-SECOND_ORDER: [one sentence identifying the second-order market implication beyond the headline]
-WHAT_WATCH: [one sentence on the most important forward-looking signal to monitor]
+WHY_MATTERS: [one sentence explaining why this story matters to investors. Must be about the SAME subject as the headline. No new topic or company introduced here.]
+SECOND_ORDER: [one sentence identifying the second-order market implication beyond the headline. Must follow logically from the headline subject. Do not pivot to an unrelated asset or theme.]
+WHAT_WATCH: [one sentence on the most important forward-looking signal to monitor. The catalyst MUST have a direct, established mechanical or fundamental link to the article's primary asset or subject. For a Bitcoin price story, name a crypto-specific catalyst (ETF flows, exchange volumes, on-chain metrics, SEC/CFTC rulemaking, halving events, major exchange earnings). Do NOT cite generic macro events (jobs report, FOMC dot plot, CPI print) unless the article itself argues a specific transmission channel from that data to the asset. If you cannot name an asset-specific catalyst, do not invent one, choose the next-best directly relevant event.]
 MARKET_IMPACT:
-• [ASSET] [+/-change%] [up/down/flat] — e.g. "OIL +4.1% up" or "S&P 500 -1.2% down" or "10Y YIELD +8bps up"
+• [ASSET] [+/-change%] [up/down/flat], e.g. "OIL +4.1% up" or "S&P 500 -1.2% down" or "10Y YIELD +8bps up"
 • [ASSET] [+/-change%] [up/down/flat]
 CRITICAL: Every MARKET_IMPACT line MUST use the exact format: ASSET +/-N.N% direction (or +/-Nbps for yields). Text descriptions like "elevated" or "under pressure" will be rejected. If you cannot find a specific numeric change for an asset, omit that MARKET_IMPACT line entirely.
-GEOPOLITICAL_THEMES: [pipe-separated list of geopolitical themes if any apply, e.g. "iran_oil_supply|us_china_trade" — or "none" if no geopolitical angle. Use snake_case tags from: iran_oil_supply, us_china_trade, russia_energy, middle_east_conflict, taiwan_risk, sanctions, tariffs, opec_supply, european_energy]
+GEOPOLITICAL_THEMES: [pipe-separated list of geopolitical themes if any apply, e.g. "iran_oil_supply|us_china_trade", or "none" if no geopolitical angle. Use snake_case tags from: iran_oil_supply, us_china_trade, russia_energy, middle_east_conflict, taiwan_risk, sanctions, tariffs, opec_supply, european_energy]
 
 [blank line]
-[story body — 5 sections, 500–800 words total]
+[story body, 5 sections, 500 to 800 words total]
 
 SINGLE-STORY FOCUS (CRITICAL)
 If your sources cover multiple unrelated events (e.g., an Apple acquisition AND an IBM deal AND a German banking dispute), do NOT write a roundup. Instead:
@@ -745,16 +769,18 @@ If your sources cover multiple unrelated events (e.g., an Apple acquisition AND 
 - Use other stories ONLY as brief supporting context (1-2 sentences max) to illustrate a broader trend
 - The headline and thesis must be about ONE event, ONE company, ONE consequence
 - NEVER give equal weight to 3+ unrelated deals/events in one article
+- WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, and KEY_TAKEAWAYS must ALL be about the same single subject as the headline. They are not opportunities to pull in adjacent topics.
+- Hard test: name the article's primary subject in one phrase (e.g., "Bitcoin price recovery", "Novartis acquires Avidity"). Every metadata field and every section heading must obviously be about THAT subject. If a field could plausibly belong to a different article, rewrite it.
 Test: If your article has 3+ company names in the opening paragraph, you are writing a roundup. Stop and refocus on the most newsworthy single story.
 
 STORY RULES
 
-1 Target 500–800 words across five sections — no single section may be less than 60 words
+1 Target 500 to 800 words across five sections. No single section may be less than 60 words.
 2 Section 1 (The News): Open with the single most important fact. Inverted pyramid. Most impactful number first. Write in the style of a Reuters flash or FT front-page lede: one sentence, one number, one consequence.
 3 Section 2 (Market Response): How markets responded in price terms. Specific index, sector, or asset moves with percentages or basis points. Name at least 2 specific assets or indices. Bloomberg Markets standard: "The S&P 500 fell 1.2%, led by energy names including Exxon (down 3.1%) and Chevron (down 2.8%)."
 4 Section 3 (Why It Matters): Why this happened. Economic context, precedent, and the broader macro narrative. Include a historical comparison or prior-period reference (e.g., "the largest single-day move since March 2023" or "the third consecutive month above the Fed's 2% target"). Bloomberg/FT standard: connect the event to the macro cycle, not just the headline.
 5 Section 4 (Investment Case): Which sectors, tickers, or strategies benefit or suffer. Name specific assets. Barron's standard: name at least one ETF, sector, or strategy that benefits and one that faces headwinds. Include a specific price level, valuation multiple, or spread that supports the call.
-6 Section 5 (What to Watch): The most important catalyst or data point to monitor over the next 1–4 weeks. CNBC/Reuters standard: name the specific date, event, or data release (e.g., "March 19 FOMC statement" or "April 10 CPI print"). Do not write vague catalysts like "upcoming data releases" or "future Fed decisions."
+6 Section 5 (What to Watch): The most important catalyst or data point to monitor over the next 1 to 4 weeks. The catalyst must have a direct mechanical or fundamental link to the article's primary asset (see WHAT_WATCH rule above). CNBC/Reuters standard: name the specific date, event, or data release (e.g., "March 19 FOMC statement" or "April 10 CPI print"). Do not write vague catalysts like "upcoming data releases" or "future Fed decisions."
 7 EVERY section heading MUST be unique and specific to THIS article. NEVER use generic headings like "Event Summary", "Market Reaction", "Macro Context", or "Investor Implications". Instead write article-specific headings that tell the reader what this section is about. Examples:
   - "## Novartis Deploys $11 Billion to Acquire Avidity" (not "## Event Summary")
   - "## Athletic Retail Stocks Slide on Tariff Fears" (not "## Market Reaction")
@@ -764,15 +790,15 @@ STORY RULES
   Begin each heading with "## " on its own line. Separate sections with a blank line.
 8 Use specific numbers, company names, dates, and percentage figures from the sources
 9 Include at least FIVE numerical data points distributed across the story body (not clustered in one paragraph)
-10 Synthesize — do not repeat the same fact in multiple sections
-11 Write with analytical depth and measured tone — not sensationalism
-12 Do not invent any facts not present in the provided sources or the MARKET DATA section
-13 No markdown formatting except ## section headings and > blockquotes — no bullet points, bold, italic, or horizontal rules. Use > blockquotes sparingly (at most 1 per article) to highlight a direct quote from a named official, CEO, or analyst that is central to the thesis. Example: "> Fed Chair Powell noted that 'the committee remains attentive to inflation risks.'" Do NOT use blockquotes for your own analysis.
-14 No dashes of any kind (em dash or hyphen used as punctuation)
-15 Write in third person only — never use "I" or first-person perspective
-16 Write in plain prose paragraphs only
-17 MARKET_IMPACT bullets: only list assets that appear in your story or MARKET DATA. Omit assets you cannot support. Each line MUST contain a numeric change (e.g. +2.3%, -45bps). Never use text descriptions (e.g. "elevated", "under pressure") as the change value — omit the line instead.
-18 Always write "U.S." (with periods) when referring to the United States — never "US"
+10 Synthesize. Do not repeat the same fact in multiple sections.
+11 Write with analytical depth and measured tone, not sensationalism.
+12 Do not invent any facts not present in the provided sources or the MARKET DATA section.
+13 No markdown formatting except ## section headings and > blockquotes. No bullet points, bold, italic, or horizontal rules. Use > blockquotes sparingly (at most 1 per article) to highlight a direct quote from a named official, CEO, or analyst that is central to the thesis. Example: "> Fed Chair Powell noted that 'the committee remains attentive to inflation risks.'" Do NOT use blockquotes for your own analysis.
+14 No em-dashes (—) or en-dashes (–) anywhere, ever. Use commas, periods, semicolons, parentheses, or "to" for ranges. Hyphens are allowed only inside compound words (e.g., "year-over-year", "10-Year Treasury", "second-order"), never as a sentence break.
+15 Write in third person only. Never use "I" or first-person perspective.
+16 Write in plain prose paragraphs only.
+17 MARKET_IMPACT bullets: only list assets that appear in your story or MARKET DATA. Omit assets you cannot support. Each line MUST contain a numeric change (e.g. +2.3%, -45bps). Never use text descriptions (e.g. "elevated", "under pressure") as the change value, omit the line instead.
+18 Always write "U.S." (with periods) when referring to the United States, never "US".
 
 FACT ACCURACY RULES (Step 11 — Data Sanity)
 These rules prevent stale or fabricated numbers:
@@ -2607,6 +2633,17 @@ function generateId(topic: string): string {
  */
 function inferTickerFromText(title: string, body: string): string | undefined {
   const text = `${title} ${body}`.toLowerCase();
+  const titleLower = title.toLowerCase();
+
+  // Crypto-priority: if the title is clearly about Bitcoin/crypto, do NOT
+  // fall through to equity tickers that may incidentally appear in the body.
+  if (
+    /\b(bitcoin|btc|ethereum|eth|crypto|stablecoin|tokeniz)/i.test(titleLower)
+  ) {
+    if (/\bcoinbase\b/.test(text)) return "COIN";
+    return undefined; // Bitcoin itself has no equity ticker; skip equity match
+  }
+
   const COMPANIES: [RegExp, string][] = [
     [/\blululemon\b/, "LULU"],
     [/\bnike\b/, "NKE"],
@@ -2614,7 +2651,7 @@ function inferTickerFromText(title: string, body: string): string | undefined {
     [/\btesla\b/, "TSLA"],
     [/\bsuper micro\b|\bsmci\b|\bsupermicro\b/, "SMCI"],
     [/\bnvidia\b|\bnvda\b/, "NVDA"],
-    [/\bmeta\b.*\bplatform/, "META"],
+    [/\bmeta\s+platforms?\b/, "META"],
     [/\bgoogle\b|\balphabet\b/, "GOOGL"],
     [/\bamazon\b/, "AMZN"],
     [/\bmicrosoft\b/, "MSFT"],

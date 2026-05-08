@@ -191,15 +191,10 @@ export function NewsInlineChart({ chart }: NewsInlineChartProps) {
   );
 
   const renderChartFooter = () => {
-    if (!chart.source && !chart.caption) return null;
+    if (!chart.caption) return null;
     return (
       <div className="bg-surface-2 border-t border-border px-5 py-2.5 space-y-0.5">
-        {chart.caption && (
-          <p className="text-xs text-text-muted italic leading-relaxed">{chart.caption}</p>
-        )}
-        {chart.source && (
-          <p className="text-[10px] text-text-light">Source: {chart.source}</p>
-        )}
+        <p className="text-xs text-text-muted italic leading-relaxed">{chart.caption}</p>
       </div>
     );
   };
@@ -451,7 +446,6 @@ export function NewsKeyDataInline({ dataPoints }: NewsKeyDataInlineProps) {
                 </span>
               )}
             </div>
-            {dp.source && <p className="text-white/25 text-[10px] mt-0.5">{dp.source}</p>}
           </div>
         ))}
       </div>
