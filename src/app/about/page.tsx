@@ -63,7 +63,7 @@ export default function AboutPage() {
         <p>
           I&apos;ve been a member of CMU&apos;s <strong>Student-Managed
           Investment Funds</strong> since 2023 and served as <strong>Co-Chair
-          from 2025</strong>, leading investment research for a $4.4M
+          from 2025</strong>, leading investment research for a $4.5M
           multi-asset portfolio across equities and fixed income. As Co-Chair I
           designed and delivered DCF and comparable-company valuation workshops
           and presented portfolio performance and strategy to the Senior Alumni
