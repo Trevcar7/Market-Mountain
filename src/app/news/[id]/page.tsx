@@ -320,6 +320,20 @@ export default async function NewsStoryPage({ params }: Props) {
       <div className="bg-card">
       <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 sm:py-14">
         <article>
+          {/* AI-synthesis disclosure — first-time-visitor transparency */}
+          <div className="mb-6 flex items-start gap-2.5 px-3.5 py-2.5 rounded-md bg-surface-2 border border-border text-[11px] leading-snug text-text-muted">
+            <svg className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>
+              Synthesized by Claude from named primary sources (Bloomberg, Reuters, FT, Fed, BLS, EIA). Not original reporting.{" "}
+              <Link href="/methodology" className="text-accent-600 hover:text-accent-700 font-medium underline decoration-accent-600/30 hover:decoration-accent-700">
+                See methodology
+              </Link>
+              .
+            </span>
+          </div>
+
           <div className="prose prose-slate max-w-none">
             {paragraphs.map((para, i) => {
               // Track which text paragraph index this is (skip headings and blockquotes)

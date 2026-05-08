@@ -13,6 +13,7 @@ const navLinks = [
   { href: "/briefing", label: "Briefing" },
   { href: "/articles", label: "Articles" },
   { href: "/track-record", label: "Track Record" },
+  { href: "/methodology", label: "Methodology" },
   { href: "/about", label: "About" },
 ];
 

@@ -485,16 +485,28 @@ function Section({ title, type, items, loading, skeletonCount = 4, borderClass }
 
 function SignalTagRow({ tags }: { tags: SignalTag[] }) {
   if (tags.length === 0) return null;
+  // Map original tag color family → dot + text classes (literal so Tailwind JIT picks them up)
+  const styleFor = (cc: string): { dot: string; text: string } => {
+    if (cc.includes("text-red-")) return { dot: "bg-red-400", text: "text-red-300" };
+    if (cc.includes("text-amber-")) return { dot: "bg-amber-400", text: "text-amber-300" };
+    if (cc.includes("text-emerald-")) return { dot: "bg-emerald-400", text: "text-emerald-300" };
+    if (cc.includes("text-slate-")) return { dot: "bg-slate-400", text: "text-slate-300" };
+    return { dot: "bg-white/40", text: "text-white/60" };
+  };
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-2 flex flex-wrap gap-2 justify-center sm:justify-start">
-      {tags.map((tag) => (
-        <span
-          key={tag.label}
-          className={`inline-flex items-center px-2.5 py-1 rounded-md border text-[11px] font-semibold tracking-wide ${tag.colorClass}`}
-        >
-          {tag.label}
-        </span>
-      ))}
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-2 flex flex-wrap gap-x-5 gap-y-1.5 justify-center sm:justify-start">
+      {tags.map((tag) => {
+        const s = styleFor(tag.colorClass);
+        return (
+          <span
+            key={tag.label}
+            className={`inline-flex items-center gap-1.5 text-[10px] font-medium tracking-[0.14em] uppercase ${s.text}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} aria-hidden="true" />
+            {tag.label}
+          </span>
+        );
+      })}
     </div>
   );
 }

@@ -69,13 +69,24 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-12">
             <div className="flex-1">
               <p className="text-[10px] font-bold tracking-widest uppercase text-accent-400 mb-2">
-                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
               </p>
               <h1 className="text-2xl sm:text-3xl font-bold font-playfair leading-tight text-white mb-2">
                 Independent market research and macro commentary
               </h1>
               <p className="text-white/50 text-sm leading-relaxed max-w-lg">
                 Data-driven equity analysis and curated daily briefings by Trevor Carnovsky.
+              </p>
+              <p className="text-white/35 text-xs leading-relaxed max-w-lg mt-2">
+                By Trevor Carnovsky, an undergraduate equity analyst at Central Michigan University.{" "}
+                <Link href="/methodology" className="underline decoration-white/20 hover:decoration-white/60 hover:text-white/60 transition-colors">
+                  Methodology
+                </Link>
+                {" "}and{" "}
+                <Link href="/track-record" className="underline decoration-white/20 hover:decoration-white/60 hover:text-white/60 transition-colors">
+                  track record
+                </Link>
+                {" "}are public.
               </p>
             </div>
             <div className="flex gap-3 shrink-0">
