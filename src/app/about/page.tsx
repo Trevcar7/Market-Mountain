@@ -61,12 +61,14 @@ export default function AboutPage() {
 
         <h2>Investment Experience</h2>
         <p>
-          Since 2023, I&apos;ve served as <strong>Co-Chair of the Student-Managed
-          Investment Funds</strong> at CMU, leading investment research for a
-          $4.4M multi-asset portfolio across equities and fixed income. In that
-          role I&apos;ve designed and delivered DCF and comparable-company
-          valuation workshops and presented portfolio performance and strategy
-          to the Senior Alumni Advisory Board.
+          I&apos;ve been a member of CMU&apos;s <strong>Student-Managed
+          Investment Funds</strong> since 2023 and served as <strong>Co-Chair
+          from 2025</strong>, leading investment research for a $4.4M
+          multi-asset portfolio across equities and fixed income. As Co-Chair I
+          designed and delivered DCF and comparable-company valuation workshops
+          and presented portfolio performance and strategy to the Senior Alumni
+          Advisory Board. I now serve as <strong>Co-Chair Emeritus and Senior
+          Mentor</strong> through graduation.
         </p>
         <p>
           I founded <strong>Market Mountain</strong> in March 2025 to operate
