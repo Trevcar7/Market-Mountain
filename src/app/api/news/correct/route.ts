@@ -69,6 +69,8 @@ interface CorrectionRequest {
    * Accepts any NewsItem field key → new value.
    */
   fieldUpdates?: Partial<Record<string, unknown>>;
+  /** If true, delete the story from the feed entirely. */
+  remove?: boolean;
   /** Human-readable reason — written to the console audit log. */
   reason?: string;
 }
@@ -93,14 +95,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { id, replacements = [], fieldUpdates = {}, reason = "editorial correction" } = body;
+  const { id, replacements = [], fieldUpdates = {}, remove = false, reason = "editorial correction" } = body;
 
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing or invalid story id" }, { status: 400 });
   }
-  if (replacements.length === 0 && Object.keys(fieldUpdates).length === 0) {
+  if (!remove && replacements.length === 0 && Object.keys(fieldUpdates).length === 0) {
     return NextResponse.json(
-      { error: "No replacements or fieldUpdates provided" },
+      { error: "No replacements, fieldUpdates, or remove flag provided" },
       { status: 400 }
     );
   }
@@ -132,6 +134,30 @@ export async function POST(request: NextRequest) {
   }
 
   const original = collection.news[storyIndex];
+
+  // ── Removal path ──────────────────────────────────────────────────────────
+  if (remove) {
+    collection.news.splice(storyIndex, 1);
+    collection.lastUpdated = new Date().toISOString();
+    try {
+      await kv.set("news", collection);
+    } catch (err) {
+      console.error("[news/correct] Failed to write feed after removal:", err);
+      return NextResponse.json(
+        { error: "Failed to save deletion to storage" },
+        { status: 500 }
+      );
+    }
+    console.log(
+      `[news/correct] AUDIT: REMOVED story="${original.title}" id=${id} reason="${reason}"`
+    );
+    return NextResponse.json({
+      success: true,
+      removed: { id, title: original.title },
+      reason,
+    });
+  }
+
   const corrected: NewsItem = { ...original };
   let changesApplied = 0;
 
