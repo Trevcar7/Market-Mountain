@@ -494,7 +494,7 @@ function SignalTagRow({ tags }: { tags: SignalTag[] }) {
     return { dot: "bg-white/40", text: "text-white/60" };
   };
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-2 flex flex-wrap gap-x-5 gap-y-1.5 justify-center sm:justify-start">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-2 flex flex-wrap gap-x-5 gap-y-1.5 justify-center">
       {tags.map((tag) => {
         const s = styleFor(tag.colorClass);
         return (

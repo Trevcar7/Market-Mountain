@@ -5,7 +5,7 @@ import Image from "next/image";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Trevor Carnovsky — equity researcher, investment analyst, and founder of Market Mountain. CFA Research Challenge champion, RBC Capital Markets, PwC.",
+    "Trevor Carnovsky, Finance and Accounting student at Central Michigan University, founder of Market Mountain, CFA Research Challenge Michigan Champion, RBC and PwC.",
 };
 
 export default function AboutPage() {
@@ -40,63 +40,109 @@ export default function AboutPage() {
       <div className="prose prose-slate max-w-none">
         <h2>Background</h2>
         <p>
-          I&apos;m Trevor Carnovsky, an equity researcher and investment analyst
-          with experience across capital markets, audit, and portfolio management.
-          I founded Market Mountain to publish independent equity research, macro
-          analysis, and automated daily market briefings built on institutional-grade
-          data pipelines.
+          I&apos;m Trevor Carnovsky, a Finance and Accounting student at{" "}
+          <strong>Central Michigan University</strong> (3.89 GPA, anticipated
+          December 2026) and the founder of Market Mountain. I publish independent
+          equity research, macro analysis, and automated daily market briefings
+          built on institutional-grade data pipelines.
         </p>
 
+        <h2>Professional Experience</h2>
         <p>
-          My professional experience spans{" "}
-          <strong>Royal Bank of Canada</strong> (Capital Markets operations) and{" "}
-          <strong>PwC</strong> (assurance), where I executed audit testing for a
-          $7B+ revenue energy and utility client under FERC and GAAP standards.
-          I also co-chair a <strong>$4M student-managed investment fund</strong>,
-          leading investment research across equities and fixed income and
-          presenting strategy to the Senior Alumni Advisory Board.
+          I&apos;ll be joining <strong>Royal Bank of Canada</strong> in New York
+          this summer as an incoming Operations Analyst Intern. Previously, I
+          interned at <strong>PwC</strong> in Detroit on the Assurance team,
+          where I executed audit testing for a $7B+ revenue energy and utility
+          client under FERC and GAAP standards, analyzed financial statements
+          and operational data to support testing of internal controls and
+          account balances, and coordinated with client finance teams on
+          documentation supporting audit procedures.
         </p>
 
-        <h2>Investment Research</h2>
+        <h2>Investment Experience</h2>
         <p>
-          My research has been recognized in national competition. I led the{" "}
-          <strong>CFA Institute Research Challenge</strong> team that won the
-          Michigan championship, authoring a five-month equity research report
-          on Penske Automotive Group and presenting a Buy thesis to a CFA
-          charterholder panel. I also placed 2nd out of 60+ teams at the{" "}
-          <strong>University of Florida Stock Pitch Competition</strong>,
-          building a bull/base/bear valuation on First Solar using DCF and
-          trading multiples.
+          Since 2023, I&apos;ve served as <strong>Co-Chair of the Student-Managed
+          Investment Funds</strong> at CMU, leading investment research for a
+          $4.4M multi-asset portfolio across equities and fixed income. In that
+          role I&apos;ve designed and delivered DCF and comparable-company
+          valuation workshops and presented portfolio performance and strategy
+          to the Senior Alumni Advisory Board.
+        </p>
+        <p>
+          I founded <strong>Market Mountain</strong> in March 2025 to operate
+          automated pipelines that generate daily market briefings, macro
+          dashboards, and equity research analyzing competitive positioning,
+          valuation frameworks, and macroeconomic trends.
         </p>
 
+        <h2>Competitions</h2>
+        <ul>
+          <li>
+            <strong>CFA Institute Research Challenge, Michigan Champion</strong>{" "}
+            (February 2026). Led a five-month equity research process, authored
+            the report, and presented a Buy thesis on Penske Automotive Group to
+            a CFA charterholder panel.
+          </li>
+          <li>
+            <strong>University of Florida Stock Pitch, 2nd Place out of 60+
+            teams</strong> (February 2026). Built a bull/base/bear valuation on
+            First Solar using DCF and trading multiples; pitched a thesis on
+            technology leadership and domestic supply-chain advantages.
+          </li>
+          <li>
+            <strong>University of Florida Financial Planning Competition, 1st
+            Place</strong> (January 2025). Developed a financial plan integrating
+            retirement modeling, tax strategy, and portfolio allocation for a
+            family of five.
+          </li>
+          <li>
+            <strong>ACG Cup Competition</strong>, Participant (2024 and 2026).
+            Evaluated strategic M&amp;A alternatives and delivered
+            valuation-based recommendations in live board-style presentations.
+          </li>
+        </ul>
+
+        <h2>Honors</h2>
+        <ul>
+          <li>Provost&apos;s Award (one of two recipients college-wide)</li>
+          <li>Outstanding Student of the Year (top 2.5% of 400+ graduating class)</li>
+          <li>Voigtman Family Endowed Scholarship (competitive merit award)</li>
+          <li>James H. Wanty Wealth Management Scholarship (largest finance scholarship at CMU)</li>
+          <li>Michigan Finance Scholar</li>
+          <li>L.A. Johns / Isabella Bank Endowed Scholarship</li>
+        </ul>
+
+        <h2>Certifications &amp; Skills</h2>
         <p>
           I hold the <strong>SIE</strong> and{" "}
           <strong>Bloomberg Market Concepts</strong> certifications and am
-          currently pursuing <strong>CFA Level I</strong>.
+          currently a <strong>CFA Level I candidate</strong>. My technical
+          toolkit includes advanced Excel, financial modeling, financial
+          statement analysis, the Bloomberg Terminal, and SAP.
         </p>
 
-        <h2>Methodology</h2>
+        <h2>Research Methodology</h2>
         <p>
           Each equity analysis begins with a thorough review of a company&apos;s
-          financial statements — income statement, balance sheet, and cash flow
-          statement. Valuation methods used include:
+          financial statements: income statement, balance sheet, and cash flow
+          statement. Valuation methods I rely on include:
         </p>
         <ul>
           <li>
-            <strong>Discounted Cash Flow (DCF)</strong> — Intrinsic value based on
-            projected free cash flows
+            <strong>Discounted Cash Flow (DCF)</strong>: intrinsic value based on
+            projected free cash flows.
           </li>
           <li>
-            <strong>EV / EBITDA</strong> — Enterprise value relative to earnings
-            before interest, taxes, depreciation, and amortization
+            <strong>EV / EBITDA</strong>: enterprise value relative to earnings
+            before interest, taxes, depreciation, and amortization.
           </li>
           <li>
-            <strong>P/E and P/CF Multiples</strong> — Peer-relative valuation
-            benchmarking
+            <strong>P/E and P/CF multiples</strong>: peer-relative valuation
+            benchmarking.
           </li>
           <li>
-            <strong>Sensitivity Analysis</strong> — WACC and growth rate stress
-            testing
+            <strong>Sensitivity analysis</strong>: WACC and growth-rate stress
+            testing.
           </li>
         </ul>
 

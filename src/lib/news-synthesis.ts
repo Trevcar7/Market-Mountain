@@ -592,6 +592,28 @@ function parseStructuredOutput(raw: string, fallbackTitle: string): ParsedArticl
   result.secondOrderImplication = stripDashes(result.secondOrderImplication);
   result.keyTakeaways = result.keyTakeaways.map(stripDashes);
 
+  // ── Tilde sanitization ────────────────────────────────────────────────
+  // Editorial style: never use ~ as an "approximately" shorthand. Rewrite
+  // "~5%" → "approximately 5%", "~$1B" → "approximately $1B", "~10 days" → "about 10 days".
+  const stripTildes = (s: string) => {
+    if (!s) return s;
+    return s
+      // ~$1.2B / ~$350 million → approximately $1.2B / approximately $350 million
+      .replace(/~\s*\$/g, "approximately $")
+      // ~5% / ~ 5% → approximately 5%
+      .replace(/~\s*(\d[\d,.]*\s*%)/g, "approximately $1")
+      // ~10 days / ~ 4 hours → about 10 days / about 4 hours
+      .replace(/~\s*(\d[\d,.]*)\s+([A-Za-z])/g, "about $1 $2")
+      // Any remaining bare ~ → drop
+      .replace(/~/g, "");
+  };
+  result.story = stripTildes(result.story);
+  result.title = stripTildes(result.title);
+  result.whyThisMatters = stripTildes(result.whyThisMatters);
+  result.whatToWatchNext = stripTildes(result.whatToWatchNext);
+  result.secondOrderImplication = stripTildes(result.secondOrderImplication);
+  result.keyTakeaways = result.keyTakeaways.map(stripTildes);
+
   // ── Fallback title extraction ──────────────────────────────────────────
   // If no HEADLINE: section was found (title === fallbackTitle), try to
   // extract a reasonable title from the first substantive line of the output.
@@ -715,6 +737,9 @@ Write in the style of The Wall Street Journal or Financial Times: clear, authori
 
 PUNCTUATION RULE (ABSOLUTE)
 Never use em-dashes (—) or en-dashes (–). Anywhere. In any field. Use commas, periods, semicolons, parentheses, or the word "to" for ranges (e.g., "500 to 800 words"). This applies to HEADLINE, KEY_TAKEAWAYS, WHY_MATTERS, SECOND_ORDER, WHAT_WATCH, the story body, and section headings. Hyphens inside compound words like "year-over-year" or "10-Year Treasury" are fine.
+
+TILDE RULE (ABSOLUTE)
+Never use the tilde character (~) as an "approximately" shorthand. Write "approximately $350 million" not "~$350M", "about 10 days" not "~10 days", "roughly 40%" not "~40%". This applies to every field.
 
 WORKFLOW: THESIS to EVIDENCE to NARRATIVE
 Before writing, identify:

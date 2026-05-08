@@ -437,7 +437,7 @@ export default async function TrackRecordPage() {
           </h3>
           <p className="text-xs text-text-muted leading-relaxed">
             Entry prices are the closing price on publication date. <strong className="text-text">Price Target</strong> is the
-            published valuation target. <strong className="text-text">Current Price</strong> updates every ~4 hours during market hours.
+            published valuation target. <strong className="text-text">Current Price</strong> updates every 4 hours during market hours.
             When a pick hits its price target and coverage is closed, the hypothetical proceeds are reinvested
             equally into remaining active picks still below their targets. The S&amp;P 500 benchmark uses actual SPY prices
             over the full holding period. Past performance does not guarantee future results.

@@ -2087,7 +2087,7 @@ const MACRO_SIGNIFICANCE: Record<string, string> = {
   "unemployment": "Unemployment data informs Fed slack estimates; a tighter labor market keeps inflation pressure alive, extending the higher-for-longer rate narrative.",
   "gdp": "GDP surprises shift growth expectations and recalibrate Fed trajectory — a miss raises recession risk and pressures cyclical earnings.",
   "ism manufacturing": "Manufacturing PMI below 50 signals contraction in goods-producing sectors and tends to pull Treasury yields and commodity prices lower.",
-  "ism services": "Services PMI captures the dominant sector of the U.S. economy; a miss raises recession risk given services account for ~70% of GDP.",
+  "ism services": "Services PMI captures the dominant sector of the U.S. economy; a miss raises recession risk given services account for roughly 70% of GDP.",
   "pmi": "PMI data signals whether economic momentum is expanding or contracting, shaping earnings revision cycles for cyclical sectors.",
   "retail sales": "Retail sales measure consumer spending, the largest GDP component; a miss raises stagflation risk if inflation remains elevated.",
   "ppi": "PPI measures upstream price pressure that feeds into CPI with a lag — a hot print warns of future consumer inflation.",

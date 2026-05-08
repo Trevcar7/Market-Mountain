@@ -135,7 +135,7 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
     ],
     series: [{ name: "Tax Credits", color: "#EE2821", darkColor: "#FCA5A5" }],
     yFormat: (v) => `$${v.toFixed(2)}B`,
-    caption: "IRA 45X manufacturing tax credits sold at ~$0.95 on the dollar. FY2025E based on midpoint of $1.65-1.7B guidance.",
+    caption: "IRA 45X manufacturing tax credits sold at approximately $0.95 on the dollar. FY2025E based on midpoint of $1.65-1.7B guidance.",
   },
 };
 

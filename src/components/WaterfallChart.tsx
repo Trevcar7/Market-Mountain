@@ -32,7 +32,7 @@ const CHARTS: Record<WaterfallVariant, WaterfallConfig> = {
     color: "#0000EB",
     darkColor: "#818CF8",
     caption:
-      "FY2025 approximate bridge from total revenue to free cash flow. Adj. EBITDA margin ~31%. FCF margin ~15%. Source: SiriusXM 10-K filings.",
+      "FY2025 approximate bridge from total revenue to free cash flow. Adj. EBITDA margin approximately 31%. FCF margin approximately 15%. Source: SiriusXM 10-K filings.",
   },
 };
 

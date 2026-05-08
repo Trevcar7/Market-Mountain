@@ -101,24 +101,6 @@ export default async function BriefingDatePage({ params }: Props) {
       <div className="h-1 bg-gradient-to-r from-navy-900 via-accent-500 to-navy-900" />
 
       <div className="container mx-auto px-4 sm:px-6 max-w-4xl py-8 sm:py-16 space-y-8 sm:space-y-12">
-        {/* AI-synthesis disclosure */}
-        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-md bg-surface-2 border border-border text-[11px] leading-snug text-text-muted">
-          <svg className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>
-            Synthesized by Claude from named primary sources (Bloomberg, Reuters, FT, Fed, BLS, EIA). Not original reporting.{" "}
-            <Link href="/methodology" className="text-accent-600 hover:text-accent-700 font-medium underline decoration-accent-600/30 hover:decoration-accent-700">
-              See methodology
-            </Link>
-            {" · "}
-            <Link href="/briefing/archive" className="text-accent-600 hover:text-accent-700 font-medium underline decoration-accent-600/30 hover:decoration-accent-700">
-              View archive
-            </Link>
-            .
-          </span>
-        </div>
-
         {/* Lead Story */}
         <section>
           <div className="flex items-center gap-3 mb-5">
