@@ -1298,19 +1298,55 @@ const SECTOR_BUCKETS: Record<string, RegExp> = {
   cloud_software: /\b(cloud|saas|software|datadog|snowflake|mongodb|salesforce|servicenow|observability)\b/i,
   semiconductor: /\b(chip|chips|semiconductor|nvidia|amd|intel|micron|tsmc|gpu|cpu)\b/i,
   energy_storage: /\b(energy storage|battery|fluence|grid storage|backup power)\b/i,
-  oil_energy: /\b(oil|crude|wti|brent|opec|petroleum|refinery)\b/i,
-  consumer_discretionary: /\b(consumer discretionary|whirlpool|appliance|retailer|apparel|discretionary)\b/i,
+  oil_energy: /\b(oil|crude|wti|brent|opec|petroleum|refinery|gasoline|natural gas|energy (shocks?|crisis|prices?))\b/i,
+  consumer_discretionary: /\b(consumer discretionary|whirlpool|appliance|retailer|apparel|discretionary spending|consumer staples)\b/i,
+  consumer_sentiment: /\b(consumer (despair|confidence|sentiment|fear)|umich)\b/i,
   ev_auto: /\b(ev|electric vehicle|tesla|lucid|rivian|automaker)\b/i,
-  banking: /\b(bank|jpmorgan|goldman|citigroup|wells fargo|private credit)\b/i,
-  housing: /\b(housing|home price|mortgage|halifax|homebuilder)\b/i,
+  banking: /\b(bank|jpmorgan|goldman|citigroup|wells fargo|private credit|bank earnings)\b/i,
+  housing: /\b(housing|home price|mortgage|halifax|homebuilder|home sales)\b/i,
   biotech_pharma: /\b(biotech|pharma|drug|fda|clinical trial)\b/i,
   ai: /\b(artificial intelligence|\bai\b|llm|model release|anthropic|openai)\b/i,
+  // Macro / policy / geopolitics buckets — added to catch cross-theme bundling
+  monetary_policy: /\b(fed|federal reserve|powell|fomc|rate (cut|hike|decision)|inflation|cpi|ppi|interest rate)\b/i,
+  fiscal_trade: /\b(tariff|trade policy|trade war|customs|import duty|treasury yield|deficit|debt ceiling|budget)\b/i,
+  geopolitics: /\b(iran|russia|ukraine|china tension|hormuz|sanctions|ceasefire|war|geopolitic|middle east)\b/i,
+  supply_chain: /\b(supply chain|tomato|steel|food (price|supply)|commodit(y|ies)|shipping|logistics|port)\b/i,
+  labor_jobs: /\b(payroll|nonfarm|unemployment|jobless|wage growth|labor market|jobs report)\b/i,
+  earnings_general: /\b(earnings (season|test|rally|beat|miss)|first[- ]quarter|q[1-4] (results|earnings)|guidance)\b/i,
+  regional_macro: /\b(uk |united kingdom|britain|india|europe|eurozone|japan|china (economy|gdp))\b/i,
 };
 
+/** Connector phrases that signal forced multi-thesis stitching. */
+const BUNDLING_CONNECTORS_RE = /\b(while|as |but |amid|clashes? with|mask(s|ed|ing)?|paint(s|ed|ing)? (a |an )?divergent|rippling through|divergence|bifurcation|rotation|even as|despite)\b/i;
+
 /**
- * Detects headlines that bundle 3+ unrelated sector buckets — a pattern that
- * produces unfocused articles with no clear thesis. Returns null if OK, or
- * a rejection reason string if the headline is bundled.
+ * Bucket pairs that legitimately co-occur in single-thesis articles.
+ * If a 2-bucket headline matches a coherent pair, the frankenstein check
+ * is bypassed. Order-independent ("a|b" === "b|a").
+ */
+const COHERENT_PAIRS: Set<string> = new Set(
+  [
+    ["ai", "semiconductor"],            // AI chip cycle
+    ["geopolitics", "oil_energy"],      // Iran/Russia → crude shock
+    ["geopolitics", "supply_chain"],    // Sanctions are a supply-chain action
+    ["banking", "monetary_policy"],     // Rate moves → bank margins
+    ["labor_jobs", "monetary_policy"],  // Payrolls → Fed reaction
+    ["labor_jobs", "consumer_discretionary"], // Jobs + retail spending
+    ["labor_jobs", "consumer_sentiment"],     // Payrolls + UMich sentiment
+    ["monetary_policy", "consumer_sentiment"],// Fed reaction to sentiment
+    ["housing", "monetary_policy"],     // Mortgage rates → home sales
+    ["earnings_general", "banking"],    // Bank earnings season
+    ["ev_auto", "energy_storage"],      // EV battery supply
+  ].map(([a, b]) => [a, b].sort().join("|"))
+);
+
+/**
+ * Detects headlines that bundle multiple unrelated themes — either:
+ *   (a) 3+ distinct sector/macro/geopolitical buckets, OR
+ *   (b) 2+ buckets stitched by a "while/as/but/amid/mask" connector,
+ *       which is the canonical "frankenstein headline" pattern.
+ *
+ * Returns null if OK, or a rejection reason string.
  */
 function checkSingleThesisDiscipline(
   synthesizedTitle: string
@@ -1319,12 +1355,27 @@ function checkSingleThesisDiscipline(
   for (const [bucket, re] of Object.entries(SECTOR_BUCKETS)) {
     if (re.test(synthesizedTitle)) hits.push(bucket);
   }
+
+  // (a) Hard bundling: 3+ buckets regardless of phrasing
   if (hits.length >= 3) {
     return (
-      `Headline bundles ${hits.length} unrelated sectors (${hits.join(", ")}) — ` +
-      `forced "rotation"/"divergence"/"bifurcation" framing produces unfocused articles`
+      `Headline bundles ${hits.length} unrelated themes (${hits.join(", ")}) — ` +
+      `forced umbrella framing produces unfocused articles`
     );
   }
+
+  // (b) Frankenstein bundling: 2 buckets stitched by a contrastive connector
+  if (hits.length === 2 && BUNDLING_CONNECTORS_RE.test(synthesizedTitle)) {
+    const pairKey = [...hits].sort().join("|");
+    if (!COHERENT_PAIRS.has(pairKey)) {
+      return (
+        `Headline stitches ${hits.length} themes (${hits.join(", ")}) with a ` +
+        `contrastive connector ("while"/"as"/"amid"/"mask"/"divergence") — ` +
+        `frankenstein headline pattern, no single thesis`
+      );
+    }
+  }
+
   return null;
 }
 
