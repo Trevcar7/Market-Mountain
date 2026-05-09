@@ -77,13 +77,6 @@ export default function HomePage() {
               <p className="text-white/50 text-sm leading-relaxed max-w-lg">
                 Data-driven equity analysis and curated daily briefings by Trevor Carnovsky.
               </p>
-              <p className="text-white/35 text-xs leading-relaxed max-w-lg mt-2">
-                By Trevor Carnovsky, an undergraduate equity analyst at Central Michigan University.{" "}
-                <Link href="/track-record" className="underline decoration-white/20 hover:decoration-white/60 hover:text-white/60 transition-colors">
-                  Track record
-                </Link>
-                {" "}is public.
-              </p>
             </div>
             <div className="flex gap-3 shrink-0">
               <Link
