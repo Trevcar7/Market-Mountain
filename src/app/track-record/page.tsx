@@ -350,16 +350,9 @@ export default async function TrackRecordPage() {
       {closedPicksForReinvest.length > 0 && reinvestTargets.length > 0 && (
         <section className="mx-auto max-w-4xl px-4 sm:px-6 mt-6">
           <div className="bg-card rounded-xl border border-border shadow-sm p-5 sm:p-6">
-            <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-2">
+            <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-4">
               Closed-Pick Reinvestment
             </h2>
-            <p className="text-xs text-text-muted leading-relaxed mb-4">
-              When a pick closes at its price target, the $1,000 hypothetical position
-              is sold and split equally across active picks still below target —
-              <strong className="text-text"> bought at each pick&apos;s price on the closed pick&apos;s exit date</strong>,
-              not the original publication price. This avoids back-dating reinvested capital
-              to gains it never captured.
-            </p>
             <div className="space-y-4">
               {closedPickProceedsList.map(({ pick: cp, proceeds, eligible, slicePerEligible }) => (
                 <div key={cp.ticker} className="border-l-2 border-accent-500 pl-4">
