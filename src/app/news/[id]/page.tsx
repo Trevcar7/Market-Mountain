@@ -326,11 +326,7 @@ export default async function NewsStoryPage({ params }: Props) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>
-              Synthesized by Claude from named primary sources (Bloomberg, Reuters, FT, Fed, BLS, EIA). Not original reporting.{" "}
-              <Link href="/methodology" className="text-accent-600 hover:text-accent-700 font-medium underline decoration-accent-600/30 hover:decoration-accent-700">
-                See methodology
-              </Link>
-              .
+              Synthesized by Claude from named primary sources (Bloomberg, Reuters, FT, Fed, BLS, EIA). Not original reporting.
             </span>
           </div>
 

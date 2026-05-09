@@ -44,7 +44,6 @@ export default function Footer() {
                 { href: "/briefing", label: "Briefing" },
                 { href: "/articles", label: "Articles" },
                 { href: "/track-record", label: "Track Record" },
-                { href: "/methodology", label: "Methodology" },
                 { href: "/about", label: "About" },
                 { href: "/preferences", label: "Email Preferences" },
               ].map((link) => (
