@@ -154,13 +154,14 @@ export default async function TrackRecordPage() {
     );
   }
 
-  // Per-closed-pick proceeds: $1K grown by (target/entry)
+  // Per-closed-pick proceeds: $1K grown by (target/entry).
+  // Recipients = all qualified active-below-target picks (the 30-day
+  // maturing filter excludes brand-new picks naturally).
   const closedPickProceedsList = closedPicksForReinvest.map((cp) => ({
     pick: cp,
     proceeds: investmentPerPick * (cp.priceTarget / cp.priceAtPublish),
   }));
   const totalClosedProceeds = closedPickProceedsList.reduce((s, c) => s + c.proceeds, 0);
-  // Each closed pick's proceeds are split evenly across active reinvest targets.
   const slicePerActivePerClosedPick = (cpProceeds: number) =>
     reinvestTargets.length > 0 ? cpProceeds / reinvestTargets.length : 0;
 
@@ -175,8 +176,7 @@ export default async function TrackRecordPage() {
       const slice = slicePerActivePerClosedPick(proceeds);
       const pxAtClose = dateMap?.get(cp.targetHitDate!);
       if (!pxAtClose) {
-        // fallback: cash, no growth
-        total += slice;
+        total += slice; // fallback: cash, no growth
       } else {
         total += slice * (currentPrice / pxAtClose);
       }

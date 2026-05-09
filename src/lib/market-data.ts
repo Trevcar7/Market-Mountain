@@ -718,9 +718,11 @@ export async function fetchFmpStockHistory(
       historical = Array.isArray(stableData) ? stableData : (stableData?.historical ?? []);
     }
 
-    // Fallback to Alpha Vantage if FMP returns no data (premium-only tickers)
+    // Fallback to Alpha Vantage if FMP returns no data (premium-only tickers).
+    // Use outputsize=full when caller asks for >100 days; compact otherwise.
     if (historical.length < 5 && process.env.ALPHAVANTAGE_API_KEY) {
-      const avUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${process.env.ALPHAVANTAGE_API_KEY}`;
+      const outputsize = days > 100 ? "full" : "compact";
+      const avUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=${outputsize}&apikey=${process.env.ALPHAVANTAGE_API_KEY}`;
       const avRes = await fetch(avUrl, { signal: withTimeout(15000) }).catch(() => null);
       if (avRes?.ok) {
         const avData = await avRes.json();
@@ -736,6 +738,24 @@ export async function fetchFmpStockHistory(
         // Filter to requested time range
         const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
         historical = entries.filter((e) => e.date >= cutoff);
+      }
+    }
+
+    // Final fallback: Polygon (covers premium tickers like SFM that other providers gate)
+    if (historical.length < 5 && process.env.POLYGON_API_KEY) {
+      const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const to = new Date().toISOString().split("T")[0];
+      const polyUrl = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/day/${from}/${to}?adjusted=true&apiKey=${process.env.POLYGON_API_KEY}`;
+      const polyRes = await fetch(polyUrl, { signal: withTimeout(15000) }).catch(() => null);
+      if (polyRes?.ok) {
+        const polyData = await polyRes.json();
+        const results: Array<{ t: number; c: number }> = polyData?.results ?? [];
+        historical = results
+          .map((r) => ({
+            date: new Date(r.t).toISOString().split("T")[0],
+            close: r.c,
+          }))
+          .filter((e) => e.close > 0);
       }
     }
 
