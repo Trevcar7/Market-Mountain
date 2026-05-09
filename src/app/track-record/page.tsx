@@ -24,11 +24,18 @@ const statusLabels: Record<string, string> = {
 };
 
 function formatDateShort(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  // Parse YYYY-MM-DD as local date (not UTC) so display doesn't timezone-shift
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const local = new Date(y, m - 1, d);
+  return local.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatMoney(n: number): string {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
 function formatHoldingPeriod(days: number): string {
@@ -83,21 +90,13 @@ export default async function TrackRecordPage() {
 
   // Aggregate stats
   const targetHits = enrichedPicks.filter((p) => p.hitTarget);
-  const avgTargetUpside =
-    enrichedPicks.length > 0
-      ? enrichedPicks.reduce((sum, p) => sum + (p.targetReturn ?? 0), 0) / enrichedPicks.length
-      : 0;
-  const withReturns = enrichedPicks.filter((p) => p.returnPct !== null);
-  const avgReturn =
-    withReturns.length > 0
-      ? withReturns.reduce((sum, p) => sum + (p.returnPct ?? 0), 0) / withReturns.length
-      : 0;
 
   // Portfolio value: $1K per pick, equal-weight
   // Picks held < 30 days are excluded so new holdings don't drag down the average.
   // Once a pick passes 30 days (or hits ±15% move), it's included at full weight.
   // When a closed pick hits its target, proceeds are reinvested equally into
-  // active picks still below their price targets.
+  // active picks still below their price targets — at the price on the closed
+  // pick's target-hit date, NOT the active pick's original entry price.
   const MIN_DAYS = 30;
   const MOVE_THRESHOLD = 15;
   const investmentPerPick = 1000;
@@ -110,25 +109,91 @@ export default async function TrackRecordPage() {
   const totalInvested = qualifiedPicks.length * investmentPerPick;
 
   // Reinvestment: closed-pick proceeds are redistributed into active picks below target
-  const closedPickProceeds = qualifiedPicks
-    .filter((p) => p.coverageStatus === "closed")
-    .reduce((sum, p) => sum + investmentPerPick * (p.priceTarget / p.priceAtPublish), 0);
+  const closedPicksForReinvest = qualifiedPicks.filter(
+    (p) => p.coverageStatus === "closed" && p.targetHitDate
+  );
   const reinvestTargets = qualifiedPicks.filter(
     (p) => p.coverageStatus !== "closed" && !p.hitTarget
   );
-  const reinvestPerPick = reinvestTargets.length > 0
-    ? closedPickProceeds / reinvestTargets.length
-    : 0;
+
+  // Fetch each active reinvest target's historical price covering all closed
+  // pick target-hit dates, so the reinvested capital can buy in at the
+  // close-date price instead of the original pitch-date price.
+  const activePriceOnCloseDate = new Map<string, Map<string, number>>(); // ticker → date → price
+  if (closedPicksForReinvest.length > 0 && reinvestTargets.length > 0) {
+    const oldestCloseDate = closedPicksForReinvest.reduce(
+      (oldest, p) => (p.targetHitDate! < oldest ? p.targetHitDate! : oldest),
+      closedPicksForReinvest[0].targetHitDate!
+    );
+    const daysBack =
+      Math.floor((Date.now() - new Date(oldestCloseDate).getTime()) / 86400000) + 30;
+
+    await Promise.allSettled(
+      reinvestTargets.map(async (rt) => {
+        const hist = await fetchFmpStockHistory(rt.ticker, daysBack);
+        if (!hist || hist.labels.length === 0) return;
+        const dateMap = new Map<string, number>();
+        for (let i = 0; i < hist.labels.length; i++) {
+          dateMap.set(hist.labels[i], hist.values[i]);
+        }
+        const lookupMap = new Map<string, number>();
+        for (const cp of closedPicksForReinvest) {
+          const target = cp.targetHitDate!;
+          // find nearest market day within ±5 days
+          for (let off = 0; off <= 5; off++) {
+            const fwd = new Date(new Date(target).getTime() + off * 86400000)
+              .toISOString().split("T")[0];
+            const bwd = new Date(new Date(target).getTime() - off * 86400000)
+              .toISOString().split("T")[0];
+            if (dateMap.has(fwd)) { lookupMap.set(target, dateMap.get(fwd)!); break; }
+            if (dateMap.has(bwd)) { lookupMap.set(target, dateMap.get(bwd)!); break; }
+          }
+        }
+        activePriceOnCloseDate.set(rt.ticker, lookupMap);
+      })
+    );
+  }
+
+  // Per-closed-pick proceeds: $1K grown by (target/entry)
+  const closedPickProceedsList = closedPicksForReinvest.map((cp) => ({
+    pick: cp,
+    proceeds: investmentPerPick * (cp.priceTarget / cp.priceAtPublish),
+  }));
+  const totalClosedProceeds = closedPickProceedsList.reduce((s, c) => s + c.proceeds, 0);
+  // Each closed pick's proceeds are split evenly across active reinvest targets.
+  const slicePerActivePerClosedPick = (cpProceeds: number) =>
+    reinvestTargets.length > 0 ? cpProceeds / reinvestTargets.length : 0;
+
+  // Compute today's value of all reinvested slices for a given active pick.
+  // Each slice grows from its closed-pick-date price → today's price.
+  const reinvestValueForActive = (activeTicker: string): number => {
+    const currentPrice = priceMap.get(activeTicker);
+    if (!currentPrice) return 0;
+    const dateMap = activePriceOnCloseDate.get(activeTicker);
+    let total = 0;
+    for (const { pick: cp, proceeds } of closedPickProceedsList) {
+      const slice = slicePerActivePerClosedPick(proceeds);
+      const pxAtClose = dateMap?.get(cp.targetHitDate!);
+      if (!pxAtClose) {
+        // fallback: cash, no growth
+        total += slice;
+      } else {
+        total += slice * (currentPrice / pxAtClose);
+      }
+    }
+    return total;
+  };
 
   const portfolioValue = qualifiedPicks.reduce((sum, p) => {
     if (p.coverageStatus === "closed") {
-      // Proceeds reinvested — this pick contributes $0 directly
+      // Proceeds redistributed — this pick contributes $0 directly
       return sum;
     }
+    const baseGrowth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
+    const baseValue = investmentPerPick * baseGrowth;
     const isReinvestTarget = !p.hitTarget;
-    const allocation = investmentPerPick + (isReinvestTarget ? reinvestPerPick : 0);
-    const growth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
-    return sum + allocation * growth;
+    const reinvestValue = isReinvestTarget ? reinvestValueForActive(p.ticker) : 0;
+    return sum + baseValue + reinvestValue;
   }, 0);
 
   // S&P 500 benchmark: simple SPY return from first pick date to today
@@ -199,7 +264,7 @@ export default async function TrackRecordPage() {
       {/* Stats Dashboard */}
       {enrichedPicks.length > 0 && (
         <section className="mx-auto max-w-4xl px-4 sm:px-6 -mt-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               <p className="text-2xl font-bold text-text">{enrichedPicks.length}</p>
               <p className="text-xs text-text-muted mt-1">Picks</p>
@@ -209,12 +274,6 @@ export default async function TrackRecordPage() {
                 {targetHits.length}/{enrichedPicks.length}
               </p>
               <p className="text-xs text-text-muted mt-1">Price Targets Hit</p>
-            </div>
-            <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
-              <p className="text-2xl font-bold text-accent-600">
-                +{avgTargetUpside.toFixed(0)}%
-              </p>
-              <p className="text-xs text-text-muted mt-1">Avg Target Upside</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 text-center shadow-sm">
               {(() => {
@@ -240,7 +299,7 @@ export default async function TrackRecordPage() {
                     Portfolio vs. S&amp;P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""}{closedPickProceeds > 0 && reinvestTargets.length > 0 ? ` · closed proceeds reinvested` : ""})
+                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""}{totalClosedProceeds > 0 && reinvestTargets.length > 0 ? ` · closed proceeds reinvested at exit-date prices` : ""})
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
@@ -277,6 +336,59 @@ export default async function TrackRecordPage() {
               </div>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Reinvestment Flow — full transparency on closed-pick proceeds */}
+      {closedPicksForReinvest.length > 0 && reinvestTargets.length > 0 && (
+        <section className="mx-auto max-w-4xl px-4 sm:px-6 mt-6">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-5 sm:p-6">
+            <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-2">
+              Closed-Pick Reinvestment
+            </h2>
+            <p className="text-xs text-text-muted leading-relaxed mb-4">
+              When a pick closes at its price target, the $1,000 hypothetical position
+              is sold and split equally across active picks still below target —
+              <strong className="text-text"> bought at each pick&apos;s price on the closed pick&apos;s exit date</strong>,
+              not the original publication price. This avoids back-dating reinvested capital
+              to gains it never captured.
+            </p>
+            <div className="space-y-4">
+              {closedPickProceedsList.map(({ pick: cp, proceeds }) => {
+                const slice = slicePerActivePerClosedPick(proceeds);
+                return (
+                  <div key={cp.ticker} className="border-l-2 border-accent-500 pl-4">
+                    <p className="text-sm font-semibold text-text">
+                      {cp.ticker} closed {formatDateShort(cp.targetHitDate!)}
+                      <span className="text-text-muted font-normal"> — ${cp.priceAtPublish} → ${cp.priceTarget} ({(((cp.priceTarget - cp.priceAtPublish) / cp.priceAtPublish) * 100).toFixed(0)}%)</span>
+                    </p>
+                    <p className="text-xs text-text-muted mt-1">
+                      $1,000 grew to <strong className="text-text">${formatMoney(proceeds)}</strong>,
+                      split into {reinvestTargets.length} active picks =
+                      <strong className="text-text"> +${formatMoney(slice)} each</strong>
+                    </p>
+                    <div className="mt-2 text-xs text-text-muted">
+                      <span className="font-semibold text-text-light">Reinvested into:</span>{" "}
+                      {reinvestTargets.map((rt, i) => {
+                        const pxAtClose = activePriceOnCloseDate.get(rt.ticker)?.get(cp.targetHitDate!);
+                        return (
+                          <span key={rt.ticker}>
+                            <span className="font-semibold text-text">{rt.ticker}</span>
+                            {pxAtClose ? (
+                              <span> @ ${pxAtClose.toFixed(2)}</span>
+                            ) : (
+                              <span className="text-text-light"> (price unavailable, held as cash)</span>
+                            )}
+                            {i < reinvestTargets.length - 1 ? <span>, </span> : null}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </section>
       )}
 
@@ -435,13 +547,37 @@ export default async function TrackRecordPage() {
           <h3 className="text-xs font-bold tracking-widest uppercase text-text-light mb-3">
             How We Track Performance
           </h3>
-          <p className="text-xs text-text-muted leading-relaxed">
-            Entry prices are the closing price on publication date. <strong className="text-text">Price Target</strong> is the
-            published valuation target. <strong className="text-text">Current Price</strong> updates every 4 hours during market hours.
-            When a pick hits its price target and coverage is closed, the hypothetical proceeds are reinvested
-            equally into remaining active picks still below their targets. The S&amp;P 500 benchmark uses actual SPY prices
-            over the full holding period. Past performance does not guarantee future results.
-          </p>
+          <ul className="text-xs text-text-muted leading-relaxed space-y-2 list-disc pl-4">
+            <li>
+              <strong className="text-text">Entry price</strong> = closing price on publication date.
+              Each pick is allocated $1,000 hypothetically, equal-weight.
+            </li>
+            <li>
+              <strong className="text-text">Current price</strong> updates every 4 hours during market hours via FMP.
+            </li>
+            <li>
+              <strong className="text-text">Closed picks</strong> lock in the thesis return ($1,000 grows to
+              $1,000 × target ÷ entry). Coverage ends; the position is hypothetically sold at the price target.
+            </li>
+            <li>
+              <strong className="text-text">Reinvestment</strong>: those proceeds are split equally across active
+              picks still below their target,
+              <strong className="text-text"> bought at the closed pick&apos;s exit-date price</strong> — not the
+              active pick&apos;s original entry price. The reinvested capital therefore earns only the gains
+              from the close date forward, not the active pick&apos;s full holding-period return.
+            </li>
+            <li>
+              <strong className="text-text">Maturing window</strong>: picks held under 30 days are excluded
+              from the portfolio total unless they&apos;ve already moved ±15%.
+            </li>
+            <li>
+              <strong className="text-text">S&amp;P 500 benchmark</strong> uses actual SPY prices over the full
+              holding period (oldest pick&apos;s publication date → today).
+            </li>
+            <li className="text-text-light italic">
+              Past performance does not guarantee future results.
+            </li>
+          </ul>
         </div>
       </section>
     </div>

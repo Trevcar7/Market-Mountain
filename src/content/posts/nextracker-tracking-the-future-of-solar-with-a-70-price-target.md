@@ -12,6 +12,7 @@ priceAtPublish: 50
 rating: "buy"
 targetHit: true
 coverageStatus: "active"
+coverageNote: "Price target of $70 reached August 2025. Coverage remains active as I continue to monitor earnings growth and management execution on the $4.5B backlog."
 targetHitDate: "2025-08-19"
 ---
 
