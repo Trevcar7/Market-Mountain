@@ -432,6 +432,25 @@ export default async function TrackRecordPage() {
             const isClosed = pick.coverageStatus === "closed";
             const isTargetHit = pick.coverageStatus === "target-hit" || pick.hitTarget;
 
+            // Hypothetical position size + weighted-average cost basis.
+            // Starts with $1,000 at entry; if this pick is an eligible
+            // reinvest recipient, each closed pick adds its slice at the
+            // close-date price.
+            const isReinvestRecipient = reinvestTargets.some((rt) => rt.ticker === pick.ticker);
+            const isQualified = qualifiedPicks.some((qp) => qp.ticker === pick.ticker);
+            let positionInvested = investmentPerPick;
+            let positionShares = investmentPerPick / pick.priceAtPublish;
+            if (isReinvestRecipient) {
+              const dateMap = activePriceOnCloseDate.get(pick.ticker);
+              for (const { pick: cp, slicePerEligible } of closedPickProceedsList) {
+                const pxAtClose = dateMap?.get(cp.targetHitDate!);
+                if (!pxAtClose) continue;
+                positionInvested += slicePerEligible;
+                positionShares += slicePerEligible / pxAtClose;
+              }
+            }
+            const avgCost = positionShares > 0 ? positionInvested / positionShares : pick.priceAtPublish;
+
             return (
               <Link
                 key={`${pick.ticker}-${pick.date}`}
@@ -501,6 +520,19 @@ export default async function TrackRecordPage() {
                   </div>
                   )}
                 </div>
+
+                {/* Hypothetical position note */}
+                {!isClosed && (
+                  <div className="px-5 -mt-1 mb-2">
+                    <p className="text-[11px] text-text-light">
+                      Hypothetical position:{" "}
+                      <span className="font-semibold text-text-muted">${formatMoney(positionInvested)}</span>
+                      {" "}invested · avg cost{" "}
+                      <span className="font-semibold text-text-muted">${avgCost.toFixed(2)}/share</span>
+                      {!isQualified && <span className="text-text-light"> · maturing</span>}
+                    </p>
+                  </div>
+                )}
 
                 {/* Progress bar */}
                 <div className="px-5 pb-3">
