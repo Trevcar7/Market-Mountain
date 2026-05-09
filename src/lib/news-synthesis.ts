@@ -1283,6 +1283,52 @@ function checkHeadlineEntityCoOccurrence(
 }
 
 // ---------------------------------------------------------------------------
+// Multi-thesis bundling check
+// ---------------------------------------------------------------------------
+
+/**
+ * Sector keyword buckets used to detect headlines that bundle 3+ unrelated
+ * verticals under a forced "rotation" / "divergence" / "bifurcation" framing.
+ *
+ * A headline like "Cloud and Energy Storage Stocks Surge While Consumer
+ * Discretionary Craters" hits cloud + energy + consumer = 3 buckets and
+ * should be rejected as bundled.
+ */
+const SECTOR_BUCKETS: Record<string, RegExp> = {
+  cloud_software: /\b(cloud|saas|software|datadog|snowflake|mongodb|salesforce|servicenow|observability)\b/i,
+  semiconductor: /\b(chip|chips|semiconductor|nvidia|amd|intel|micron|tsmc|gpu|cpu)\b/i,
+  energy_storage: /\b(energy storage|battery|fluence|grid storage|backup power)\b/i,
+  oil_energy: /\b(oil|crude|wti|brent|opec|petroleum|refinery)\b/i,
+  consumer_discretionary: /\b(consumer discretionary|whirlpool|appliance|retailer|apparel|discretionary)\b/i,
+  ev_auto: /\b(ev|electric vehicle|tesla|lucid|rivian|automaker)\b/i,
+  banking: /\b(bank|jpmorgan|goldman|citigroup|wells fargo|private credit)\b/i,
+  housing: /\b(housing|home price|mortgage|halifax|homebuilder)\b/i,
+  biotech_pharma: /\b(biotech|pharma|drug|fda|clinical trial)\b/i,
+  ai: /\b(artificial intelligence|\bai\b|llm|model release|anthropic|openai)\b/i,
+};
+
+/**
+ * Detects headlines that bundle 3+ unrelated sector buckets — a pattern that
+ * produces unfocused articles with no clear thesis. Returns null if OK, or
+ * a rejection reason string if the headline is bundled.
+ */
+function checkSingleThesisDiscipline(
+  synthesizedTitle: string
+): string | null {
+  const hits: string[] = [];
+  for (const [bucket, re] of Object.entries(SECTOR_BUCKETS)) {
+    if (re.test(synthesizedTitle)) hits.push(bucket);
+  }
+  if (hits.length >= 3) {
+    return (
+      `Headline bundles ${hits.length} unrelated sectors (${hits.join(", ")}) — ` +
+      `forced "rotation"/"divergence"/"bifurcation" framing produces unfocused articles`
+    );
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Pre-synthesis story worthiness gate
 // ---------------------------------------------------------------------------
 
@@ -1662,6 +1708,19 @@ export async function synthesizeGroupedArticles(
         continue;
       }
 
+      // ── Single-thesis discipline check ────────────────────────────────
+      // Catches headlines that string together 3+ unrelated sectors under
+      // a forced "rotation"/"divergence"/"bifurcation" umbrella.
+      const bundlingFailure = checkSingleThesisDiscipline(parsed.title);
+      if (bundlingFailure) {
+        stats.rejected++;
+        const reason = `"${group.topic}" THESIS_BUNDLING — ${bundlingFailure}`;
+        stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
+        console.warn(`[synthesis] HARD REJECT — ${reason}`);
+        continue;
+      }
+
       // ── Multi-Layer Fact Check ──────────────────────────────────────────
       // Layer 1: Heuristic/Google keyword check (original — always runs)
       // Layer 2: Data-backed verification (cross-refs claims vs FRED/BLS/EIA)
@@ -1736,6 +1795,27 @@ export async function synthesizeGroupedArticles(
         stats.rejectedTopics.push(group.topic);
         console.warn(`[synthesis] Rejected ${reason}`);
         logRejection(group.topic, `Composite fact-check score: ${adjustedScore}`, adjustedScore);
+        continue;
+      }
+
+      // Hard reject: any fabricated entity relationship (e.g., a non-existent
+      // product like Anthropic's "Mythos" model, or a deal between two
+      // companies that don't co-occur in any source). This is a HARD reject
+      // regardless of REBUILD_MODE — fabricated entities are never acceptable.
+      if (
+        factCheckReport.entityRelationships &&
+        factCheckReport.entityRelationships.fabricatedCount > 0
+      ) {
+        stats.rejected++;
+        const fabRels = factCheckReport.entityRelationships.relationships
+          .filter((r) => !r.grounded)
+          .map((r) => `"${r.entityA}" ↔ "${r.entityB}" (${r.relationship})`)
+          .join("; ");
+        const reason = `"${group.topic}" FABRICATED_RELATIONSHIPS — ${fabRels}`;
+        stats.rejectionDetails.push(reason);
+        stats.rejectedTopics.push(group.topic);
+        console.warn(`[synthesis] HARD REJECT — fabricated relationships: ${reason}`);
+        logRejection(group.topic, `Fabricated relationships: ${fabRels}`, adjustedScore);
         continue;
       }
 
