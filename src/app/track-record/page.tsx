@@ -180,6 +180,8 @@ export default async function TrackRecordPage() {
     return reinvestTargets.filter((rt) => {
       if (rt.ticker === opts.excludeTicker) return false;
       if (opts.requireQualified && !qualifiedTickers.has(rt.ticker)) return false;
+      // Same-day publish always qualifies — buy-in price falls back to publish price.
+      if (rt.date === eventDate) return true;
       return activePriceOnEventDate.get(rt.ticker)?.has(eventDate);
     });
   };
@@ -232,23 +234,33 @@ export default async function TrackRecordPage() {
     };
   });
 
+  // Buy-in price for a reinvest recipient on a given event date.
+  // If the recipient was published on the event date, use its publish
+  // price — the live FMP history typically lags one trading day and
+  // the publish price is the canonical entry price for that pick.
+  const pickByTicker = new Map(enrichedPicks.map((p) => [p.ticker, p]));
+  const buyInPrice = (ticker: string, eventDate: string): number | undefined => {
+    const p = pickByTicker.get(ticker);
+    if (p && p.date === eventDate) return p.priceAtPublish;
+    return activePriceOnEventDate.get(ticker)?.get(eventDate);
+  };
+
   // Compute today's value of all reinvested slices (closed + partial-sale) for
   // a given active pick. Each slice grows from its event-date price → today's price.
   const reinvestValueForActive = (activeTicker: string): number => {
     const currentPrice = priceMap.get(activeTicker);
     if (!currentPrice) return 0;
-    const dateMap = activePriceOnEventDate.get(activeTicker);
     let total = 0;
     for (const { eventDate, slicePerEligible, eligible } of closedPickProceedsList) {
       if (!eligible.some((e) => e.ticker === activeTicker)) continue;
-      const pxAtEvent = dateMap?.get(eventDate);
+      const pxAtEvent = buyInPrice(activeTicker, eventDate);
       if (!pxAtEvent) continue;
       total += slicePerEligible * (currentPrice / pxAtEvent);
     }
     for (const ev of partialSaleProceedsList) {
       if (ev.pick.ticker === activeTicker) continue;
       if (!ev.eligible.some((e) => e.ticker === activeTicker)) continue;
-      const pxAtEvent = dateMap?.get(ev.eventDate);
+      const pxAtEvent = buyInPrice(activeTicker, ev.eventDate);
       if (!pxAtEvent) continue;
       total += ev.slicePerEligible * (currentPrice / pxAtEvent);
     }
@@ -471,7 +483,7 @@ export default async function TrackRecordPage() {
                       <div className="mt-2 text-xs text-text-muted">
                         <span className="font-semibold text-text-light">Reinvested into:</span>{" "}
                         {ev.eligible.map((rt, i) => {
-                          const pxAtEvent = activePriceOnEventDate.get(rt.ticker)?.get(ev.eventDate)!;
+                          const pxAtEvent = buyInPrice(rt.ticker, ev.eventDate)!;
                           return (
                             <span key={rt.ticker}>
                               <span className="font-semibold text-text">{rt.ticker}</span>
@@ -546,10 +558,9 @@ export default async function TrackRecordPage() {
             let positionInvested = investmentPerPick;
             let positionShares = investmentPerPick / pick.priceAtPublish;
             if (isReinvestRecipient) {
-              const dateMap = activePriceOnEventDate.get(pick.ticker);
               for (const { eventDate, slicePerEligible, eligible } of closedPickProceedsList) {
                 if (!eligible.some((e) => e.ticker === pick.ticker)) continue;
-                const pxAtEvent = dateMap?.get(eventDate);
+                const pxAtEvent = buyInPrice(pick.ticker, eventDate);
                 if (!pxAtEvent) continue;
                 positionInvested += slicePerEligible;
                 positionShares += slicePerEligible / pxAtEvent;
@@ -557,7 +568,7 @@ export default async function TrackRecordPage() {
               for (const ev of partialSaleProceedsList) {
                 if (ev.pick.ticker === pick.ticker) continue;
                 if (!ev.eligible.some((e) => e.ticker === pick.ticker)) continue;
-                const pxAtEvent = dateMap?.get(ev.eventDate);
+                const pxAtEvent = buyInPrice(pick.ticker, ev.eventDate);
                 if (!pxAtEvent) continue;
                 positionInvested += ev.slicePerEligible;
                 positionShares += ev.slicePerEligible / pxAtEvent;
