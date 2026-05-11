@@ -561,37 +561,44 @@ export default async function TrackRecordPage() {
             const isClosed = pick.coverageStatus === "closed";
             const isTargetHit = pick.coverageStatus === "target-hit" || pick.hitTarget;
 
-            // Hypothetical position size + weighted-average cost basis.
-            // Starts with $1,000 at entry; if this pick is an eligible
-            // reinvest recipient, each closed pick AND partial-sale event
-            // adds its slice at the event-date price.
+            // Hypothetical position size + FIFO cost basis (Robinhood default).
+            // Build chronological lots: initial $1K buy at entry, plus any
+            // reinvest slice this pick received (at the event-date price).
+            // On a partial sale, consume the earliest lots first.
             const isReinvestRecipient = reinvestTargets.some((rt) => rt.ticker === pick.ticker);
             const isQualified = qualifiedTickers.has(pick.ticker);
-            let positionInvested = investmentPerPick;
-            let positionShares = investmentPerPick / pick.priceAtPublish;
+            const lots: { date: string; shares: number; costPerShare: number }[] = [
+              { date: pick.date, shares: investmentPerPick / pick.priceAtPublish, costPerShare: pick.priceAtPublish },
+            ];
             if (isReinvestRecipient) {
               for (const { eventDate, slicePerEligible, eligible } of closedPickProceedsList) {
                 if (!eligible.some((e) => e.ticker === pick.ticker)) continue;
                 const pxAtEvent = buyInPrice(pick.ticker, eventDate);
                 if (!pxAtEvent) continue;
-                positionInvested += slicePerEligible;
-                positionShares += slicePerEligible / pxAtEvent;
+                lots.push({ date: eventDate, shares: slicePerEligible / pxAtEvent, costPerShare: pxAtEvent });
               }
               for (const ev of partialSaleProceedsList) {
                 if (ev.pick.ticker === pick.ticker) continue;
                 if (!ev.eligible.some((e) => e.ticker === pick.ticker)) continue;
                 const pxAtEvent = buyInPrice(pick.ticker, ev.eventDate);
                 if (!pxAtEvent) continue;
-                positionInvested += ev.slicePerEligible;
-                positionShares += ev.slicePerEligible / pxAtEvent;
+                lots.push({ date: ev.eventDate, shares: ev.slicePerEligible / pxAtEvent, costPerShare: pxAtEvent });
               }
+              lots.sort((a, b) => a.date.localeCompare(b.date));
             }
-            // Seller of a partial sale: only the un-sold fraction remains.
+            // FIFO partial sale: drain earliest lots first.
             if (pick.partialSale) {
               const f = Math.max(0, Math.min(1, pick.partialSale.fraction));
-              positionInvested *= 1 - f;
-              positionShares *= 1 - f;
+              let toSell = lots.reduce((s, l) => s + l.shares, 0) * f;
+              for (const lot of lots) {
+                if (toSell <= 0) break;
+                const sellFromLot = Math.min(lot.shares, toSell);
+                lot.shares -= sellFromLot;
+                toSell -= sellFromLot;
+              }
             }
+            const positionShares = lots.reduce((s, l) => s + l.shares, 0);
+            const positionInvested = lots.reduce((s, l) => s + l.shares * l.costPerShare, 0);
             const avgCost = positionShares > 0 ? positionInvested / positionShares : pick.priceAtPublish;
 
             return (

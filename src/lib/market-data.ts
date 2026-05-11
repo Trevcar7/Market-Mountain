@@ -667,27 +667,58 @@ function fmpUrl(path: string, params: Record<string, string> = {}): string {
 export async function fetchFmpQuote(
   symbol: string
 ): Promise<number | null> {
-  if (!process.env.FMP_API_KEY) return null;
-
-  try {
-    // Use /stable/profile — confirmed working on current FMP plan.
-    // The /api/v3/* legacy endpoints were deprecated Aug 2025.
-    const res = await fetch(
-      fmpUrl(`/stable/profile`, { symbol }),
-      { signal: withTimeout() }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      const profile = Array.isArray(data) ? data[0] : data;
-      const price = profile?.price ?? null;
-      if (typeof price === "number" && price > 0) return price;
+  // Try FMP first (preferred — fastest, full coverage).
+  if (process.env.FMP_API_KEY) {
+    try {
+      // Use /stable/profile — confirmed working on current FMP plan.
+      // The /api/v3/* legacy endpoints were deprecated Aug 2025.
+      const res = await fetch(
+        fmpUrl(`/stable/profile`, { symbol }),
+        { signal: withTimeout() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const profile = Array.isArray(data) ? data[0] : data;
+        const price = profile?.price ?? null;
+        if (typeof price === "number" && price > 0) return price;
+      }
+    } catch (err) {
+      logWarn("FMP", `quote fetch failed for ${symbol}: ${String(err)}`);
     }
-
-    return null;
-  } catch (err) {
-    logWarn("FMP", `quote fetch failed for ${symbol}: ${String(err)}`);
-    return null;
   }
+
+  // Fallback: Alpha Vantage GLOBAL_QUOTE.
+  if (process.env.ALPHAVANTAGE_API_KEY) {
+    try {
+      const avUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${process.env.ALPHAVANTAGE_API_KEY}`;
+      const res = await fetch(avUrl, { signal: withTimeout() });
+      if (res.ok) {
+        const data = await res.json();
+        const priceStr = data?.["Global Quote"]?.["05. price"];
+        const price = priceStr ? Number(priceStr) : null;
+        if (typeof price === "number" && price > 0) return price;
+      }
+    } catch (err) {
+      logWarn("AlphaVantage", `quote fetch failed for ${symbol}: ${String(err)}`);
+    }
+  }
+
+  // Fallback: Polygon previous-day close.
+  if (process.env.POLYGON_API_KEY) {
+    try {
+      const polyUrl = `https://api.polygon.io/v2/aggs/ticker/${symbol}/prev?adjusted=true&apiKey=${process.env.POLYGON_API_KEY}`;
+      const res = await fetch(polyUrl, { signal: withTimeout() });
+      if (res.ok) {
+        const data = await res.json();
+        const price = data?.results?.[0]?.c ?? null;
+        if (typeof price === "number" && price > 0) return price;
+      }
+    } catch (err) {
+      logWarn("Polygon", `quote fetch failed for ${symbol}: ${String(err)}`);
+    }
+  }
+
+  return null;
 }
 
 /**
