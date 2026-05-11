@@ -166,26 +166,26 @@ export default async function TrackRecordPage() {
   }
 
   // Per-closed-pick proceeds: $1K grown by (target/entry).
-  // Recipients = active-below-target picks that have a valid close-date
-  // historical price. Picks without data are excluded so capital is never
-  // assumed to sit in cash; remaining recipients split a proportionally
-  // larger slice.
-  // Recipients must have existed as a pick by (event date + 14-day grace),
-  // so reinvested capital can't backflow into a pick that wasn't published yet.
-  // The grace handles cases like FSLR closing Oct 31 and SFM being pitched Nov 3.
-  const eligibleRecipientsForDate = (eventDate: string, excludeTicker?: string) => {
-    const eventMs = new Date(eventDate).getTime();
+  // For closed picks: recipients = qualified active picks below target
+  // (i.e., picks that have matured past the 30-day window or moved ±15%).
+  // This means proceeds flow to today's "live" portfolio rather than only
+  // to picks that existed when the closed pick hit its target. New picks
+  // start receiving slices once they mature.
+  // For partial sales: recipients = all reinvest targets (excluding seller),
+  // since the sale date is concurrent with portfolio rebalancing.
+  const eligibleRecipientsForDate = (
+    eventDate: string,
+    opts: { excludeTicker?: string; requireQualified?: boolean } = {}
+  ) => {
     return reinvestTargets.filter((rt) => {
-      if (rt.ticker === excludeTicker) return false;
-      const rtMs = new Date(rt.date).getTime();
-      const daysAfter = (rtMs - eventMs) / 86400000;
-      if (daysAfter > 14) return false;
+      if (rt.ticker === opts.excludeTicker) return false;
+      if (opts.requireQualified && !qualifiedTickers.has(rt.ticker)) return false;
       return activePriceOnEventDate.get(rt.ticker)?.has(eventDate);
     });
   };
 
   const closedPickProceedsList = closedPicksForReinvest.map((cp) => {
-    const eligible = eligibleRecipientsForDate(cp.targetHitDate!);
+    const eligible = eligibleRecipientsForDate(cp.targetHitDate!, { requireQualified: true });
     const proceeds = investmentPerPick * (cp.priceTarget / cp.priceAtPublish);
     return {
       pick: cp,
@@ -198,12 +198,13 @@ export default async function TrackRecordPage() {
   const totalClosedProceeds = closedPickProceedsList.reduce((s, c) => s + c.proceeds, 0);
 
   // Helper: seller's positionShares right before the partial sale (initial $1K
-  // plus any closed-pick reinvest slices into this seller, if any).
+  // plus any closed-pick reinvest slices into this seller, if eligible).
   const sellerSharesBeforeSale = (sellerTicker: string, sellerPriceAtPublish: number) => {
     let shares = investmentPerPick / sellerPriceAtPublish;
     const dateMap = activePriceOnEventDate.get(sellerTicker);
     if (!dateMap) return shares;
-    for (const { eventDate, slicePerEligible } of closedPickProceedsList) {
+    for (const { eventDate, slicePerEligible, eligible } of closedPickProceedsList) {
+      if (!eligible.some((e) => e.ticker === sellerTicker)) continue;
       const pxAtClose = dateMap.get(eventDate);
       if (!pxAtClose) continue;
       shares += slicePerEligible / pxAtClose;
@@ -218,7 +219,7 @@ export default async function TrackRecordPage() {
     const f = Math.max(0, Math.min(1, ps.fraction));
     const sellerShares = sellerSharesBeforeSale(sp.ticker, sp.priceAtPublish);
     const proceeds = sellerShares * f * ps.salePrice;
-    const eligible = eligibleRecipientsForDate(ps.date, sp.ticker);
+    const eligible = eligibleRecipientsForDate(ps.date, { excludeTicker: sp.ticker });
     return {
       pick: sp,
       eventDate: ps.date,
@@ -238,7 +239,8 @@ export default async function TrackRecordPage() {
     if (!currentPrice) return 0;
     const dateMap = activePriceOnEventDate.get(activeTicker);
     let total = 0;
-    for (const { eventDate, slicePerEligible } of closedPickProceedsList) {
+    for (const { eventDate, slicePerEligible, eligible } of closedPickProceedsList) {
+      if (!eligible.some((e) => e.ticker === activeTicker)) continue;
       const pxAtEvent = dateMap?.get(eventDate);
       if (!pxAtEvent) continue;
       total += slicePerEligible * (currentPrice / pxAtEvent);
@@ -545,7 +547,8 @@ export default async function TrackRecordPage() {
             let positionShares = investmentPerPick / pick.priceAtPublish;
             if (isReinvestRecipient) {
               const dateMap = activePriceOnEventDate.get(pick.ticker);
-              for (const { eventDate, slicePerEligible } of closedPickProceedsList) {
+              for (const { eventDate, slicePerEligible, eligible } of closedPickProceedsList) {
+                if (!eligible.some((e) => e.ticker === pick.ticker)) continue;
                 const pxAtEvent = dateMap?.get(eventDate);
                 if (!pxAtEvent) continue;
                 positionInvested += slicePerEligible;
