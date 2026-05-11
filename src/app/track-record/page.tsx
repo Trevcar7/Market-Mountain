@@ -49,20 +49,31 @@ function formatHoldingPeriod(days: number): string {
 export default async function TrackRecordPage() {
   const picks = extractPicks();
 
-  // Fetch live prices + SPY history in parallel
-  const uniqueTickers = [...new Set([...picks.map((p) => p.ticker), "SPY"])];
+  // Fetch live prices + SPY history in parallel.
+  // Closed picks use thesis target price, so skip their live quotes — keeps the
+  // request count under AlphaVantage's free-tier 5/min cap.
+  const uniqueTickers = [...new Set([
+    ...picks.filter((p) => p.coverageStatus !== "closed").map((p) => p.ticker),
+    "SPY",
+  ])];
   const priceMap = new Map<string, number>();
   const oldestPick = picks.reduce((oldest, p) =>
     p.holdingDays > oldest.holdingDays ? p : oldest, picks[0]);
 
+  // Serialize quote fetches with ~250ms spacing — AlphaVantage's free tier
+  // asks for "1 request per second" and throttles concurrent bursts.
+  const fetchQuotesSerial = async () => {
+    for (let i = 0; i < uniqueTickers.length; i++) {
+      const ticker = uniqueTickers[i];
+      const price = await fetchFmpQuote(ticker);
+      if (price) priceMap.set(ticker, price);
+      if (i < uniqueTickers.length - 1) {
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+    }
+  };
   const [, spyHistoryResult] = await Promise.all([
-    // Fetch all quotes in parallel
-    Promise.allSettled(
-      uniqueTickers.map(async (ticker) => {
-        const price = await fetchFmpQuote(ticker);
-        if (price) priceMap.set(ticker, price);
-      })
-    ),
+    fetchQuotesSerial(),
     // Fetch SPY history concurrently (don't wait for quotes first)
     fetchFmpStockHistory("SPY", oldestPick.holdingDays + 30),
   ]);

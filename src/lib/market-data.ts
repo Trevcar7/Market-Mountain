@@ -22,6 +22,7 @@
  */
 
 import { KeyDataPoint, ChartDataset } from "./news-types";
+import { getRedisClient } from "./redis";
 
 // ---------------------------------------------------------------------------
 // Shared timeout helper
@@ -667,10 +668,10 @@ function fmpUrl(path: string, params: Record<string, string> = {}): string {
 export async function fetchFmpQuote(
   symbol: string
 ): Promise<number | null> {
-  // 15-min KV cache — shields us from FMP/AV/Polygon rate limits.
+  // 15-min KV cache — shields us from FMP/AV rate limits.
   const sym = symbol.toUpperCase();
   const cacheKey = `quote:${sym}`;
-  const redis = (await import("./redis")).getRedisClient();
+  const redis = getRedisClient();
   if (redis) {
     try {
       const cached = await redis.get<number>(cacheKey);
@@ -680,72 +681,75 @@ export async function fetchFmpQuote(
     }
   }
 
-  const writeCache = async (price: number) => {
+  const writeCache = async (price: number, ttlSeconds: number) => {
     if (!redis) return;
     try {
-      await redis.set(cacheKey, price, { ex: 15 * 60 });
+      await redis.set(cacheKey, price, { ex: ttlSeconds });
     } catch {
       // Cache write failure is non-fatal.
     }
   };
 
-  // Try FMP first (preferred — fastest, full coverage).
-  if (process.env.FMP_API_KEY) {
-    try {
-      // Use /stable/profile — confirmed working on current FMP plan.
-      // The /api/v3/* legacy endpoints were deprecated Aug 2025.
-      const res = await fetch(
-        fmpUrl(`/stable/profile`, { symbol }),
-        { signal: withTimeout() }
-      );
-      if (res.ok) {
+  // Provider chain. FMP and AV return today's session price (15-min TTL).
+  // Polygon's free /prev endpoint is one-day-stale, so it's last-resort and
+  // gets a short 90s TTL — keeps the UI populated when both real-time
+  // providers rate-limit, but doesn't persist stale "current" prices.
+  const providers: {
+    name: string;
+    key: string | undefined;
+    ttl: number;
+    fetchPrice: () => Promise<number | null>;
+  }[] = [
+    {
+      name: "FMP",
+      key: process.env.FMP_API_KEY,
+      ttl: 15 * 60,
+      fetchPrice: async () => {
+        // /stable/profile — /api/v3/* deprecated Aug 2025.
+        const res = await fetch(fmpUrl(`/stable/profile`, { symbol }), { signal: withTimeout(4000) });
+        if (!res.ok) return null;
         const data = await res.json();
         const profile = Array.isArray(data) ? data[0] : data;
-        const price = profile?.price ?? null;
-        if (typeof price === "number" && price > 0) {
-          await writeCache(price);
-          return price;
-        }
-      }
-    } catch (err) {
-      logWarn("FMP", `quote fetch failed for ${symbol}: ${String(err)}`);
-    }
-  }
-
-  // Fallback: Alpha Vantage GLOBAL_QUOTE.
-  if (process.env.ALPHAVANTAGE_API_KEY) {
-    try {
-      const avUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${process.env.ALPHAVANTAGE_API_KEY}`;
-      const res = await fetch(avUrl, { signal: withTimeout() });
-      if (res.ok) {
+        return typeof profile?.price === "number" ? profile.price : null;
+      },
+    },
+    {
+      name: "AlphaVantage",
+      key: process.env.ALPHAVANTAGE_API_KEY,
+      ttl: 15 * 60,
+      fetchPrice: async () => {
+        const avUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${process.env.ALPHAVANTAGE_API_KEY}`;
+        const res = await fetch(avUrl, { signal: withTimeout(4000) });
+        if (!res.ok) return null;
         const data = await res.json();
         const priceStr = data?.["Global Quote"]?.["05. price"];
-        const price = priceStr ? Number(priceStr) : null;
-        if (typeof price === "number" && price > 0) {
-          await writeCache(price);
-          return price;
-        }
-      }
-    } catch (err) {
-      logWarn("AlphaVantage", `quote fetch failed for ${symbol}: ${String(err)}`);
-    }
-  }
-
-  // Fallback: Polygon previous-day close.
-  if (process.env.POLYGON_API_KEY) {
-    try {
-      const polyUrl = `https://api.polygon.io/v2/aggs/ticker/${symbol}/prev?adjusted=true&apiKey=${process.env.POLYGON_API_KEY}`;
-      const res = await fetch(polyUrl, { signal: withTimeout() });
-      if (res.ok) {
+        return priceStr ? Number(priceStr) : null;
+      },
+    },
+    {
+      name: "Polygon",
+      key: process.env.POLYGON_API_KEY,
+      ttl: 90, // short TTL — this is yesterday's close, retry the real-time providers soon.
+      fetchPrice: async () => {
+        const polyUrl = `https://api.polygon.io/v2/aggs/ticker/${symbol}/prev?adjusted=true&apiKey=${process.env.POLYGON_API_KEY}`;
+        const res = await fetch(polyUrl, { signal: withTimeout(4000) });
+        if (!res.ok) return null;
         const data = await res.json();
-        const price = data?.results?.[0]?.c ?? null;
-        if (typeof price === "number" && price > 0) {
-          await writeCache(price);
-          return price;
-        }
+        return typeof data?.results?.[0]?.c === "number" ? data.results[0].c : null;
+      },
+    },
+  ];
+
+  for (const p of providers) {
+    if (!p.key) continue;
+    try {
+      const price = await p.fetchPrice();
+      if (typeof price === "number" && price > 0) {
+        await writeCache(price, p.ttl);
+        return price;
       }
     } catch (err) {
-      logWarn("Polygon", `quote fetch failed for ${symbol}: ${String(err)}`);
+      logWarn(p.name, `quote fetch failed for ${symbol}: ${String(err)}`);
     }
   }
 
