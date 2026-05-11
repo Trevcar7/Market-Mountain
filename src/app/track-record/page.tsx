@@ -167,12 +167,11 @@ export default async function TrackRecordPage() {
 
   // Per-closed-pick proceeds: $1K grown by (target/entry).
   // For closed picks: recipients = qualified active picks below target
-  // (i.e., picks that have matured past the 30-day window or moved ±15%).
-  // This means proceeds flow to today's "live" portfolio rather than only
-  // to picks that existed when the closed pick hit its target. New picks
-  // start receiving slices once they mature.
-  // For partial sales: recipients = all reinvest targets (excluding seller),
-  // since the sale date is concurrent with portfolio rebalancing.
+  // (i.e., picks that have matured past the 30-day window or moved ±15%)
+  // AND were already published as of the event date. A pick that
+  // launched after the event date can't retroactively receive proceeds.
+  // For partial sales: recipients = all reinvest targets (excluding seller)
+  // that were live on the sale date.
   const eligibleRecipientsForDate = (
     eventDate: string,
     opts: { excludeTicker?: string; requireQualified?: boolean } = {}
@@ -182,7 +181,17 @@ export default async function TrackRecordPage() {
       if (opts.requireQualified && !qualifiedTickers.has(rt.ticker)) return false;
       // Same-day publish always qualifies — buy-in price falls back to publish price.
       if (rt.date === eventDate) return true;
-      return activePriceOnEventDate.get(rt.ticker)?.has(eventDate);
+      // Pick published after the event date: still receives a slice;
+      // the cash waits and is bought at the pick's priceAtPublish.
+      if (rt.date > eventDate) return true;
+      // Pick published before the event date: needs a historical price.
+      // FMP daily history sometimes misses very recent days, so accept
+      // any pick that has a live `priceMap` entry (buyInPrice falls
+      // back to today's price for recent events).
+      return (
+        activePriceOnEventDate.get(rt.ticker)?.has(eventDate) ||
+        priceMap.has(rt.ticker)
+      );
     });
   };
 
@@ -199,15 +208,32 @@ export default async function TrackRecordPage() {
   });
   const totalClosedProceeds = closedPickProceedsList.reduce((s, c) => s + c.proceeds, 0);
 
+  // Buy-in price for a reinvest recipient on a given event date.
+  // - If the recipient was published on/after the event date, the slice
+  //   waits in cash until the pick is published and is bought at its
+  //   `priceAtPublish` (the canonical entry price for that pick).
+  // - Otherwise use the recipient's market price on the event date,
+  //   falling back to today's live price for events within the last
+  //   ~7 days (FMP daily history often lags a trading day).
+  const pickByTicker = new Map(enrichedPicks.map((p) => [p.ticker, p]));
+  const todayIso = new Date().toISOString().split("T")[0];
+  const buyInPrice = (ticker: string, eventDate: string): number | undefined => {
+    const p = pickByTicker.get(ticker);
+    if (p && p.date >= eventDate) return p.priceAtPublish;
+    const fromHistory = activePriceOnEventDate.get(ticker)?.get(eventDate);
+    if (fromHistory) return fromHistory;
+    const daysAgo = (new Date(todayIso).getTime() - new Date(eventDate).getTime()) / 86400000;
+    if (daysAgo <= 7) return priceMap.get(ticker);
+    return undefined;
+  };
+
   // Helper: seller's positionShares right before the partial sale (initial $1K
   // plus any closed-pick reinvest slices into this seller, if eligible).
   const sellerSharesBeforeSale = (sellerTicker: string, sellerPriceAtPublish: number) => {
     let shares = investmentPerPick / sellerPriceAtPublish;
-    const dateMap = activePriceOnEventDate.get(sellerTicker);
-    if (!dateMap) return shares;
     for (const { eventDate, slicePerEligible, eligible } of closedPickProceedsList) {
       if (!eligible.some((e) => e.ticker === sellerTicker)) continue;
-      const pxAtClose = dateMap.get(eventDate);
+      const pxAtClose = buyInPrice(sellerTicker, eventDate);
       if (!pxAtClose) continue;
       shares += slicePerEligible / pxAtClose;
     }
@@ -233,17 +259,6 @@ export default async function TrackRecordPage() {
       slicePerEligible: eligible.length > 0 ? proceeds / eligible.length : 0,
     };
   });
-
-  // Buy-in price for a reinvest recipient on a given event date.
-  // If the recipient was published on the event date, use its publish
-  // price — the live FMP history typically lags one trading day and
-  // the publish price is the canonical entry price for that pick.
-  const pickByTicker = new Map(enrichedPicks.map((p) => [p.ticker, p]));
-  const buyInPrice = (ticker: string, eventDate: string): number | undefined => {
-    const p = pickByTicker.get(ticker);
-    if (p && p.date === eventDate) return p.priceAtPublish;
-    return activePriceOnEventDate.get(ticker)?.get(eventDate);
-  };
 
   // Compute today's value of all reinvested slices (closed + partial-sale) for
   // a given active pick. Each slice grows from its event-date price → today's price.
@@ -454,7 +469,7 @@ export default async function TrackRecordPage() {
                   <div className="mt-2 text-xs text-text-muted">
                     <span className="font-semibold text-text-light">Reinvested into:</span>{" "}
                     {eligible.map((rt, i) => {
-                      const pxAtClose = activePriceOnEventDate.get(rt.ticker)?.get(cp.targetHitDate!)!;
+                      const pxAtClose = buyInPrice(rt.ticker, cp.targetHitDate!)!;
                       return (
                         <span key={rt.ticker}>
                           <span className="font-semibold text-text">{rt.ticker}</span>
