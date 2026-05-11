@@ -20,6 +20,13 @@ export interface ArticleMeta {
   coverageStatus?: "active" | "target-hit" | "closed";  // Track record status
   coverageNote?: string;           // e.g., "Target reached May 2025. Coverage ended."
   targetHitDate?: string;          // YYYY-MM-DD when price target was reached (for closed/target-hit picks)
+  /** Optional partial sale — locks in gains on a fraction of the hypothetical position */
+  partialSale?: {
+    date: string;        // YYYY-MM-DD
+    fraction: number;    // 0–1 (e.g., 0.5 for half)
+    salePrice: number;   // execution price for the sold fraction
+    note?: string;       // rationale shown on the track-record card
+  };
   disclosure?: string;            // Conflict of interest disclosure
 }
 

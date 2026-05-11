@@ -106,27 +106,39 @@ export default async function TrackRecordPage() {
     p.holdingDays >= MIN_DAYS ||
     Math.abs(p.returnPct ?? 0) >= MOVE_THRESHOLD
   );
+  const qualifiedTickers = new Set(qualifiedPicks.map((p) => p.ticker));
   const totalInvested = qualifiedPicks.length * investmentPerPick;
 
-  // Reinvestment: closed-pick proceeds are redistributed into active picks below target
+  // Reinvestment: closed-pick proceeds AND partial-sale proceeds are both
+  // redistributed into active picks below target.
   const closedPicksForReinvest = qualifiedPicks.filter(
     (p) => p.coverageStatus === "closed" && p.targetHitDate
   );
-  const reinvestTargets = qualifiedPicks.filter(
+  const picksWithPartialSale = qualifiedPicks.filter(
+    (p) => p.partialSale && p.coverageStatus !== "closed"
+  );
+  // Reinvest recipients = all active picks below target, including not-yet-
+  // qualified picks (so freshly published picks can receive reinvested capital
+  // immediately even if they're still in the < 30-day maturing window).
+  const reinvestTargets = enrichedPicks.filter(
     (p) => p.coverageStatus !== "closed" && !p.hitTarget
   );
 
-  // Fetch each active reinvest target's historical price covering all closed
-  // pick target-hit dates, so the reinvested capital can buy in at the
-  // close-date price instead of the original pitch-date price.
-  const activePriceOnCloseDate = new Map<string, Map<string, number>>(); // ticker → date → price
-  if (closedPicksForReinvest.length > 0 && reinvestTargets.length > 0) {
-    const oldestCloseDate = closedPicksForReinvest.reduce(
-      (oldest, p) => (p.targetHitDate! < oldest ? p.targetHitDate! : oldest),
-      closedPicksForReinvest[0].targetHitDate!
+  // Fetch each active reinvest target's historical price covering all close
+  // dates AND partial-sale dates, so reinvested capital can buy in at the
+  // event-date price.
+  const activePriceOnEventDate = new Map<string, Map<string, number>>(); // ticker → event-date → price
+  const reinvestEventDates = [
+    ...closedPicksForReinvest.map((p) => p.targetHitDate!),
+    ...picksWithPartialSale.map((p) => p.partialSale!.date),
+  ];
+  if (reinvestEventDates.length > 0 && reinvestTargets.length > 0) {
+    const oldestEventDate = reinvestEventDates.reduce(
+      (oldest, d) => (d < oldest ? d : oldest),
+      reinvestEventDates[0]
     );
     const daysBack =
-      Math.floor((Date.now() - new Date(oldestCloseDate).getTime()) / 86400000) + 30;
+      Math.floor((Date.now() - new Date(oldestEventDate).getTime()) / 86400000) + 30;
 
     await Promise.allSettled(
       reinvestTargets.map(async (rt) => {
@@ -137,8 +149,7 @@ export default async function TrackRecordPage() {
           dateMap.set(hist.labels[i], hist.values[i]);
         }
         const lookupMap = new Map<string, number>();
-        for (const cp of closedPicksForReinvest) {
-          const target = cp.targetHitDate!;
+        for (const target of reinvestEventDates) {
           // find nearest market day within ±5 days
           for (let off = 0; off <= 5; off++) {
             const fwd = new Date(new Date(target).getTime() + off * 86400000)
@@ -149,7 +160,7 @@ export default async function TrackRecordPage() {
             if (dateMap.has(bwd)) { lookupMap.set(target, dateMap.get(bwd)!); break; }
           }
         }
-        activePriceOnCloseDate.set(rt.ticker, lookupMap);
+        activePriceOnEventDate.set(rt.ticker, lookupMap);
       })
     );
   }
@@ -159,16 +170,26 @@ export default async function TrackRecordPage() {
   // historical price. Picks without data are excluded so capital is never
   // assumed to sit in cash; remaining recipients split a proportionally
   // larger slice.
-  const eligibleRecipientsForCp = (cpDate: string) =>
-    reinvestTargets.filter((rt) =>
-      activePriceOnCloseDate.get(rt.ticker)?.has(cpDate)
-    );
+  // Recipients must have existed as a pick by (event date + 14-day grace),
+  // so reinvested capital can't backflow into a pick that wasn't published yet.
+  // The grace handles cases like FSLR closing Oct 31 and SFM being pitched Nov 3.
+  const eligibleRecipientsForDate = (eventDate: string, excludeTicker?: string) => {
+    const eventMs = new Date(eventDate).getTime();
+    return reinvestTargets.filter((rt) => {
+      if (rt.ticker === excludeTicker) return false;
+      const rtMs = new Date(rt.date).getTime();
+      const daysAfter = (rtMs - eventMs) / 86400000;
+      if (daysAfter > 14) return false;
+      return activePriceOnEventDate.get(rt.ticker)?.has(eventDate);
+    });
+  };
 
   const closedPickProceedsList = closedPicksForReinvest.map((cp) => {
-    const eligible = eligibleRecipientsForCp(cp.targetHitDate!);
+    const eligible = eligibleRecipientsForDate(cp.targetHitDate!);
     const proceeds = investmentPerPick * (cp.priceTarget / cp.priceAtPublish);
     return {
       pick: cp,
+      eventDate: cp.targetHitDate!,
       proceeds,
       eligible,
       slicePerEligible: eligible.length > 0 ? proceeds / eligible.length : 0,
@@ -176,28 +197,79 @@ export default async function TrackRecordPage() {
   });
   const totalClosedProceeds = closedPickProceedsList.reduce((s, c) => s + c.proceeds, 0);
 
-  // Compute today's value of all reinvested slices for a given active pick.
-  // Each slice grows from its closed-pick-date price → today's price.
+  // Helper: seller's positionShares right before the partial sale (initial $1K
+  // plus any closed-pick reinvest slices into this seller, if any).
+  const sellerSharesBeforeSale = (sellerTicker: string, sellerPriceAtPublish: number) => {
+    let shares = investmentPerPick / sellerPriceAtPublish;
+    const dateMap = activePriceOnEventDate.get(sellerTicker);
+    if (!dateMap) return shares;
+    for (const { eventDate, slicePerEligible } of closedPickProceedsList) {
+      const pxAtClose = dateMap.get(eventDate);
+      if (!pxAtClose) continue;
+      shares += slicePerEligible / pxAtClose;
+    }
+    return shares;
+  };
+
+  // Partial-sale proceeds: sellerShares × fraction × salePrice. Recipients =
+  // reinvest targets (excluding the seller) with a price on the sale date.
+  const partialSaleProceedsList = picksWithPartialSale.map((sp) => {
+    const ps = sp.partialSale!;
+    const f = Math.max(0, Math.min(1, ps.fraction));
+    const sellerShares = sellerSharesBeforeSale(sp.ticker, sp.priceAtPublish);
+    const proceeds = sellerShares * f * ps.salePrice;
+    const eligible = eligibleRecipientsForDate(ps.date, sp.ticker);
+    return {
+      pick: sp,
+      eventDate: ps.date,
+      fraction: f,
+      salePrice: ps.salePrice,
+      sellerShares,
+      proceeds,
+      eligible,
+      slicePerEligible: eligible.length > 0 ? proceeds / eligible.length : 0,
+    };
+  });
+
+  // Compute today's value of all reinvested slices (closed + partial-sale) for
+  // a given active pick. Each slice grows from its event-date price → today's price.
   const reinvestValueForActive = (activeTicker: string): number => {
     const currentPrice = priceMap.get(activeTicker);
     if (!currentPrice) return 0;
-    const dateMap = activePriceOnCloseDate.get(activeTicker);
+    const dateMap = activePriceOnEventDate.get(activeTicker);
     let total = 0;
-    for (const { pick: cp, slicePerEligible } of closedPickProceedsList) {
-      const pxAtClose = dateMap?.get(cp.targetHitDate!);
-      if (!pxAtClose) continue; // not an eligible recipient — no cash assumed
-      total += slicePerEligible * (currentPrice / pxAtClose);
+    for (const { eventDate, slicePerEligible } of closedPickProceedsList) {
+      const pxAtEvent = dateMap?.get(eventDate);
+      if (!pxAtEvent) continue;
+      total += slicePerEligible * (currentPrice / pxAtEvent);
+    }
+    for (const ev of partialSaleProceedsList) {
+      if (ev.pick.ticker === activeTicker) continue;
+      if (!ev.eligible.some((e) => e.ticker === activeTicker)) continue;
+      const pxAtEvent = dateMap?.get(ev.eventDate);
+      if (!pxAtEvent) continue;
+      total += ev.slicePerEligible * (currentPrice / pxAtEvent);
     }
     return total;
   };
 
-  const portfolioValue = qualifiedPicks.reduce((sum, p) => {
+  const portfolioValue = enrichedPicks.reduce((sum, p) => {
     if (p.coverageStatus === "closed") {
       // Proceeds redistributed — this pick contributes $0 directly
       return sum;
     }
+    // Partial sale: seller contributes only the un-sold fraction at live price;
+    // sold proceeds were redeployed into other picks via reinvestValueForActive.
+    if (p.partialSale && p.currentPrice) {
+      const f = Math.max(0, Math.min(1, p.partialSale.fraction));
+      const sellerShares = sellerSharesBeforeSale(p.ticker, p.priceAtPublish);
+      return sum + sellerShares * (1 - f) * p.currentPrice;
+    }
+    const isQualified = qualifiedTickers.has(p.ticker);
     const baseGrowth = p.currentPrice ? p.currentPrice / p.priceAtPublish : 1;
-    const baseValue = investmentPerPick * baseGrowth;
+    // Unqualified picks (< 30 days, no big move) don't yet contribute their
+    // baseline $1K — but they DO contribute any reinvest slice they received.
+    const baseValue = isQualified ? investmentPerPick * baseGrowth : 0;
     const isReinvestTarget = !p.hitTarget;
     const reinvestValue = isReinvestTarget ? reinvestValueForActive(p.ticker) : 0;
     return sum + baseValue + reinvestValue;
@@ -306,7 +378,7 @@ export default async function TrackRecordPage() {
                     Portfolio vs. S&amp;P 500{spyDataAvailable ? "" : " (Est.)"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""}{totalClosedProceeds > 0 && reinvestTargets.length > 0 ? ` · closed proceeds reinvested at exit-date prices` : ""})
+                    ${totalInvested.toLocaleString()} invested ($1K per pick{qualifiedPicks.length < enrichedPicks.length ? `, ${enrichedPicks.length - qualifiedPicks.length} maturing` : ""}{(totalClosedProceeds > 0 || partialSaleProceedsList.length > 0) && reinvestTargets.length > 0 ? ` · proceeds reinvested at event-date prices` : ""})
                   </p>
                 </div>
                 <div className="flex items-center gap-6">
@@ -346,16 +418,16 @@ export default async function TrackRecordPage() {
         </section>
       )}
 
-      {/* Reinvestment Flow — full transparency on closed-pick proceeds */}
-      {closedPicksForReinvest.length > 0 && reinvestTargets.length > 0 && (
+      {/* Reinvestment Flow — closed-pick and partial-sale proceeds */}
+      {(closedPickProceedsList.length > 0 || partialSaleProceedsList.length > 0) && reinvestTargets.length > 0 && (
         <section className="mx-auto max-w-4xl px-4 sm:px-6 mt-6">
           <div className="bg-card rounded-xl border border-border shadow-sm p-5 sm:p-6">
             <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-4">
-              Closed-Pick Reinvestment
+              Reinvestment Flow
             </h2>
             <div className="space-y-4">
               {closedPickProceedsList.map(({ pick: cp, proceeds, eligible, slicePerEligible }) => (
-                <div key={cp.ticker} className="border-l-2 border-accent-500 pl-4">
+                <div key={`closed-${cp.ticker}`} className="border-l-2 border-accent-500 pl-4">
                   <p className="text-sm font-semibold text-text">
                     {cp.ticker} closed {formatDateShort(cp.targetHitDate!)}
                     <span className="text-text-muted font-normal"> — ${cp.priceAtPublish} → ${cp.priceTarget} ({(((cp.priceTarget - cp.priceAtPublish) / cp.priceAtPublish) * 100).toFixed(0)}%)</span>
@@ -368,7 +440,7 @@ export default async function TrackRecordPage() {
                   <div className="mt-2 text-xs text-text-muted">
                     <span className="font-semibold text-text-light">Reinvested into:</span>{" "}
                     {eligible.map((rt, i) => {
-                      const pxAtClose = activePriceOnCloseDate.get(rt.ticker)?.get(cp.targetHitDate!)!;
+                      const pxAtClose = activePriceOnEventDate.get(rt.ticker)?.get(cp.targetHitDate!)!;
                       return (
                         <span key={rt.ticker}>
                           <span className="font-semibold text-text">{rt.ticker}</span>
@@ -380,6 +452,37 @@ export default async function TrackRecordPage() {
                   </div>
                 </div>
               ))}
+              {partialSaleProceedsList.map((ev) => {
+                const fracLabel = ev.fraction === 0.5 ? "half" : `${Math.round(ev.fraction * 100)}%`;
+                return (
+                  <div key={`partial-${ev.pick.ticker}`} className="border-l-2 border-accent-400 pl-4">
+                    <p className="text-sm font-semibold text-text">
+                      {ev.pick.ticker} sold {fracLabel} {formatDateShort(ev.eventDate)}
+                      <span className="text-text-muted font-normal"> — ${ev.pick.priceAtPublish} entry → ${ev.salePrice.toFixed(2)} sale ({(((ev.salePrice - ev.pick.priceAtPublish) / ev.pick.priceAtPublish) * 100).toFixed(0)}%)</span>
+                    </p>
+                    <p className="text-xs text-text-muted mt-1">
+                      <strong className="text-text">${formatMoney(ev.proceeds)}</strong> realized,
+                      split into {ev.eligible.length} active pick{ev.eligible.length === 1 ? "" : "s"} =
+                      <strong className="text-text"> +${formatMoney(ev.slicePerEligible)} each</strong>
+                    </p>
+                    {ev.eligible.length > 0 && (
+                      <div className="mt-2 text-xs text-text-muted">
+                        <span className="font-semibold text-text-light">Reinvested into:</span>{" "}
+                        {ev.eligible.map((rt, i) => {
+                          const pxAtEvent = activePriceOnEventDate.get(rt.ticker)?.get(ev.eventDate)!;
+                          return (
+                            <span key={rt.ticker}>
+                              <span className="font-semibold text-text">{rt.ticker}</span>
+                              <span> @ ${pxAtEvent.toFixed(2)}</span>
+                              {i < ev.eligible.length - 1 ? <span>, </span> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -434,20 +537,34 @@ export default async function TrackRecordPage() {
 
             // Hypothetical position size + weighted-average cost basis.
             // Starts with $1,000 at entry; if this pick is an eligible
-            // reinvest recipient, each closed pick adds its slice at the
-            // close-date price.
+            // reinvest recipient, each closed pick AND partial-sale event
+            // adds its slice at the event-date price.
             const isReinvestRecipient = reinvestTargets.some((rt) => rt.ticker === pick.ticker);
-            const isQualified = qualifiedPicks.some((qp) => qp.ticker === pick.ticker);
+            const isQualified = qualifiedTickers.has(pick.ticker);
             let positionInvested = investmentPerPick;
             let positionShares = investmentPerPick / pick.priceAtPublish;
             if (isReinvestRecipient) {
-              const dateMap = activePriceOnCloseDate.get(pick.ticker);
-              for (const { pick: cp, slicePerEligible } of closedPickProceedsList) {
-                const pxAtClose = dateMap?.get(cp.targetHitDate!);
-                if (!pxAtClose) continue;
+              const dateMap = activePriceOnEventDate.get(pick.ticker);
+              for (const { eventDate, slicePerEligible } of closedPickProceedsList) {
+                const pxAtEvent = dateMap?.get(eventDate);
+                if (!pxAtEvent) continue;
                 positionInvested += slicePerEligible;
-                positionShares += slicePerEligible / pxAtClose;
+                positionShares += slicePerEligible / pxAtEvent;
               }
+              for (const ev of partialSaleProceedsList) {
+                if (ev.pick.ticker === pick.ticker) continue;
+                if (!ev.eligible.some((e) => e.ticker === pick.ticker)) continue;
+                const pxAtEvent = dateMap?.get(ev.eventDate);
+                if (!pxAtEvent) continue;
+                positionInvested += ev.slicePerEligible;
+                positionShares += ev.slicePerEligible / pxAtEvent;
+              }
+            }
+            // Seller of a partial sale: only the un-sold fraction remains.
+            if (pick.partialSale) {
+              const f = Math.max(0, Math.min(1, pick.partialSale.fraction));
+              positionInvested *= 1 - f;
+              positionShares *= 1 - f;
             }
             const avgCost = positionShares > 0 ? positionInvested / positionShares : pick.priceAtPublish;
 
@@ -531,6 +648,27 @@ export default async function TrackRecordPage() {
                       <span className="font-semibold text-text-muted">${avgCost.toFixed(2)}/share</span>
                       {!isQualified && <span className="text-text-light"> · maturing</span>}
                     </p>
+                    {pick.partialSale && (() => {
+                      const f = Math.max(0, Math.min(1, pick.partialSale.fraction));
+                      const fracLabel = f === 0.5 ? "half" : `${Math.round(f * 100)}%`;
+                      const event = partialSaleProceedsList.find((ev) => ev.pick.ticker === pick.ticker);
+                      const recipients = event?.eligible.map((e) => e.ticker).join(", ");
+                      return (
+                        <p className="text-[11px] text-text-light mt-1">
+                          Sold {fracLabel} at{" "}
+                          <span className="font-semibold text-text-muted">${pick.partialSale.salePrice.toFixed(2)}</span>
+                          {" "}on {formatDateShort(pick.partialSale.date)}
+                          {event && event.proceeds > 0 && (
+                            <>
+                              {" "}·{" "}
+                              <span className="font-semibold text-text-muted">${formatMoney(event.proceeds)}</span>
+                              {" "}reinvested
+                              {recipients && <span> into {recipients}</span>}
+                            </>
+                          )}
+                        </p>
+                      );
+                    })()}
                   </div>
                 )}
 

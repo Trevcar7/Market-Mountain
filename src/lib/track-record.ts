@@ -19,6 +19,13 @@ export interface TrackRecordPick {
   coverageNote?: string;
   /** Date when price target was hit (YYYY-MM-DD) — used for closed picks to lock in returns */
   targetHitDate?: string;
+  /** Optional partial sale info — locks in gains on a fraction of the hypothetical position */
+  partialSale?: {
+    date: string;
+    fraction: number;
+    salePrice: number;
+    note?: string;
+  };
   /** Days since publication */
   holdingDays: number;
   currentPrice?: number;
@@ -63,6 +70,7 @@ export function extractPicks(): TrackRecordPick[] {
       coverageStatus: a.coverageStatus ?? (a.targetHit ? "target-hit" : "active"),
       coverageNote: a.coverageNote ?? undefined,
       targetHitDate: a.targetHitDate ?? undefined,
+      partialSale: a.partialSale ?? undefined,
       holdingDays: Math.floor((Date.now() - new Date(a.date).getTime()) / 86400000),
       targetReturn: ((a.priceTarget - a.priceAtPublish) / a.priceAtPublish) * 100,
     }));

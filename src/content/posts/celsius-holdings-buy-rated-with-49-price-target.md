@@ -2,7 +2,7 @@
 title: "Celsius Holdings: Buy-Rated with $49 Price Target"
 date: "2026-05-11"
 readTime: "8 min read"
-excerpt: "Following the Alani Nu acquisition and the consolidation of Rockstar Energy under its expanded PepsiCo partnership, Celsius now operates a three-brand portfolio with roughly 20% U.S. energy drink share. At about 14.4x FY2025 EV/EBITDA versus a peer median near 19x, the stock already trades at a discount. My DCF implies a fair value near $49/share to common holders (net of preferred liquidation value), a 66% premium to the May 11 price of $29.50."
+excerpt: "Following the Alani Nu acquisition and the consolidation of Rockstar Energy under its expanded PepsiCo partnership, Celsius now operates a three-brand portfolio with roughly 20% U.S. energy drink share. At about 14.4x FY2025 EV/EBITDA versus a peer median near 19x, the stock already trades at a discount. My DCF implies a fair value near $49/share on a diluted basis, a 66% premium to the May 11 price of $29.50."
 tags: ["Stock Analysis"]
 disclaimer: true
 coverImage: "/images/celsius.png"
@@ -18,7 +18,7 @@ coverageStatus: "active"
 
 Celsius Holdings was founded in 2004 and trades on the Nasdaq under the ticker CELH. For most of its history, the company was a small-cap specialty beverage brand without meaningful national distribution. That changed in 2022, when PepsiCo took an equity stake and became Celsius's exclusive U.S. distributor. Today, Celsius operates a portfolio of three energy drink brands: its namesake CELSIUS line, Alani Nu (acquired April 2025), and Rockstar Energy (consolidated under Celsius as part of an expanded August 2025 agreement with PepsiCo).
 
-The company reported **$2.52 billion in revenue** for FY2025, trades at an enterprise value of roughly **$8.9 billion** at the May 11 close of $29.50 (about $7.52B common market cap on 255M diluted shares, $1.14B of PepsiCo Series A and Series B convertible preferred at liquidation value, and $271M net debt), and holds approximately **20% dollar share** of the U.S. energy drink category per Nielsen scanner data. The CELSIUS brand alone held roughly 5% three years earlier, before the Alani Nu acquisition and Rockstar consolidation lifted the combined portfolio to current levels. Celsius is now the third-largest energy drink brand in the U.S. by dollar share, behind Red Bull and Monster. The U.S. energy drink category has been growing at a mid-single-digit rate, with functional and zero-sugar sub-segments growing faster, both of which are areas where Celsius's product mix is concentrated.
+The company reported **$2.52 billion in revenue** for FY2025, trades at an enterprise value of roughly **$8.9 billion** at the May 11 close of $29.50 on 255M diluted shares, and holds approximately **20% dollar share** of the U.S. energy drink category per Nielsen scanner data. The CELSIUS brand alone held roughly 5% three years earlier, before the Alani Nu acquisition and Rockstar consolidation lifted the combined portfolio to current levels. Celsius is now the third-largest energy drink brand in the U.S. by dollar share, behind Red Bull and Monster. The U.S. energy drink category has been growing at a mid-single-digit rate, with functional and zero-sugar sub-segments growing faster, both of which are areas where Celsius's product mix is concentrated.
 
 <BarChart variant="celh-share" />
 
@@ -26,7 +26,7 @@ The company reported **$2.52 billion in revenue** for FY2025, trades at an enter
 
 On April 1, 2025, Celsius closed its acquisition of Alani Nu, a women-focused energy and wellness brand. Alani Nu had been one of the faster-growing brands in the U.S. energy category, with a customer base that skewed female, a demographic underrepresented in the legacy CELSIUS mix.
 
-The acquisition does three things. It expands Celsius's addressable market into a segment where the namesake brand was underweight. It removes Alani Nu as an independent competitor in convenience and grocery channels. And it consolidates manufacturing, distribution, and retailer negotiation across both brands. Reported revenue growth of **86%** in FY2025 reflects roughly **8 to 10 points of organic growth** at the legacy CELSIUS brand layered on top of the Alani Nu and Rockstar contribution, with the acquired-brand step-up accounting for the bulk of the headline figure.
+The acquisition does three things. It expands Celsius's addressable market into a segment where the namesake brand was underweight. It removes Alani Nu as an independent competitor in convenience and grocery channels. And it consolidates manufacturing, distribution, and retailer negotiation across both brands. FY2025 revenue grew **86%** year over year, with the legacy CELSIUS brand contributing roughly 8 to 10 points of organic growth and the rest coming from the Alani Nu acquisition and Rockstar consolidation.
 
 ## Rockstar and the PepsiCo Partnership
 
@@ -34,7 +34,7 @@ The PepsiCo partnership was signed in August 2022, when PEP took a minority equi
 
 In August 2025, that agreement was amended. As part of the broader transaction surrounding Alani Nu, Celsius assumed control of the Rockstar Energy brand from PepsiCo's portfolio. Rockstar adds a value-tier offering, complementing CELSIUS at the premium end and Alani Nu in the female wellness segment. The combined portfolio now spans three price points and three consumer segments under one operator. For PepsiCo, the restructuring concentrates its energy-drink strategy on a single partner.
 
-PepsiCo's economic stake sits in two tranches of convertible preferred stock: the original Series A from August 2022 ($550M) and the Series B added in August 2025 ($585M) alongside the Rockstar consolidation, both paying 5% cumulative dividends. The preferreds are currently anti-dilutive in Celsius's EPS math (Q1 2026 basic EPS of $0.33 equals diluted EPS, with preferred dividends and the participating-preferred allocation subtracted from net income to derive the figure attributable to common shareholders). For valuation purposes, this analysis uses the 255M common diluted share count and treats the $1.14B aggregate preferred liquidation value as a senior claim against equity, deducted before deriving fair value per common share. The structure aligns PepsiCo's incentives with common holders (distribution performance flows back through dividends and conversion economics), but it caps the upside common shareholders capture if Celsius's market price ever rises far enough to trigger preferred conversion.
+PepsiCo's economic stake sits in two tranches of convertible preferred stock: the original Series A from August 2022 ($550M) and the Series B added in August 2025 ($585M) alongside the Rockstar consolidation, both paying 5% cumulative dividends. The structure aligns PepsiCo's incentives with common holders (distribution performance flows back through dividends and conversion economics), but it caps the upside common shareholders capture if Celsius's market price ever rises far enough to trigger preferred conversion.
 
 ## International Expansion
 
@@ -53,7 +53,7 @@ FY2025 results are distorted by acquisition accounting and integration costs. Th
 
 <BarChart variant="celh-revenue" />
 
-GAAP net income of $108M, or **diluted EPS of $0.25 attributable to common shareholders** after the 5% Series A and Series B preferred dividends paid to PepsiCo, understates underlying earnings power because acquisition-related expenses, deal fees, and inventory step-ups flowed through the income statement in FY2025. EBITDA and free cash flow are more representative of operating reality.
+GAAP net income of $108M, or **diluted EPS of $0.25**, understates underlying earnings power because acquisition-related expenses, deal fees, and inventory step-ups flowed through the income statement in FY2025. EBITDA and free cash flow are more representative of operating reality.
 
 <BarChart variant="celh-fcf" />
 
@@ -61,7 +61,7 @@ Recent quarterly trends are constructive. The Alani Nu deal closed on April 1, 2
 
 For FY2026, management has guided to high-single-digit organic growth at the legacy CELSIUS brand, with reported revenue further boosted by the first full year of Alani Nu and Rockstar contribution. Consensus revenue estimates currently sit in the **$3.4 to $3.5 billion** range, implying roughly 35 to 39% reported growth, which aligns with the assumption embedded in my DCF. Management has also reiterated its medium-term EBITDA-margin target in the high-20s, contingent on integration completing on schedule.
 
-**Q1 2026 results**, reported in early May, support that growth path: revenue of **$783 million** marked the first full quarter of the three-brand portfolio under one P&L, and international momentum continued with $35.3M of segment revenue (up 55% year over year). The print did not change the FY2026 consensus range, and gives a fresh data point on margin trajectory as integration costs continue to roll off.
+**Q1 2026 results**, reported in early May, support that growth path: revenue of **$783 million** marked the first full quarter of the three-brand portfolio under one P&L, and international momentum continued with $35.3M of segment revenue (up 55% year over year). Gross margin expanded both sequentially and year over year as the one-time distributor termination and acquisition charges that weighed on FY2025 continued to roll off, supporting the trajectory toward the 27% medium-term EBITDA-margin target. The print did not change the FY2026 consensus range.
 
 Celsius's **debt-to-equity ratio of 0.23** is well below the 1.26 peer median (Monster, Coca-Cola, PepsiCo, Keurig Dr Pepper), and its **current ratio of 1.68** compares favorably to a peer set with mixed liquidity profiles: Monster runs a cash-rich 3.4, Coca-Cola sits near 1.0, while PepsiCo (0.8) and Keurig Dr Pepper (0.6) operate below 1.0 by design given their working-capital structures. The balance sheet supports additional M&A, marketing investment, or international expansion without meaningful incremental leverage.
 
@@ -88,7 +88,7 @@ The DCF uses a five-year explicit forecast. Key assumptions:
 - **WACC**: 9%, reflecting the company's low leverage and high incremental margins, partially offset by single-distributor concentration risk.
 - **Terminal growth**: 3%, in line with long-run U.S. nominal GDP growth and the high end of large-cap beverage peer terminal assumptions, reflecting the still-expanding global energy drink category.
 
-The model produces a sum of PV of explicit FCFs of roughly $2.9B and a PV of terminal value near $10.9B, for an enterprise value of approximately **$13.8B**. After adjusting for $670M of debt, $399M of cash, and the $1.14B preferred liquidation senior claim, common equity value is approximately **$12.4B**, or roughly **$49 per share** on 255M common diluted shares (a **66% premium** to the May 11 close of $29.50).
+The model produces a sum of PV of explicit FCFs of roughly $2.9B and a PV of terminal value near $10.9B, for an enterprise value of approximately **$13.8B**. After adjusting for net debt, equity value works out to roughly **$49 per share** on 255M diluted shares (a **66% premium** to the May 11 close of $29.50).
 
 | Methodology | Implied Price | Upside |
 |---|---|---|
@@ -120,7 +120,7 @@ The sensitivity table shows the implied share price across a range of WACC and t
 
 ## Conclusion
 
-Celsius now operates a three-brand portfolio with roughly 20% U.S. energy drink share, distributed by PepsiCo, growing off a higher base than at any prior point in its history. FY2025 GAAP results understate underlying earnings because of acquisition-related expenses, and Q1 2026 already shows the three-brand portfolio operating cleanly under one P&L. The setup is a 14.4x EV/EBITDA stock against a peer set near 19x, with a credible path to margin expansion as integration costs roll off. The DCF implies $49 per share at a 9% WACC and 3% terminal growth (a 66% premium to the May 11 close of $29.50, net of the $1.14B PepsiCo preferred liquidation senior claim), and peer-multiple cross-checks anchor a wider range from $33 to $41. I rate Celsius Holdings a **Buy with a $49 price target** and will track margin progression, Alani Nu and Rockstar integration, and quarterly Nielsen share data.
+Celsius now operates a three-brand portfolio with roughly 20% U.S. energy drink share, distributed by PepsiCo, growing off a higher base than at any prior point in its history. FY2025 GAAP results understate underlying earnings because of acquisition-related expenses, and Q1 2026 already shows the three-brand portfolio operating cleanly under one P&L. The setup is a 14.4x EV/EBITDA stock against a peer set near 19x, with a credible path to margin expansion as integration costs roll off. The DCF implies $49 per share at a 9% WACC and 3% terminal growth (a 66% premium to the May 11 close of $29.50), and peer-multiple cross-checks anchor a wider range from $33 to $41. I rate Celsius Holdings a **Buy with a $49 price target** and will track margin progression, Alani Nu and Rockstar integration, and quarterly Nielsen share data.
 
 ---
 

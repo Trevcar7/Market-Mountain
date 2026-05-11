@@ -12,8 +12,13 @@ priceAtPublish: 50
 rating: "buy"
 targetHit: true
 coverageStatus: "active"
-coverageNote: "Price target of $70 reached August 2025. Coverage remains active as I continue to monitor earnings growth and management execution on the $4.5B backlog."
+coverageNote: "Price target of $70 reached August 2025. NXT now trades at a rich valuation versus fundamentals, so I sold half the position on May 11, 2026 to lock in gains. Coverage remains active on the remaining half as I continue to monitor earnings growth and management execution on the $4.5B backlog."
 targetHitDate: "2025-08-19"
+partialSale:
+  date: "2026-05-11"
+  fraction: 0.5
+  salePrice: 126.98
+  note: "Sold half to lock in gains. NXT trades at a rich valuation versus fundamentals."
 ---
 
 ## Company Background and Competition
