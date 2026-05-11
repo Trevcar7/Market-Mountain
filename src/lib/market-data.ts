@@ -667,6 +667,28 @@ function fmpUrl(path: string, params: Record<string, string> = {}): string {
 export async function fetchFmpQuote(
   symbol: string
 ): Promise<number | null> {
+  // 15-min KV cache — shields us from FMP/AV/Polygon rate limits.
+  const sym = symbol.toUpperCase();
+  const cacheKey = `quote:${sym}`;
+  const redis = (await import("./redis")).getRedisClient();
+  if (redis) {
+    try {
+      const cached = await redis.get<number>(cacheKey);
+      if (typeof cached === "number" && cached > 0) return cached;
+    } catch {
+      // Cache read failure is non-fatal.
+    }
+  }
+
+  const writeCache = async (price: number) => {
+    if (!redis) return;
+    try {
+      await redis.set(cacheKey, price, { ex: 15 * 60 });
+    } catch {
+      // Cache write failure is non-fatal.
+    }
+  };
+
   // Try FMP first (preferred — fastest, full coverage).
   if (process.env.FMP_API_KEY) {
     try {
@@ -680,7 +702,10 @@ export async function fetchFmpQuote(
         const data = await res.json();
         const profile = Array.isArray(data) ? data[0] : data;
         const price = profile?.price ?? null;
-        if (typeof price === "number" && price > 0) return price;
+        if (typeof price === "number" && price > 0) {
+          await writeCache(price);
+          return price;
+        }
       }
     } catch (err) {
       logWarn("FMP", `quote fetch failed for ${symbol}: ${String(err)}`);
@@ -696,7 +721,10 @@ export async function fetchFmpQuote(
         const data = await res.json();
         const priceStr = data?.["Global Quote"]?.["05. price"];
         const price = priceStr ? Number(priceStr) : null;
-        if (typeof price === "number" && price > 0) return price;
+        if (typeof price === "number" && price > 0) {
+          await writeCache(price);
+          return price;
+        }
       }
     } catch (err) {
       logWarn("AlphaVantage", `quote fetch failed for ${symbol}: ${String(err)}`);
@@ -711,7 +739,10 @@ export async function fetchFmpQuote(
       if (res.ok) {
         const data = await res.json();
         const price = data?.results?.[0]?.c ?? null;
-        if (typeof price === "number" && price > 0) return price;
+        if (typeof price === "number" && price > 0) {
+          await writeCache(price);
+          return price;
+        }
       }
     } catch (err) {
       logWarn("Polygon", `quote fetch failed for ${symbol}: ${String(err)}`);
