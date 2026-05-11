@@ -117,12 +117,24 @@ export default async function TrackRecordPage() {
   const picksWithPartialSale = qualifiedPicks.filter(
     (p) => p.partialSale && p.coverageStatus !== "closed"
   );
-  // Reinvest recipients = all active picks below target, including not-yet-
-  // qualified picks (so freshly published picks can receive reinvested capital
-  // immediately even if they're still in the < 30-day maturing window).
+  // Reinvest recipients = every pick whose coverage hasn't been closed.
+  // Hit-target picks remain in the portfolio (coverage continues), so they
+  // can still receive proceeds from a closed pick's distribution.
   const reinvestTargets = enrichedPicks.filter(
-    (p) => p.coverageStatus !== "closed" && !p.hitTarget
+    (p) => p.coverageStatus !== "closed"
   );
+
+  // A pick is "live" (part of the portfolio) on a given date when it had
+  // already been published AND its coverage hadn't closed yet. Closed
+  // picks exit the portfolio on `targetHitDate`; everything else is live
+  // from its publish date onward.
+  const isLiveAt = (p: typeof enrichedPicks[number], date: string) => {
+    if (p.date > date) return false;
+    if (p.coverageStatus === "closed" && p.targetHitDate && p.targetHitDate <= date) {
+      return false;
+    }
+    return true;
+  };
 
   // Fetch each active reinvest target's historical price covering all close
   // dates AND partial-sale dates, so reinvested capital can buy in at the
@@ -165,38 +177,23 @@ export default async function TrackRecordPage() {
     );
   }
 
-  // Per-closed-pick proceeds: $1K grown by (target/entry).
-  // For closed picks: recipients = qualified active picks below target
-  // (i.e., picks that have matured past the 30-day window or moved ±15%)
-  // AND were already published as of the event date. A pick that
-  // launched after the event date can't retroactively receive proceeds.
-  // For partial sales: recipients = all reinvest targets (excluding seller)
-  // that were live on the sale date.
+  // Recipients for a reinvest event: every reinvest target that was live
+  // on the event date (published and not yet closed), excluding the
+  // selling/closing pick itself. This is the chronologically honest
+  // model — proceeds flow to picks that actually existed at the time,
+  // not to today's roster retroactively.
   const eligibleRecipientsForDate = (
     eventDate: string,
-    opts: { excludeTicker?: string; requireQualified?: boolean } = {}
+    opts: { excludeTicker?: string } = {}
   ) => {
     return reinvestTargets.filter((rt) => {
       if (rt.ticker === opts.excludeTicker) return false;
-      if (opts.requireQualified && !qualifiedTickers.has(rt.ticker)) return false;
-      // Same-day publish always qualifies — buy-in price falls back to publish price.
-      if (rt.date === eventDate) return true;
-      // Pick published after the event date: still receives a slice;
-      // the cash waits and is bought at the pick's priceAtPublish.
-      if (rt.date > eventDate) return true;
-      // Pick published before the event date: needs a historical price.
-      // FMP daily history sometimes misses very recent days, so accept
-      // any pick that has a live `priceMap` entry (buyInPrice falls
-      // back to today's price for recent events).
-      return (
-        activePriceOnEventDate.get(rt.ticker)?.has(eventDate) ||
-        priceMap.has(rt.ticker)
-      );
+      return isLiveAt(rt, eventDate);
     });
   };
 
   const closedPickProceedsList = closedPicksForReinvest.map((cp) => {
-    const eligible = eligibleRecipientsForDate(cp.targetHitDate!, { requireQualified: true });
+    const eligible = eligibleRecipientsForDate(cp.targetHitDate!, { excludeTicker: cp.ticker });
     const proceeds = investmentPerPick * (cp.priceTarget / cp.priceAtPublish);
     return {
       pick: cp,
@@ -222,9 +219,9 @@ export default async function TrackRecordPage() {
     if (p && p.date >= eventDate) return p.priceAtPublish;
     const fromHistory = activePriceOnEventDate.get(ticker)?.get(eventDate);
     if (fromHistory) return fromHistory;
-    const daysAgo = (new Date(todayIso).getTime() - new Date(eventDate).getTime()) / 86400000;
-    if (daysAgo <= 7) return priceMap.get(ticker);
-    return undefined;
+    // FMP historical can be flaky; fall back to today's live price so the
+    // page renders. Approximate when events are old, accurate when recent.
+    return priceMap.get(ticker);
   };
 
   // Helper: seller's positionShares right before the partial sale (initial $1K
@@ -463,17 +460,17 @@ export default async function TrackRecordPage() {
                   </p>
                   <p className="text-xs text-text-muted mt-1">
                     $1,000 grew to <strong className="text-text">${formatMoney(proceeds)}</strong>,
-                    split into {eligible.length} active picks =
+                    split into {eligible.length} active pick{eligible.length === 1 ? "" : "s"} =
                     <strong className="text-text"> +${formatMoney(slicePerEligible)} each</strong>
                   </p>
                   <div className="mt-2 text-xs text-text-muted">
                     <span className="font-semibold text-text-light">Reinvested into:</span>{" "}
                     {eligible.map((rt, i) => {
-                      const pxAtClose = buyInPrice(rt.ticker, cp.targetHitDate!)!;
+                      const pxAtClose = buyInPrice(rt.ticker, cp.targetHitDate!);
                       return (
                         <span key={rt.ticker}>
                           <span className="font-semibold text-text">{rt.ticker}</span>
-                          <span> @ ${pxAtClose.toFixed(2)}</span>
+                          <span> @ {pxAtClose ? `$${pxAtClose.toFixed(2)}` : "—"}</span>
                           {i < eligible.length - 1 ? <span>, </span> : null}
                         </span>
                       );
@@ -498,11 +495,11 @@ export default async function TrackRecordPage() {
                       <div className="mt-2 text-xs text-text-muted">
                         <span className="font-semibold text-text-light">Reinvested into:</span>{" "}
                         {ev.eligible.map((rt, i) => {
-                          const pxAtEvent = buyInPrice(rt.ticker, ev.eventDate)!;
+                          const pxAtEvent = buyInPrice(rt.ticker, ev.eventDate);
                           return (
                             <span key={rt.ticker}>
                               <span className="font-semibold text-text">{rt.ticker}</span>
-                              <span> @ ${pxAtEvent.toFixed(2)}</span>
+                              <span> @ {pxAtEvent ? `$${pxAtEvent.toFixed(2)}` : "—"}</span>
                               {i < ev.eligible.length - 1 ? <span>, </span> : null}
                             </span>
                           );
