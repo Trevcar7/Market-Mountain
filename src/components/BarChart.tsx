@@ -7,7 +7,11 @@ type BarChartVariant =
   | "siri-fcf"
   | "siri-debt-coverage"
   | "fslr-revenue"
-  | "fslr-tax-credits";
+  | "fslr-tax-credits"
+  | "celh-revenue"
+  | "celh-fcf"
+  | "celh-share"
+  | "celh-margins";
 
 interface SeriesConfig {
   name: string;
@@ -18,6 +22,11 @@ interface SeriesConfig {
 interface GroupData {
   label: string;
   values: number[];
+  // Optional per-group color overrides (used for highlighting a single bar
+  // in peer-comparison charts, e.g. coloring Celsius in brand green while
+  // peers render in neutral gray).
+  color?: string;
+  darkColor?: string;
 }
 
 interface ChartConfig {
@@ -137,6 +146,55 @@ const CHARTS: Record<BarChartVariant, ChartConfig> = {
     yFormat: (v) => `$${v.toFixed(2)}B`,
     caption: "IRA 45X manufacturing tax credits sold at approximately $0.95 on the dollar. FY2025E based on midpoint of $1.65-1.7B guidance.",
   },
+  "celh-revenue": {
+    title: "Celsius Holdings Revenue ($B)",
+    data: [
+      { label: "FY2022", values: [0.65] },
+      { label: "FY2023", values: [1.32] },
+      { label: "FY2024", values: [1.36] },
+      { label: "FY2025", values: [2.52] },
+      { label: "FY2026E", values: [3.60] },
+    ],
+    series: [{ name: "Revenue", color: "#F58220", darkColor: "#FB923C" }],
+    yFormat: (v) => `$${v.toFixed(2)}B`,
+    caption: "FY2025 reflects approximately 11 months of Alani Nu and partial Rockstar contribution. FY2026E uses the midpoint of consensus $3.5 to $3.7B. Source: company filings, consensus estimates.",
+  },
+  "celh-fcf": {
+    title: "Celsius Holdings Free Cash Flow ($M)",
+    data: [
+      { label: "FY2022", values: [100] },
+      { label: "FY2023", values: [124] },
+      { label: "FY2024", values: [240] },
+      { label: "FY2025", values: [323] },
+    ],
+    series: [{ name: "Free Cash Flow", color: "#F58220", darkColor: "#FB923C" }],
+    yFormat: (v) => `$${v}M`,
+    caption: "Free cash flow has stepped higher each year since the 2022 PepsiCo distribution agreement. FY2025 reflects scale and partial Alani Nu contribution. Source: company 10-K filings.",
+  },
+  "celh-share": {
+    title: "U.S. Energy Drink Dollar Share by Brand",
+    data: [
+      { label: "Celsius (3-brand)", values: [20] },
+      { label: "Monster", values: [29] },
+      { label: "Red Bull", values: [33] },
+    ],
+    series: [{ name: "Dollar Share", color: "#F58220", darkColor: "#FB923C" }],
+    yFormat: (v) => `${v}%`,
+    caption: "Celsius's combined CELSIUS, Alani Nu, and Rockstar portfolio holds roughly 20% U.S. dollar share, up from below 5% three years earlier. Source: Nielsen scanner data.",
+  },
+  "celh-margins": {
+    title: "Operating Margin: Celsius vs. Beverage Peers",
+    data: [
+      { label: "Celsius", values: [11.5] },
+      { label: "PepsiCo", values: [14.0] },
+      { label: "Keurig DP", values: [16.9] },
+      { label: "Coca-Cola", values: [21.2] },
+      { label: "Monster", values: [25.8] },
+    ],
+    series: [{ name: "Operating Margin", color: "#F58220", darkColor: "#FB923C" }],
+    yFormat: (v) => `${v.toFixed(1)}%`,
+    caption: "FY2024 operating margins. FY2025 figures are distorted by $327M of distributor termination charges and $60M of acquisition costs tied to Alani Nu and Rockstar. The thesis assumes the gap narrows as integration completes. Source: company 10-K filings.",
+  },
 };
 
 const CHART_HEIGHT = 200;
@@ -182,6 +240,8 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
               >
                 {group.values.map((val, si) => {
                   const barH = Math.max(3, (val / maxVal) * BAR_AREA);
+                  const barColor = group.color ?? cfg.series[si].color;
+                  const barDark = group.darkColor ?? cfg.series[si].darkColor;
                   return (
                     <div
                       key={si}
@@ -190,7 +250,7 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
                     >
                       <span
                         className="bar-label text-[10px] font-semibold leading-none mb-1"
-                        style={{ color: cfg.series[si].color, "--lc-dk": cfg.series[si].darkColor } as React.CSSProperties}
+                        style={{ color: barColor, "--lc-dk": barDark } as React.CSSProperties}
                       >
                         {cfg.yFormat(val)}
                       </span>
@@ -199,7 +259,7 @@ export default function BarChart({ variant }: { variant: BarChartVariant }) {
                           height: `${barH}px`,
                           width: "100%",
                           maxWidth: "56px",
-                          backgroundColor: cfg.series[si].color,
+                          backgroundColor: barColor,
                           borderRadius: "3px 3px 0 0",
                           opacity: si > 0 ? 0.8 : 1,
                         }}
