@@ -308,7 +308,10 @@ export default async function TrackRecordPage() {
     return sum + baseValue + reinvestValue;
   }, 0);
 
-  // S&P 500 benchmark: simple SPY return from first pick date to today
+  // S&P 500 benchmark: dollar-cost-averaged into SPY. Each qualified pick's
+  // $1K is invested in SPY at that pick's publish date and held to today.
+  // This is the apples-to-apples comparison — what if I had bought SPY
+  // instead of each stock on the day I published the thesis.
   let spyPortfolioValue = 0;
   let spyReturnPct = 0;
   let spyDataAvailable = false;
@@ -332,25 +335,30 @@ export default async function TrackRecordPage() {
         return null;
       }
 
-      const oldestDate = picks.reduce((oldest, p) =>
-        p.date < oldest ? p.date : oldest, picks[0].date);
-      const spyStartPrice = findSpyPrice(oldestDate);
+      let spyTotal = 0;
+      let allFound = true;
+      for (const p of qualifiedPicks) {
+        const startPx = findSpyPrice(p.date);
+        if (!startPx) { allFound = false; break; }
+        spyTotal += investmentPerPick * (spyPrice / startPx);
+      }
 
-      if (spyStartPrice && spyPrice) {
-        const spyReturn = (spyPrice - spyStartPrice) / spyStartPrice;
-        spyReturnPct = spyReturn * 100;
-        spyPortfolioValue = totalInvested * (1 + spyReturn);
+      if (allFound && qualifiedPicks.length > 0) {
+        spyPortfolioValue = spyTotal;
+        spyReturnPct = ((spyTotal - totalInvested) / totalInvested) * 100;
         spyDataAvailable = true;
       }
     }
   }
 
   if (!spyDataAvailable) {
-    const oldestPick = picks.reduce((oldest, p) =>
-      p.holdingDays > oldest.holdingDays ? p : oldest, picks[0]);
-    const spyEstReturn = ((1 + 0.10) ** (oldestPick.holdingDays / 365) - 1) * 100;
-    spyReturnPct = spyEstReturn;
-    spyPortfolioValue = totalInvested * (1 + spyEstReturn / 100);
+    // Fallback: 10% annualized estimate, weighted by each pick's holding period
+    let spyEstTotal = 0;
+    for (const p of qualifiedPicks) {
+      spyEstTotal += investmentPerPick * (1 + 0.10) ** (p.holdingDays / 365);
+    }
+    spyPortfolioValue = spyEstTotal;
+    spyReturnPct = totalInvested > 0 ? ((spyEstTotal - totalInvested) / totalInvested) * 100 : 0;
   }
 
   const activePicks = enrichedPicks.filter((p) => p.coverageStatus !== "closed").length;
