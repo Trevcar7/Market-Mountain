@@ -797,6 +797,28 @@ export async function fetchFmpStockHistory(
 ): Promise<(ChartSeriesConfig & { labels: string[]; values: number[] }) | null> {
   if (!process.env.FMP_API_KEY) return null;
 
+  // KV cache: stock history is stable (historical closes never change, today's
+  // close doesn't change after market hours). 6h TTL smooths out provider
+  // rate-limit flicker on free-tier accounts.
+  const redis = getRedisClient();
+  const cacheKey = `stock-history:${symbol}:${days}`;
+  if (redis) {
+    try {
+      const cached = await redis.get<{ labels: string[]; values: number[]; source: string }>(cacheKey);
+      if (cached && cached.labels?.length >= 5) {
+        return {
+          title: `${symbol} Stock Price`,
+          unit: "$",
+          source: cached.source,
+          timeRange: computeTimeRange(cached.labels),
+          type: "line",
+          labels: cached.labels,
+          values: cached.values,
+        };
+      }
+    } catch { /* cache miss / network blip — continue to live fetch */ }
+  }
+
   try {
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const to = new Date().toISOString().split("T")[0];
@@ -867,6 +889,13 @@ export async function fetchFmpStockHistory(
     const source = historical.length > 0 && process.env.FMP_API_KEY
       ? "FMP — Financial Modeling Prep"
       : "Alpha Vantage";
+
+    // Persist to KV (6h TTL) so subsequent calls survive provider rate limits.
+    if (redis) {
+      try {
+        await redis.set(cacheKey, { labels, values, source }, { ex: 6 * 60 * 60 });
+      } catch { /* non-fatal */ }
+    }
 
     return {
       title: `${symbol} Stock Price`,
