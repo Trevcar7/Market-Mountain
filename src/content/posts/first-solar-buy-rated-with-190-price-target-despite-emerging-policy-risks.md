@@ -13,7 +13,7 @@ rating: "buy"
 targetHit: true
 coverageStatus: "closed"
 coverageNote: "Price target of $262 reached October 2025. Coverage closed following repeated earnings misses and a sharp downward revision to FY2026 guidance, with management guiding revenue of $4.8–5.2B, a 30% cut from prior estimates."
-targetHitDate: "2025-10-31"
+targetHitDate: "2025-11-03"
 ---
 
 > **Update:** Price target upgraded from $190 to **$262** in May 2025 following a strong earnings beat and favorable trade developments. Target reached October 2025. Coverage now closed. [See full update →](/post/markets-march-higher-first-solar-breaks-190-pt-nextracker-beats-earnings-in-a-big-way)

@@ -690,16 +690,46 @@ export async function fetchFmpQuote(
     }
   };
 
-  // Provider chain. FMP and AV return today's session price (15-min TTL).
-  // Polygon's free /prev endpoint is one-day-stale, so it's last-resort and
-  // gets a short 90s TTL — keeps the UI populated when both real-time
-  // providers rate-limit, but doesn't persist stale "current" prices.
+  // Provider chain. Yahoo is preferred because it returns pre-market and
+  // after-hours prices in the same meta block when those sessions are
+  // active — the other providers freeze on the last regular-session close.
+  // FMP/AV are real-time during regular hours but lack extended-hours data
+  // on the free tier. Polygon's /prev is one-day-stale and only used as a
+  // last-resort placeholder with a short TTL.
   const providers: {
     name: string;
     key: string | undefined;
     ttl: number;
     fetchPrice: () => Promise<number | null>;
   }[] = [
+    {
+      name: "Yahoo",
+      key: "free", // no key required
+      ttl: 5 * 60, // 5min — short so extended-hours updates flow through
+      fetchPrice: async () => {
+        const res = await fetch(
+          `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+          {
+            signal: withTimeout(4000),
+            cache: "no-store",
+            headers: {
+              "User-Agent": "Mozilla/5.0 (compatible; MarketMountain/1.0)",
+              "Accept": "application/json",
+            },
+          }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        const meta = data?.chart?.result?.[0]?.meta;
+        if (!meta) return null;
+        // Prefer the active extended-hours session price when present.
+        const price =
+          (typeof meta.postMarketPrice === "number" && meta.postMarketPrice > 0 ? meta.postMarketPrice : null) ??
+          (typeof meta.preMarketPrice === "number" && meta.preMarketPrice > 0 ? meta.preMarketPrice : null) ??
+          (typeof meta.regularMarketPrice === "number" && meta.regularMarketPrice > 0 ? meta.regularMarketPrice : null);
+        return price;
+      },
+    },
     {
       name: "FMP",
       key: process.env.FMP_API_KEY,

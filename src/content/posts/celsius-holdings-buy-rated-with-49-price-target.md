@@ -118,10 +118,6 @@ The sensitivity table shows the implied share price across a range of WACC and t
 - **Competition**: Ghost, C4, Bang, and other functional brands continue to compete for shelf space and consumer attention.
 - **Margin recovery and multiple re-rating**: The thesis depends on operating margins expanding as acquisition charges roll off and the multiple re-rating toward the higher end of the peer range. If margins fail to recover, the multiple could compress further toward 12 to 13x and the share price would likely fall even as EBITDA grows.
 
-## Conclusion
-
-Celsius now operates a three-brand portfolio with roughly 20% U.S. energy drink share, distributed by PepsiCo, growing off a higher base than at any prior point in its history. FY2025 GAAP results understate underlying earnings because of acquisition-related expenses, and Q1 2026 already shows the three-brand portfolio operating cleanly under one P&L. The setup is a 14.4x EV/EBITDA stock against a peer set near 19x, with a credible path to margin expansion as integration costs roll off. The DCF implies $49 per share at a 9% WACC and 3% terminal growth (a 66% premium to the May 11 publish price of $29.50), and peer-multiple cross-checks anchor a wider range from $33 to $41. I rate Celsius Holdings a **Buy with a $49 price target** and will track margin progression, Alani Nu and Rockstar integration, and quarterly Nielsen share data.
-
 ---
 
 *References available upon request.*

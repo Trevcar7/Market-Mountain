@@ -60,20 +60,13 @@ export default async function TrackRecordPage() {
   const oldestPick = picks.reduce((oldest, p) =>
     p.holdingDays > oldest.holdingDays ? p : oldest, picks[0]);
 
-  // Serialize quote fetches with ~250ms spacing — AlphaVantage's free tier
-  // asks for "1 request per second" and throttles concurrent bursts.
-  const fetchQuotesSerial = async () => {
-    for (let i = 0; i < uniqueTickers.length; i++) {
-      const ticker = uniqueTickers[i];
-      const price = await fetchFmpQuote(ticker);
-      if (price) priceMap.set(ticker, price);
-      if (i < uniqueTickers.length - 1) {
-        await new Promise((r) => setTimeout(r, 1100));
-      }
-    }
-  };
   const [, spyHistoryResult] = await Promise.all([
-    fetchQuotesSerial(),
+    Promise.allSettled(
+      uniqueTickers.map(async (ticker) => {
+        const price = await fetchFmpQuote(ticker);
+        if (price) priceMap.set(ticker, price);
+      })
+    ),
     // Fetch SPY history concurrently (don't wait for quotes first)
     fetchFmpStockHistory("SPY", oldestPick.holdingDays + 30),
   ]);
