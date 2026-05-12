@@ -300,8 +300,11 @@ export default async function TrackRecordPage() {
     // Unqualified picks (< 30 days, no big move) don't yet contribute their
     // baseline $1K — but they DO contribute any reinvest slice they received.
     const baseValue = isQualified ? investmentPerPick * baseGrowth : 0;
-    const isReinvestTarget = !p.hitTarget;
-    const reinvestValue = isReinvestTarget ? reinvestValueForActive(p.ticker) : 0;
+    // Hit-target picks remain in the portfolio (coverage continues), so they
+    // can still hold reinvest slices from a closed pick's distribution. The
+    // eligibility list inside reinvestValueForActive already excludes the
+    // wrong recipients, so always compute it here.
+    const reinvestValue = reinvestValueForActive(p.ticker);
     return sum + baseValue + reinvestValue;
   }, 0);
 
