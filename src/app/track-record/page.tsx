@@ -410,6 +410,28 @@ export default async function TrackRecordPage() {
             </div>
           </div>
 
+          {/* Methodology — what visitors see when reading the Portfolio Return */}
+          <details className="mt-3 bg-card rounded-xl border border-border shadow-sm group">
+            <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between text-xs font-semibold text-text-muted hover:text-text">
+              <span>How is Portfolio Return calculated?</span>
+              <span className="text-text-light text-[10px] group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="px-4 pb-4 text-xs text-text-muted leading-relaxed space-y-2 border-t border-border">
+              <p className="pt-3">
+                A hypothetical equal-weight portfolio: <span className="font-semibold text-text">$1,000 is invested at each pick&apos;s publish price</span> on the day the thesis was published.
+              </p>
+              <p>
+                When a closed pick reaches its target, <span className="font-semibold text-text">the proceeds are split equally and reinvested into active picks below their targets</span> at the price on the target-hit date — not at the original publish price.
+              </p>
+              <p>
+                Picks held under 30 days (with no ±15% move) are excluded from the total until they mature, so new positions don&apos;t skew the average.
+              </p>
+              <p>
+                Returns are computed <span className="font-semibold text-text">lot-by-lot</span>: the original $1,000 grows from the publish price; each reinvested slice grows from the event-date price it was bought at. No leverage, no margin, no real money — this is a transparent benchmark of the public thesis calls.
+              </p>
+            </div>
+          </details>
+
           {/* S&P 500 Benchmark Comparison */}
           {hasLiveData && (
             <div className="mt-3 bg-card rounded-xl border border-border p-4 sm:p-5 shadow-sm">
