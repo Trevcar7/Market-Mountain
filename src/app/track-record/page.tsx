@@ -536,7 +536,7 @@ export default async function TrackRecordPage() {
           <section className="mx-auto max-w-4xl px-4 sm:px-6 mt-6">
             <div className="bg-card rounded-xl border border-border shadow-sm p-5 sm:p-6">
               <h2 className="text-sm font-bold tracking-widest uppercase text-text-light mb-4">
-                Active Picks — Current Prices
+                Active Picks — Return Since Publish
               </h2>
               <div className="space-y-3">
                 {activeBars.map((pick) => {
@@ -648,8 +648,15 @@ export default async function TrackRecordPage() {
                   <p className="text-xs text-text-muted mt-0.5 line-clamp-2">{pick.excerpt}</p>
                 </div>
 
-                {/* Dual returns: Thesis + Live */}
-                <div className="px-5 py-3 grid grid-cols-2 gap-4">
+                {/* Returns: Target + Thesis-since-publish + Position (avg-cost) when they differ */}
+                {(() => {
+                  const hasReinvestLot = Math.abs(avgCost - pick.priceAtPublish) >= 0.01;
+                  const positionReturnPct = pick.currentPrice && avgCost > 0
+                    ? ((pick.currentPrice - avgCost) / avgCost) * 100
+                    : null;
+                  const showPositionCol = !isClosed && hasReinvestLot && positionReturnPct !== null;
+                  return (
+                <div className={`px-5 py-3 grid gap-4 ${showPositionCol ? "grid-cols-3" : "grid-cols-2"}`}>
                   <div>
                     <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">
                       Price Target
@@ -665,7 +672,7 @@ export default async function TrackRecordPage() {
                   {!isClosed && (
                   <div>
                     <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">
-                      Current Price
+                      Since Publish
                     </p>
                     {pick.returnPct !== null ? (
                       <>
@@ -673,7 +680,7 @@ export default async function TrackRecordPage() {
                           {pick.returnPct >= 0 ? "+" : ""}{pick.returnPct.toFixed(1)}%
                         </p>
                         <p className="text-xs text-text-muted">
-                          ${pick.priceAtPublish} → ${pick.currentPrice?.toFixed(2)} now
+                          ${pick.priceAtPublish} → ${pick.currentPrice?.toFixed(2)}
                         </p>
                       </>
                     ) : (
@@ -684,7 +691,22 @@ export default async function TrackRecordPage() {
                     )}
                   </div>
                   )}
+                  {showPositionCol && positionReturnPct !== null && (
+                  <div>
+                    <p className="text-[10px] font-bold tracking-widest uppercase text-text-light mb-1">
+                      Position (avg cost)
+                    </p>
+                    <p className={`text-lg font-bold ${positionReturnPct >= 0 ? "text-accent-600" : "text-red-500"}`}>
+                      {positionReturnPct >= 0 ? "+" : ""}{positionReturnPct.toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      ${avgCost.toFixed(2)} → ${pick.currentPrice?.toFixed(2)}
+                    </p>
+                  </div>
+                  )}
                 </div>
+                  );
+                })()}
 
                 {/* Hypothetical position note */}
                 {!isClosed && (
